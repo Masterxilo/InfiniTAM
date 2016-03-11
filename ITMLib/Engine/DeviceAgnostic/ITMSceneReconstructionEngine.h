@@ -6,27 +6,27 @@
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
 
-/// Camera Data Integration
+/// Fusion Stage - Camera Data Integration
 /// \returns \f$\eta\f$, -1 on failure
 // Note that the stored T-SDF values are normalized to lie
 // in [-1,1] within the truncation band.
 template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
     DEVICEPTR(TVoxel) &voxel, //!< X
-    const THREADPTR(Vector4f) & pt_model, //!< voxel location
+    const THREADPTR(Vector4f) & pt_model, //!< voxel location X
     const CONSTPTR(Matrix4f) & M_d, //!< depth camera pose
     const CONSTPTR(Vector4f) & projParams_d, //!< intrinsic camera parameters \f$K_d\f$
     float mu, int maxW, const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize)
 {
-    /// X_d
-    Vector4f pt_camera;
-    /// \pi(K_dX_d)
-    Vector2f pt_image;
 
     float depth_measure, eta, oldF, newF;
     int oldW, newW;
 
     // project point into depth image
+    /// X_d, depth camera coordinate system
+    Vector4f pt_camera;
+    /// \pi(K_dX_d), projection into the depth image
+    Vector2f pt_image;
     if (!projectModel(projParams_d, M_d,
         imgSize, pt_model, pt_camera, pt_image)) return -1;
 
@@ -56,8 +56,8 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
     return eta;
 }
 
-
-/// \returns -1 on failure
+/// Used only if TVoxel::hasColorInformation
+/// \returns early on failure
 template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &voxel, const THREADPTR(Vector4f) & pt_model, const CONSTPTR(Matrix4f) & M_rgb,
     const CONSTPTR(Vector4f) & projParams_rgb, float mu, uchar maxW, float eta, const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & imgSize)
@@ -107,7 +107,7 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
     {
         float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
 
-        // Only the voxels withing 25% mu affect the color
+        // Only the voxels withing +- 25% mu of the surface get color
         if ((eta > mu) || (fabs(eta / mu) > 0.25f)) return;
         computeUpdatedVoxelColorInfo(voxel, pt_model, M_rgb, projParams_rgb, mu, maxW, eta, rgb, imgSize_rgb);
     }
@@ -122,15 +122,17 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 #define VT_VISIBLE_AND_STREAMED_OUT 2//entry has been streamed out but is visible
 #define VT_VISIBLE_PREVIOUS_AND_UNSTREAMED 3 // visible at previous frame and unstreamed
 
+/// For allocation and visibility determination. Also for judging what to swap in.
+///
 /// Determine the blocks around a given depth sample that are currently visible
 /// and need to be allocated.
 /// Builds hashVisibility and entriesAllocType.
 /// \param x,y [in] loop over depth image.
 _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
-    DEVICEPTR(uchar) *entriesAllocType, //!< [out] allocation type AT_ for each hash table bucket, indexed by values computed from hashIndex
-    DEVICEPTR(uchar) *entriesVisibleType,//!< [out] visibility type for each hash table bucket, indexed by values computed from hashIndex
+    DEVICEPTR(uchar) *entriesAllocType, //!< [out] allocation type (AT_*) for each hash table bucket, indexed by values computed from hashIndex, or in excess part
+    DEVICEPTR(uchar) *entriesVisibleType,//!< [out] visibility type (VT_*) for each hash table bucket, indexed by values computed from hashIndex, or in excess part
     int x, int y,
-    DEVICEPTR(Vector4s) *blockCoords, //!< [out] blockPos coordinate of each voxel block, indexed by values computed from hashIndex 
+    DEVICEPTR(Vector4s) *blockCoords, //!< [out] blockPos coordinate of each voxel block that needs allocation, indexed by values computed from hashIndex, or in excess part
     const CONSTPTR(float) *depth,
     Matrix4f invM_d, //!< depth to world transformation
     Vector4f invProjParams_d, //!< Note: Inverse projection parameters to avoid division by fx, fy.
@@ -159,6 +161,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
     point_e = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f + mu / norm))) * oneOverVoxelSize;
 
     // We will step along point -> point_e and add all voxel blocks we encounter to the visible list
+    // "Create a segment on the line of sight in the range of the T-SDF truncation band"
     direction = point_e - point;
     norm = length(direction);
     noSteps = (int)ceil(2.0f*norm);
@@ -168,51 +171,46 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
     //add neighbouring blocks
     for (int i = 0; i < noSteps; i++)
     {
+        // "take the block coordinates of voxels on this line segment"
         blockPos = TO_SHORT_FLOOR3(point);
 
         //compute index in hash table
         hashIdx = hashIndex(blockPos);
 
-        //check if hash table contains entry
+        //check if hash table contains entry (block has already been allocated)
         bool isFound = false;
 
-        ITMHashEntry hashEntry = hashTable[hashIdx];
+        ITMHashEntry hashEntry;
 
-        if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= -1)
-        {
-            //entry has been streamed out but is visible or in memory and visible
-            entriesVisibleType[hashIdx] = (hashEntry.ptr == -1) ? VT_VISIBLE_AND_STREAMED_OUT : VT_VISIBLE_AND_IN_MEMORY;
+        // whether we find blockPos at the current hashIdx
+#define check_found(BREAK) \
+            hashEntry = hashTable[hashIdx]; \
+            if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.isAllocated()) \
+            {\
+                entriesVisibleType[hashIdx] = (hashEntry.isSwappedOut()) ? \
+            VT_VISIBLE_AND_STREAMED_OUT : VT_VISIBLE_AND_IN_MEMORY; \
+                isFound = true; \
+                BREAK;\
+            }
 
-            isFound = true;
-        }
+        check_found();
 
         if (!isFound)
         {
             bool isExcess = false;
-            if (hashEntry.ptr >= -1) //seach excess list only if there is no room in ordered part
+            if (hashEntry.isAllocated()) //seach excess list only if there is no room in ordered part
             {
-                while (hashEntry.offset >= 1)
-                {
-                    hashIdx = SDF_BUCKET_NUM + hashEntry.offset - 1;
-                    hashEntry = hashTable[hashIdx];
-
-                    if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.ptr >= -1)
-                    {
-                        //entry has been streamed out but is visible or in memory and visible
-                        entriesVisibleType[hashIdx] = (hashEntry.ptr == -1) ? 2 : 1;
-
-                        isFound = true;
-                        break;
-                    }
-                }
-
                 isExcess = true;
+                while (hashEntry.hasExcessListOffset())
+                {
+                    hashIdx = hashEntry.getHashIndexOfNextExcessEntry();
+                    check_found(break);
+                }
             }
 
-            if (!isFound) //still not found
+            if (!isFound) //still not found: needs allocation 
             {
                 entriesAllocType[hashIdx] = isExcess ? AT_NEEDS_ALLOC_EXCESS : AT_NEEDS_ALLOC_FITS; //needs allocation 
-                if (!isExcess) entriesVisibleType[hashIdx] = 1; //new entry is visible
 
                 blockCoords[hashIdx] = Vector4s(blockPos.x, blockPos.y, blockPos.z, 1);
             }
@@ -220,6 +218,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 
         point += direction;
     }
+    #undef check_found
 }
 
 template<bool useSwapping>
