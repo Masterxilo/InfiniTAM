@@ -65,7 +65,7 @@ typedef class ORUtils::Vector6<float> Vector6f;
 #endif
 
 #ifndef TO_SHORT3
-#define TO_SHORT3(x) Vector3s(p.x, p.y, p.z)
+#define TO_SHORT3(p) Vector3s(p.x, p.y, p.z)
 #endif
 
 #ifndef TO_VECTOR3

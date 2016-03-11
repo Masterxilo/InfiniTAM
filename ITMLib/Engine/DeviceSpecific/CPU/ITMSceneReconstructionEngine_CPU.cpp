@@ -146,7 +146,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 
 	ITMHashSwapState *swapStates = scene->useSwapping ? 
         scene->globalCache->GetSwapStates(false) : 0;
-	const bool useSwapping = scene->useSwapping;
+	/* not const, changed later */ bool useSwapping = scene->useSwapping;
 
     uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 
@@ -200,6 +200,9 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 			unsigned char hashChangeType = entriesAllocType[targetIdx];
 
             if (hashChangeType < 0) continue;
+            vbaIdx = lastFreeVoxelBlockId; lastFreeVoxelBlockId--;
+            if (vbaIdx < 0) break; //there is no room in the voxel block array
+
             Vector4s pt_block_all = blockCoords[targetIdx];
             ITMHashEntry hashEntry;
             hashEntry.pos = TO_SHORT3(pt_block_all);
@@ -209,20 +212,14 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 			switch (hashChangeType)
 			{
             case AT_NEEDS_ALLOC_FITS:
-				vbaIdx = lastFreeVoxelBlockId; lastFreeVoxelBlockId--;
-
-				if (vbaIdx >= 0) //there is room in the voxel block array
-				{
-					hashTable[targetIdx] = hashEntry;
-                    entriesVisibleType[hashIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
-				}
+				hashTable[targetIdx] = hashEntry;
+                entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
+				
 
 				break;
             case AT_NEEDS_ALLOC_EXCESS:
-				vbaIdx = lastFreeVoxelBlockId; lastFreeVoxelBlockId--;
 				exlIdx = lastFreeExcessListId; lastFreeExcessListId--;
-
-				if (vbaIdx >= 0 && exlIdx >= 0) //there is room in the voxel block array and excess list
+				if (exlIdx >= 0) //there is room in the excess list
 				{
 					int exlOffset = excessAllocationList[exlIdx];
 
