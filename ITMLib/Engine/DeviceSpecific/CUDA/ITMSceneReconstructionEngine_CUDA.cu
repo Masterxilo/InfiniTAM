@@ -196,20 +196,21 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	dim3 gridSize(renderState_vh->noVisibleEntries);
 
+#define integrateIntoScene_d(stopIntegratingAtMaxW, approximateIntegration) \
+    integrateIntoScene_device<TVoxel, stopIntegratingAtMaxW, approximateIntegration> << <gridSize, cudaBlockSize >> >(\
+    localVBA, hashTable, visibleEntryIDs,\
+        rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW)
+
 	if (scene->sceneParams->stopIntegratingAtMaxW)
 		if (trackingState->requiresFullRendering)
-			integrateIntoScene_device<TVoxel, true, false> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+            integrateIntoScene_d(true, false);
 		else
-			integrateIntoScene_device<TVoxel, true, true> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+            integrateIntoScene_d(true, true);
 	else
 		if (trackingState->requiresFullRendering)
-			integrateIntoScene_device<TVoxel, false, false> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+            integrateIntoScene_d(false, false);
 		else
-			integrateIntoScene_device<TVoxel, false, true> << <gridSize, cudaBlockSize >> >(localVBA, hashTable, visibleEntryIDs,
-			rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+            integrateIntoScene_d(false, true);
 }
 
 // plain voxel array
@@ -281,7 +282,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMPlainVoxelArray>::IntegrateInt
 
 // device functions
 
-template<class TVoxel, bool stopMaxW, bool approximateIntegration>
+template<class TVoxel, bool stopIntegratingAtMaxW, bool approximateIntegration>
 __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxelArray::ITMVoxelArrayInfo *arrayInfo,
 	const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i depthImgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d, 
 	Vector4f projParams_rgb, float _voxelSize, float mu, int maxW)
@@ -294,7 +295,7 @@ __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxe
 
 	locId = x + y * arrayInfo->size.x + z * arrayInfo->size.x * arrayInfo->size.y;
 	
-	if (stopMaxW) if (voxelArray[locId].w_depth == maxW) return;
+    if (stopIntegratingAtMaxW) if (voxelArray[locId].w_depth == maxW) return;
 //	if (approximateIntegration) if (voxelArray[locId].w_depth != 0) return;
 
 	pt_model.x = (float)(x + arrayInfo->offset.x) * _voxelSize;
@@ -305,11 +306,12 @@ __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxe
 	ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(voxelArray[locId], pt_model, M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
 
-template<class TVoxel, bool stopMaxW, bool approximateIntegration>
+template<class TVoxel, bool stopIntegratingAtMaxW, bool approximateIntegration>
 __global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, int *visibleEntryIDs,
 	const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i depthImgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d, 
 	Vector4f projParams_rgb, float voxelSize, float mu, int maxW)
 {
+    // one thread block for each voxel block
 	Vector3i globalPos;
 	int entryId = visibleEntryIDs[blockIdx.x];
 
@@ -321,21 +323,10 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *
 
 	TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
 
+    // one thread for each voxel
 	int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
-
-	Vector4f pt_model; int locId;
-
-	locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
-
-	if (stopMaxW) if (localVoxelBlock[locId].w_depth == maxW) return;
-	if (approximateIntegration) if (localVoxelBlock[locId].w_depth != 0) return;
-
-	pt_model = Vector4f(
-        (globalPos.toFloat() + Vector3f(x,y,z)) * voxelSize, 1.f);
-
-	ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(
-        localVoxelBlock[locId], 
-        pt_model, 
+    integrateVoxel(x, y, z,
+        stopIntegratingAtMaxW, globalPos, localVoxelBlock, voxelSize,
         M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
 
@@ -364,7 +355,6 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
 	if (targetIdx > noTotalEntries - 1) return;
 
-
     allocateVoxelBlock(targetIdx,
         voxelAllocationList,
         excessAllocationList,
@@ -382,13 +372,7 @@ __global__ void reAllocateSwappedOutVoxelBlocks_device(int *voxelAllocationList,
 	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
 	if (targetIdx > noTotalEntries - 1) return;
 
-	int vbaIdx;
-
-    if (entriesVisibleType[targetIdx] > 0 && hashTable[targetIdx].isSwappedOut()) //it is visible and has been previously allocated inside the hash, but deallocated from VBA
-	{
-		vbaIdx = atomicSub(&allocData->noAllocatedVoxelEntries, 1);
-		if (vbaIdx >= 0) hashTable[targetIdx].ptr = voxelAllocationList[vbaIdx];
-	}
+    reAllocateSwappedOutVoxelBlock(voxelAllocationList, targetIdx, entriesVisibleType, hashTable, allocData);
 }
 
 template<bool useSwapping>
@@ -403,50 +387,20 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, ITMHashSwapStat
 	shouldPrefix = false;
 	__syncthreads();
 
-	unsigned char hashVisibleType = entriesVisibleType[targetIdx];
-	const ITMHashEntry & hashEntry = hashTable[targetIdx];
+    bool visible = visibilityTestIfNeeded(
+        targetIdx, entriesVisibleType, useSwapping, hashTable, swapStates,
+        M_d, projParams_d, depthImgSize, voxelSize
+        );
 
-	if (hashVisibleType == 3)
-	{
-		bool isVisibleEnlarged, isVisible;
-
-		if (useSwapping)
-		{
-			checkBlockVisibility<true>(isVisible, isVisibleEnlarged, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
-			if (!isVisibleEnlarged) hashVisibleType = 0;
-		} else {
-			checkBlockVisibility<false>(isVisible, isVisibleEnlarged, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
-			if (!isVisible) hashVisibleType = 0;
-		}
-		entriesVisibleType[targetIdx] = hashVisibleType;
-	}
-
-	if (hashVisibleType > 0) shouldPrefix = true;
-
-	if (useSwapping)
-	{
-		if (hashVisibleType > 0 && swapStates[targetIdx].state != 2) swapStates[targetIdx].state = 1;
-	}
+    if (visible) shouldPrefix = true;
 
 	__syncthreads();
 
 	if (shouldPrefix)
 	{
-		int offset = computePrefixSum_device<int>(hashVisibleType > 0, &allocData->noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
+        int offset = computePrefixSum_device<int>(visible, &allocData->noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
 		if (offset != -1) visibleEntryIDs[offset] = targetIdx;
 	}
-
-#if 0
-	// "active list": blocks that have new information from depth image
-	// currently not used...
-	__syncthreads();
-
-	if (shouldPrefix)
-	{
-		int offset = computePrefixSum_device<int>(hashVisibleType == 1, noActiveEntries, blockDim.x * blockDim.y, threadIdx.x);
-		if (offset != -1) activeEntryIDs[offset] = targetIdx;
-	}
-#endif
 }
 
 template class ITMLib::Engine::ITMSceneReconstructionEngine_CUDA<ITMVoxel, ITMVoxelIndex>;

@@ -12,8 +12,8 @@ namespace ITMLib
 		{
 
 		private:
-			AccuCell *accu_host;
-			AccuCell *accu_device;
+            /// CUDA managed host/device memory (call cudaDeviceSynchronize before using on host)
+			AccuCell *accu;
 
 		protected:
             AccuCell ComputeGandH(Matrix4f T_g_k_estimate);

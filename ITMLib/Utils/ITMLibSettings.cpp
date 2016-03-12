@@ -31,10 +31,10 @@ ITMLibSettings::ITMLibSettings(void)
 	//deviceType = DEVICE_CPU;
 
 	/// enables or disables swapping. HERE BE DRAGONS: It should work, but requires more testing
-	useSwapping = false;
+	useSwapping = true; // default false
 
 	/// enables or disables approximate raycast (aka forward projection)
-    useApproximateRaycast = true;// default false false;
+    useApproximateRaycast = true;// default false
 
 	/// enable or disable bilateral depth filtering;
 	useBilateralFilter = false;

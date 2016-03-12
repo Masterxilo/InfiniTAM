@@ -1,4 +1,5 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
+#include "DeviceAgnostic\ITMVisualisationEngine.h"
 
 #include "ITMVisualisationEngine.h"
 
@@ -68,11 +69,8 @@ void IITMVisualisationEngine::NormalToUchar4(ITMUChar4Image *dst, ITMFloat4Image
 		{
 			Vector4f sourceVal = source[idx];
 			if (sourceVal.w >= 0.0f)
-			{
-				dest[idx].r = (uchar)((0.3f + (sourceVal.r + 1.0f)*0.35f)*255.0f);
-				dest[idx].g = (uchar)((0.3f + (sourceVal.g + 1.0f)*0.35f)*255.0f);
-				dest[idx].b = (uchar)((0.3f + (sourceVal.b + 1.0f)*0.35f)*255.0f);
-
+            {
+                drawPixelNormal(dest[idx], sourceVal.toVector3());
 			}
 		}
 	}

@@ -85,6 +85,8 @@ struct ITMHashEntry
     _CPU_AND_GPU_CODE_ bool isAllocatedAndActive() { return ptr >= 0; }
     /// Was once allocated, but is not in active memory.
     _CPU_AND_GPU_CODE_ bool isSwappedOut() { return ptr == -1; }
+    /// Was once allocated, but is not in active memory.
+    _CPU_AND_GPU_CODE_ void setSwappedOut() { ptr = -1; }
     /// Was once allocated, but is maybe not in active memory.
     /// But this space is permanently reserved.
     _CPU_AND_GPU_CODE_ bool isAllocated() { return ptr >= -1; }
@@ -96,6 +98,7 @@ struct ITMHashEntry
 #define HSS_NOT_ACTIVE 0
 /// 1 - data both on host and in active memory, information has not
 ///     yet been combined
+/// TODO seems more like this is data that is missing on the device? aah no, in that case it just reallocates
 #define HSS_HOST_AND_ACTIVE_NOT_COMBINED 1
 /// 2 - most recent data is in active memory, should save this data
 ///     back to host at some point
@@ -225,8 +228,9 @@ struct ITMVoxel_f
 #define _str(s) #s // note that s will not be macro expanded prior to stringification
 #define _xstr(s) _str(s) // force evaluation of s prior to 'calling' str
 #define sVOXELTYPE _xstr(VOXELTYPE) 
-typedef VOXELTYPE ITMVoxel;   
-
+struct ITMVoxel : public VOXELTYPE {
+    typedef struct { VOXELTYPE blockVoxels[SDF_BLOCK_SIZE3]; }  VoxelBlock;
+};
 /** This chooses the way the voxels are addressed and indexed. At the moment,
     valid options are ITMVoxelBlockHash and ITMPlainVoxelArray.
 */

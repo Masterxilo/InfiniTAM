@@ -17,7 +17,7 @@ template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline void combineVoxelDepthInformation(const CONSTPTR(TVoxel) & src, DEVICEPTR(TVoxel) & dst, int maxW)
 {
 	int oldW = src.w_depth;
-    if (oldW == 0) return; // Return if there is no color depth sample
+    if (oldW == 0) return; // Return if there is no depth sample to be integrated
 
 	float oldF = TVoxel::SDF_valueToFloat(src.sdf);
 
@@ -33,7 +33,7 @@ template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline void combineVoxelColorInformation(const CONSTPTR(TVoxel) & src, DEVICEPTR(TVoxel) & dst, int maxW)
 {
 	int oldW = src.w_color;
-	if (oldW == 0) return; // Return if there is no color sample
+	if (oldW == 0) return; // Return if there is no color sample to be integrated
 
 	Vector3f oldC = src.clr.toFloat();
 

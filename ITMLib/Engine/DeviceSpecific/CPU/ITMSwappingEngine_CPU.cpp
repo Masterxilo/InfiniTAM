@@ -60,7 +60,8 @@ int ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::LoadFromGlobalMemory(ITMSc
 		}
 	}
 
-	// would copy syncedVoxelBlocks_global and hasSyncedData_global and syncedVoxelBlocks_local and hasSyncedData_local here
+	// would copy syncedVoxelBlocks_global and hasSyncedData_global 
+    // to syncedVoxelBlocks_local and hasSyncedData_local here
 
 	return noNeededEntries;
 }
@@ -94,7 +95,7 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateGlobalIntoLocal(
 			TVoxel *srcVB = syncedVoxelBlocks_local + i * SDF_BLOCK_SIZE3;
 			TVoxel *dstVB = localVBA + hashTable[entryDestId].ptr * SDF_BLOCK_SIZE3;
 
-            // for each voxel
+            // for each voxel: integrate the information
 			for (int vIdx = 0; vIdx < SDF_BLOCK_SIZE3; vIdx++)
 			{
 				CombineVoxelInformation<TVoxel::hasColorInformation, TVoxel>::compute(srcVB[vIdx], dstVB[vIdx], maxW);
@@ -131,6 +132,8 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSce
 	int noNeededEntries = 0;
 	int noAllocatedVoxelEntries = scene->localVBA.lastFreeBlockId;
 
+    // Check all allocated, invisible entries in the hash table (voxel blocks)
+    // and copy them to the transfer buffer
 	for (int entryDestId = 0; entryDestId < noTotalEntries; entryDestId++)
 	{
 		if (noNeededEntries >= SDF_TRANSFER_BLOCK_NUM) break;
@@ -138,28 +141,30 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSce
 		int localPtr = hashTable[entryDestId].ptr;
 		ITMHashSwapState &swapState = swapStates[entryDestId];
 
-		if (swapState.state == 2 && localPtr >= 0 && entriesVisibleType[entryDestId] == 0)
+		if (swapState.state == HSS_ACTIVE && localPtr >= 0 && entriesVisibleType[entryDestId] == 0)
 		{
 			TVoxel *localVBALocation = localVBA + localPtr * SDF_BLOCK_SIZE3;
 
+            // Copy to transfer buffer
 			neededEntryIDs_local[noNeededEntries] = entryDestId;
-
 			hasSyncedData_local[noNeededEntries] = true;
 			memcpy(syncedVoxelBlocks_local + noNeededEntries * SDF_BLOCK_SIZE3, localVBALocation, SDF_BLOCK_SIZE3 * sizeof(TVoxel));
+            noNeededEntries++;
 
 			swapStates[entryDestId].state = 0;
 
+            // Free the corresponding local vba entry as allocatable 
+            // and mark the hashTable entry as swapped out
 			int vbaIdx = noAllocatedVoxelEntries;
 			if (vbaIdx < SDF_BUCKET_NUM - 1)
 			{
 				noAllocatedVoxelEntries++;
 				voxelAllocationList[vbaIdx + 1] = localPtr;
-				hashTable[entryDestId].ptr = -1;
+                hashTable[entryDestId].setSwappedOut();
 
 				for (int i = 0; i < SDF_BLOCK_SIZE3; i++) localVBALocation[i] = TVoxel();
 			}
 
-			noNeededEntries++;
 		}
 	}
 

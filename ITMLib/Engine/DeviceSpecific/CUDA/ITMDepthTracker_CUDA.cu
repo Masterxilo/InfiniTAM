@@ -31,16 +31,13 @@ ITMDepthTracker_CUDA::ITMDepthTracker_CUDA(Vector2i imgSize, TrackerIterationTyp
 	float distThresh, float terminationThreshold, const ITMLowLevelEngine *lowLevelEngine)
 	:ITMDepthTracker(imgSize, trackingRegime, noHierarchyLevels, noICPRunTillLevel, distThresh, terminationThreshold, lowLevelEngine, MEMORYDEVICE_CUDA)
 {
-	ITMSafeCall(cudaMallocHost((void**)&accu_host, sizeof(AccuCell)));
-	ITMSafeCall(cudaMalloc((void**)&accu_device, sizeof(AccuCell)));
+	ITMSafeCall(cudaMallocManaged((void**)&accu, sizeof(AccuCell)));
 }
 
 ITMDepthTracker_CUDA::~ITMDepthTracker_CUDA(void)
 {
-	ITMSafeCall(cudaFreeHost(accu_host));
-	ITMSafeCall(cudaFree(accu_device));
+    ITMSafeCall(cudaFree(accu));
 }
-
 
 ITMDepthTracker::AccuCell ITMDepthTracker_CUDA::ComputeGandH(Matrix4f T_g_k_estimate) {
 	Vector4f *pointsMap = sceneHierarchyLevel->pointsMap->GetData(MEMORYDEVICE_CUDA);
@@ -57,10 +54,10 @@ ITMDepthTracker::AccuCell ITMDepthTracker_CUDA::ComputeGandH(Matrix4f T_g_k_esti
         (int)ceil((float)viewImageSize.x / (float)blockSize.x), 
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
-	ITMSafeCall(cudaMemset(accu_device, 0, sizeof(AccuCell)));
+    ITMSafeCall(cudaMemset(accu, 0, sizeof(AccuCell)));
 
 	struct ITMDepthTracker_KernelParameters args;
-	args.accu = accu_device;
+    args.accu = accu;
 	args.depth = depth;
     args.approxInvPose = T_g_k_estimate;
 	args.pointsMap = pointsMap;
@@ -82,9 +79,8 @@ ITMDepthTracker::AccuCell ITMDepthTracker_CUDA::ComputeGandH(Matrix4f T_g_k_esti
     }
 #undef iteration
 
-
-	ITMSafeCall(cudaMemcpy(accu_host, accu_device, sizeof(AccuCell), cudaMemcpyDeviceToHost));
-    return *accu_host;
+    cudaDeviceSynchronize(); // for later access of accu
+    return *accu;
 }
 
 // device functions

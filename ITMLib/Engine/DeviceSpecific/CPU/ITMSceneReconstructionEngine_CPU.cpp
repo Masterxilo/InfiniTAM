@@ -48,11 +48,10 @@ template<class TVoxel>
 void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view,
 	const ITMTrackingState *trackingState, const ITMRenderState *renderState)
 {
+    // [[ rename parameters
 	Vector2i rgbImgSize = view->rgb->noDims;
 	Vector2i depthImgSize = view->depth->noDims;
 	float voxelSize = scene->sceneParams->voxelSize;
-
-
 	ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)renderState;
 
     // Prepare camera calibration
@@ -65,7 +64,8 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
 	projParams_rgb = view->calib->intrinsics_rgb.projectionParamsSimple.all;
 
     // TSDF update parameters
-	float mu = scene->sceneParams->mu; int maxW = scene->sceneParams->maxW;
+	float mu = scene->sceneParams->mu;
+    int maxW = scene->sceneParams->maxW;
 
     // Sensor data
 	float *depth = view->depth->GetData(MEMORYDEVICE_CPU);
@@ -80,6 +80,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
 
 	bool stopIntegratingAtMaxW = scene->sceneParams->stopIntegratingAtMaxW;
 	//bool approximateIntegration = !trackingState->requiresFullRendering;
+    // ]]
 
 #ifdef WITH_OPENMP
 	#pragma omp parallel for
@@ -101,22 +102,9 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
         // for each voxel, in local voxel coordinates
 		for (int z = 0; z < SDF_BLOCK_SIZE; z++) for (int y = 0; y < SDF_BLOCK_SIZE; y++) for (int x = 0; x < SDF_BLOCK_SIZE; x++)
 		{
-			Vector4f pt_model; int locId;
-
-			locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
-
-			if (stopIntegratingAtMaxW) if (localVoxelBlock[locId].w_depth == maxW) continue;
-			//if (approximateIntegration) if (localVoxelBlock[locId].w_depth != 0) continue;
-
-            // Voxel's world coordinates, for later projection into depth and color image
-            pt_model = Vector4f(
-                (globalPos.toFloat() + Vector3f(x, y, z)) * voxelSize, 1.f);
-
-			ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation,TVoxel>::compute(
-                localVoxelBlock[locId], 
-                pt_model, 
-                M_d, 
-				projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
+            integrateVoxel(x, y, z,
+                stopIntegratingAtMaxW, globalPos, localVoxelBlock, voxelSize,
+                M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 		}
 	}
 }
@@ -211,47 +199,12 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	//build visible list
 	for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
 	{
-		unsigned char hashVisibleType = entriesVisibleType[targetIdx];
-		const ITMHashEntry &hashEntry = hashTable[targetIdx];
-		
-        //  -- perform visibility check for voxel blocks that where visible in the last frame
-        // but not yet detected in the current depth frame
-        // (many of these will actually not be visible anymore)
-        if (hashVisibleType == VT_VISIBLE_PREVIOUS_AND_UNSTREAMED)
-		{
-			bool isVisibleEnlarged, isVisible;
-
-#define cbv(useSwapping) checkBlockVisibility<useSwapping>(isVisible, isVisibleEnlarged, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
-			if (useSwapping)
-            {
-                cbv(true);
-                if (!isVisibleEnlarged) entriesVisibleType[targetIdx] = 0; // no longer visible
-			} else {
-                cbv(true);
-                if (!isVisible) { entriesVisibleType[targetIdx] = 0; } // no longer visible
-			}
-#undef cbv
-		}
-
-		if (useSwapping)
-		{
-            if (hashVisibleType > 0 && swapStates[targetIdx].state != HSS_ACTIVE)
-                swapStates[targetIdx].state = HSS_HOST_AND_ACTIVE_NOT_COMBINED;
-		}
-
-		if (hashVisibleType > 0)
+        if (visibilityTestIfNeeded(
+            targetIdx, entriesVisibleType, useSwapping, hashTable, swapStates,
+            M_d, projParams_d, depthImgSize, voxelSize))
 		{	
             visibleEntryIDs[allocData.noVisibleEntries++] = targetIdx;
 		}
-
-#if 0
-		// "active list", currently disabled
-        if (hashVisibleType == VT_VISIBLE_AND_IN_MEMORY)
-		{
-			activeEntryIDs[noActiveEntries] = targetIdx;
-			noActiveEntries++;
-		}
-#endif
 	}
 
 	//reallocate deleted ones from previous swap operation
@@ -259,13 +212,8 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	{
 		for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
 		{
-			ITMHashEntry hashEntry = hashTable[targetIdx];
-
-            if (entriesVisibleType[targetIdx] > 0 && hashEntry.isSwappedOut())
-			{
-				int vbaIdx = allocData.allocVbaIdx();
-				if (vbaIdx >= 0) hashTable[targetIdx].ptr = voxelAllocationList[vbaIdx];
-			}
+            reAllocateSwappedOutVoxelBlock(voxelAllocationList,
+                targetIdx, entriesVisibleType, hashTable, &allocData);
 		}
 	}
 

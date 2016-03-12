@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "ITMPixelUtils.h"
 #include "../../Utils/ITMLibDefines.h"
 
 struct RenderingBlock {
@@ -347,6 +348,37 @@ _CPU_AND_GPU_CODE_ inline void drawPixelColour(DEVICEPTR(Vector4u) & dest, const
 }
 
 
+_CPU_AND_GPU_CODE_ inline void processPixelICPPost(
+    float angle, Vector3f outNormal,
+    DEVICEPTR(Vector4u) &outRendering,
+    DEVICEPTR(Vector4f) &pointsMap,
+    DEVICEPTR(Vector4f) &normalsMap,
+    const THREADPTR(Vector3f) & point,
+    bool foundPoint,
+    float voxelSize)
+{
+
+    if (foundPoint)
+    {
+        drawPixelGrey(outRendering, angle);
+
+        Vector4f outPoint4;
+        outPoint4.x = point.x * voxelSize; outPoint4.y = point.y * voxelSize;
+        outPoint4.z = point.z * voxelSize; outPoint4.w = 1.0f;
+        pointsMap = outPoint4;
+
+        Vector4f outNormal4;
+        outNormal4.x = outNormal.x; outNormal4.y = outNormal.y; outNormal4.z = outNormal.z; outNormal4.w = 0.0f;
+        normalsMap = outNormal4;
+    }
+    else
+    {
+        Vector4f out4;
+        out4.x = 0.0f; out4.y = 0.0f; out4.z = 0.0f; out4.w = -1.0f;
+
+        pointsMap = out4; normalsMap = out4; outRendering = Vector4u((uchar)0);
+    }
+}
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void processPixelICP(DEVICEPTR(Vector4u) &outRendering, DEVICEPTR(Vector4f) &pointsMap, DEVICEPTR(Vector4f) &normalsMap,
 	const THREADPTR(Vector3f) & point, bool foundPoint, const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
@@ -357,26 +389,15 @@ _CPU_AND_GPU_CODE_ inline void processPixelICP(DEVICEPTR(Vector4u) &outRendering
 
 	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
 
-	if (foundPoint)
-	{
-		drawPixelGrey(outRendering, angle);
+    processPixelICPPost(
+        angle, outNormal,
+       outRendering,
+       pointsMap,
+       normalsMap,
+        point,
+        foundPoint,
+        voxelSize);
 
-		Vector4f outPoint4;
-		outPoint4.x = point.x * voxelSize; outPoint4.y = point.y * voxelSize;
-		outPoint4.z = point.z * voxelSize; outPoint4.w = 1.0f;
-		pointsMap = outPoint4;
-
-		Vector4f outNormal4;
-		outNormal4.x = outNormal.x; outNormal4.y = outNormal.y; outNormal4.z = outNormal.z; outNormal4.w = 0.0f;
-		normalsMap = outNormal4;
-	}
-	else
-	{
-		Vector4f out4;
-		out4.x = 0.0f; out4.y = 0.0f; out4.z = 0.0f; out4.w = -1.0f;
-
-		pointsMap = out4; normalsMap = out4; outRendering = Vector4u((uchar)0);
-	}
 }
 
 /// \param useSmoothing whether to compute normals by forward differences two pixels away (true) or just one pixel away (false)
@@ -401,26 +422,14 @@ _CPU_AND_GPU_CODE_ inline void processPixelICP(
 
 	computeNormalAndAngle<useSmoothing>(foundPoint, x, y, pointsRay, lightSource, voxelSize, imgSize, outNormal, angle);
 
-	if (foundPoint)
-	{
-		drawPixelGrey(outRendering[locId], angle);
-
-		Vector4f outPoint4;
-		outPoint4.x = point.x * voxelSize; outPoint4.y = point.y * voxelSize;
-		outPoint4.z = point.z * voxelSize; outPoint4.w = 1.0f;
-		pointsMap[locId] = outPoint4;
-
-		Vector4f outNormal4;
-		outNormal4.x = outNormal.x; outNormal4.y = outNormal.y; outNormal4.z = outNormal.z; outNormal4.w = 0.0f;
-		normalsMap[locId] = outNormal4;
-	}
-	else
-	{
-		Vector4f out4;
-		out4.x = 0.0f; out4.y = 0.0f; out4.z = 0.0f; out4.w = -1.0f;
-
-		pointsMap[locId] = out4; normalsMap[locId] = out4; outRendering[locId] = Vector4u((uchar)0);
-	}
+    processPixelICPPost(
+        angle, outNormal,
+        outRendering[locId],
+        pointsMap[locId],
+        normalsMap[locId],
+        point.toVector3(),
+        foundPoint,
+        voxelSize);
 }
 
 template<bool useSmoothing>
@@ -430,7 +439,7 @@ _CPU_AND_GPU_CODE_ inline void processPixelForwardRender(DEVICEPTR(Vector4u) *ou
 	Vector3f outNormal;
 	float angle;
 
-	int locId = x + y * imgSize.x;
+    int locId = pixelLocId(x, y, imgSize);
 	Vector4f point = pointsRay[locId];
 
 	bool foundPoint = point.w > 0.0f;

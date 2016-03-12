@@ -29,6 +29,15 @@ namespace ITMLib
 			    This transformation takes points from the RGB
 			    camera coordinate system to the depth camera
 			    coordinate system.
+
+                M_d = trafo_rgb_to_depth.calib * M_rgb
+
+                M_rgb = trafo_rgb_to_depth.calib_inv * M_d
+
+                where M_d transforms from world to depth camera coords,
+                and M_rgb transforms from world to color camera coords.
+
+
 			*/
 			ITMExtrinsics trafo_rgb_to_depth;
 			

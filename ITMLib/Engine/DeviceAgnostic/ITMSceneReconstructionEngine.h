@@ -271,10 +271,10 @@ inline void allocateVoxelBlock(
     if (hashChangeType == 0) return;
     int vbaIdx = allocData->allocVbaIdx();
     if (vbaIdx < 0) return; //there is no room in the voxel block array
-    Vector4s pt_block_all = blockCoords[targetIdx];
+
 
     ITMHashEntry hashEntry;
-    hashEntry.pos = TO_SHORT3(pt_block_all);
+    hashEntry.pos = TO_SHORT3(blockCoords[targetIdx]);
     hashEntry.ptr = voxelAllocationList[vbaIdx];
     hashEntry.offset = 0;
 
@@ -372,4 +372,83 @@ _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible, 
     pt_model.x += factor; pt_model.y -= factor; pt_model.z += factor;
     checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
+}
+
+#ifdef __CUDACC__
+__device__
+#endif
+inline void reAllocateSwappedOutVoxelBlock(int *voxelAllocationList, int targetIdx, uchar *entriesVisibleType, ITMHashEntry *hashTable, AllocationTempData *allocData) {
+    if (entriesVisibleType[targetIdx] > 0 && hashTable[targetIdx].isSwappedOut()) //it is visible and has been previously allocated inside the hash, but deallocated from VBA
+    {
+        int vbaIdx = allocData->allocVbaIdx();
+        if (vbaIdx >= 0) hashTable[targetIdx].ptr = voxelAllocationList[vbaIdx];
+    }
+}
+
+/// \returns hashVisibleType > 0
+_CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
+    int targetIdx, uchar *entriesVisibleType, bool useSwapping,
+    ITMHashEntry *hashTable, ITMHashSwapState *swapStates,
+    Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize
+    ) {
+    unsigned char hashVisibleType = entriesVisibleType[targetIdx];
+    const ITMHashEntry &hashEntry = hashTable[targetIdx];
+
+    //  -- perform visibility check for voxel blocks that where visible in the last frame
+    // but not yet detected in the current depth frame
+    // (many of these will actually not be visible anymore)
+    if (hashVisibleType == VT_VISIBLE_PREVIOUS_AND_UNSTREAMED)
+    {
+        bool isVisibleEnlarged, isVisible;
+
+#define cbv(useSwapping) checkBlockVisibility<useSwapping>(isVisible, isVisibleEnlarged, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
+#define hide() hashVisibleType = entriesVisibleType[targetIdx] = 0; // no longer visible
+        if (useSwapping)
+        {
+            cbv(true);
+            if (!isVisibleEnlarged) hide();
+        }
+        else {
+            cbv(true);
+            if (!isVisible) hide();
+        }
+#undef cbv
+    }
+
+    if (useSwapping)
+    {
+        if (hashVisibleType > 0 && swapStates[targetIdx].state != HSS_ACTIVE)
+            swapStates[targetIdx].state = HSS_HOST_AND_ACTIVE_NOT_COMBINED;
+    }
+    return hashVisibleType > 0;
+}
+
+template<typename TVoxel>
+_CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
+    bool stopIntegratingAtMaxW, Vector3i globalPos, 
+    TVoxel *localVoxelBlock, 
+    float voxelSize,
+
+    const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) & projParams_d,
+    const CONSTPTR(Matrix4f) & M_rgb, const CONSTPTR(Vector4f) & projParams_rgb,
+    float mu, int maxW,
+    const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & depthImgSize,
+    const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & rgbImgSize
+    ) {
+    Vector4f pt_model; int locId;
+
+    locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
+
+    if (stopIntegratingAtMaxW) if (localVoxelBlock[locId].w_depth == maxW) return;
+    //if (approximateIntegration) if (localVoxelBlock[locId].w_depth != 0) continue;
+
+    // Voxel's world coordinates, for later projection into depth and color image
+    pt_model = Vector4f(
+        (globalPos.toFloat() + Vector3f(x, y, z)) * voxelSize, 1.f);
+
+    ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation, TVoxel>::compute(
+        localVoxelBlock[locId],
+        pt_model,
+        M_d,
+        projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
