@@ -196,11 +196,9 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 		//allocate
 		for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
 		{
-			int vbaIdx, exlIdx;
 			unsigned char hashChangeType = entriesAllocType[targetIdx];
-
-            if (hashChangeType < 0) continue;
-            vbaIdx = lastFreeVoxelBlockId; lastFreeVoxelBlockId--;
+            if (hashChangeType == 0) continue;
+            int vbaIdx = lastFreeVoxelBlockId; lastFreeVoxelBlockId--;
             if (vbaIdx < 0) break; //there is no room in the voxel block array
 
             Vector4s pt_block_all = blockCoords[targetIdx];
@@ -209,13 +207,12 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
             hashEntry.ptr = voxelAllocationList[vbaIdx];
             hashEntry.offset = 0;
 
+            int exlIdx;
 			switch (hashChangeType)
 			{
             case AT_NEEDS_ALLOC_FITS:
 				hashTable[targetIdx] = hashEntry;
                 entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
-				
-
 				break;
             case AT_NEEDS_ALLOC_EXCESS:
 				exlIdx = lastFreeExcessListId; lastFreeExcessListId--;
