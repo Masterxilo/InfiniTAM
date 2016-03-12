@@ -214,42 +214,36 @@ _CPU_AND_GPU_CODE_ inline float readFromSDF_float_interpolated(
 	return TVoxel::SDF_valueToFloat((1.0f - coeff.z) * res1 + coeff.z * res2);
 }
 
+/// \returns [0,1]^4 color (w = 1)
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTPTR(TVoxel) *voxelData,
 	const CONSTPTR(typename TIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) & point, 
 	THREADPTR(typename TIndex::IndexCache) & cache)
 {
-    TVoxel resn; Vector3f ret = 0.0f; Vector4f ret4; bool isFound;
+    TVoxel resn;
+    Vector3f ret = 0.0f; 
+    bool isFound;
     
     COMPUTE_COEFF_POS_FROM_POINT()
 
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 0), isFound, cache);
-	ret += (1.0f - coeff.x) * (1.0f - coeff.y) * (1.0f - coeff.z) * resn.clr.toFloat();
+#define access(dx,dy,dz) \
+    resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(dx, dy, dz), isFound, cache);\
+    ret += \
+    (dx ? coeff.x : 1.0f - coeff.x) *\
+    (dy ? coeff.y : 1.0f - coeff.y) *\
+    (dz ? coeff.z : 1.0f - coeff.z) *\
+    resn.clr.toFloat();
+    
+    access(0, 0, 0);
+    access(0, 0, 1);
+    access(0, 1, 0);
+    access(0, 1, 1);
+    access(1, 0, 0);
+    access(1, 0, 1);
+    access(1, 1, 0);
+    access(1, 1, 1);
 
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 0), isFound, cache);
-	ret += (coeff.x) * (1.0f - coeff.y) * (1.0f - coeff.z) * resn.clr.toFloat();
-
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 0), isFound, cache);
-	ret += (1.0f - coeff.x) * (coeff.y) * (1.0f - coeff.z) * resn.clr.toFloat();
-
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 0), isFound, cache);
-	ret += (coeff.x) * (coeff.y) * (1.0f - coeff.z) * resn.clr.toFloat();
-
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 1), isFound, cache);
-	ret += (1.0f - coeff.x) * (1.0f - coeff.y) * coeff.z * resn.clr.toFloat();
-
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 1), isFound, cache);
-	ret += (coeff.x) * (1.0f - coeff.y) * coeff.z * resn.clr.toFloat();;
-
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 1), isFound, cache);
-	ret += (1.0f - coeff.x) * (coeff.y) * coeff.z * resn.clr.toFloat();
-
-	resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 1), isFound, cache);
-	ret += (coeff.x) * (coeff.y) * coeff.z * resn.clr.toFloat();
-
-	ret4.x = ret.x; ret4.y = ret.y; ret4.z = ret.z; ret4.w = 255.0f;
-
-	return ret4 / 255.0f;
+    return Vector4f(ret, 255.0f) / 255.0f;
 }
 
 /// Compute SDF normal 

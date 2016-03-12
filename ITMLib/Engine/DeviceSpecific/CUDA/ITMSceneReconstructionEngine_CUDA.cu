@@ -5,11 +5,6 @@
 #include "../../DeviceAgnostic/ITMSceneReconstructionEngine.h"
 #include "../../../Objects/ITMRenderState_VH.h"
 
-struct AllocationTempData {
-	int noAllocatedVoxelEntries;
-	int noAllocatedExcessEntries;
-	int noVisibleEntries;
-};
 
 using namespace ITMLib::Engine;
 
@@ -368,46 +363,17 @@ __global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *ex
 {
 	int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
 	if (targetIdx > noTotalEntries - 1) return;
-    if (entriesAllocType[targetIdx] == 0) return;
-	int vbaIdx, exlIdx;
-    vbaIdx = atomicSub(&allocData->noAllocatedVoxelEntries, 1);
-	Vector4s pt_block_all = blockCoords[targetIdx];
 
-	ITMHashEntry hashEntry;
-	hashEntry.pos.x = pt_block_all.x; hashEntry.pos.y = pt_block_all.y; hashEntry.pos.z = pt_block_all.z;
-	hashEntry.ptr = voxelAllocationList[vbaIdx];
-	hashEntry.offset = 0;
-	switch (entriesAllocType[targetIdx])
-	{
-    case AT_NEEDS_ALLOC_FITS: //needs allocation, fits in the ordered list
 
-		if (vbaIdx >= 0) //there is room in the voxel block array
-		{
+    allocateVoxelBlock(targetIdx,
+        voxelAllocationList,
+        excessAllocationList,
+        hashTable,
+        allocData,
 
-            hashTable[targetIdx] = hashEntry;
-            entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
-
-		}
-		break;
-
-    case AT_NEEDS_ALLOC_EXCESS: //needs allocation in the excess list
-		exlIdx = atomicSub(&allocData->noAllocatedExcessEntries, 1);
-
-		if (vbaIdx >= 0 && exlIdx >= 0) //there is room in the voxel block array and excess list
-		{
-			
-
-			int exlOffset = excessAllocationList[exlIdx];
-
-			hashTable[targetIdx].offset = exlOffset + 1; //connect to child
-
-			hashTable[SDF_BUCKET_NUM + exlOffset] = hashEntry; //add child to the excess list
-
-			entriesVisibleType[SDF_BUCKET_NUM + exlOffset] = 1; //make child visible
-		}
-
-		break;
-	}
+        entriesAllocType,
+        entriesVisibleType,
+        blockCoords);
 }
 
 __global__ void reAllocateSwappedOutVoxelBlocks_device(int *voxelAllocationList, ITMHashEntry *hashTable, int noTotalEntries,

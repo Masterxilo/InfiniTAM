@@ -6,6 +6,8 @@
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
 
+
+
 /// Fusion Stage - Camera Data Integration
 /// \returns \f$\eta\f$, -1 on failure
 // Note that the stored T-SDF values are normalized to lie
@@ -113,6 +115,7 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
     }
 };
 
+
 // alloc types
 #define AT_NEEDS_ALLOC_FITS 1 //needs allocation, fits in the ordered list
 #define AT_NEEDS_ALLOC_EXCESS 2 //needs allocation in the excess list
@@ -219,6 +222,82 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
         point += direction;
     }
     #undef check_found
+}
+
+#include <cuda_runtime.h>
+struct AllocationTempData {
+    int noAllocatedVoxelEntries;
+#ifdef __CUDACC__
+    __device__ int allocVbaIdx() {
+        return atomicSub(&noAllocatedVoxelEntries, 1);
+    }
+#else
+    int allocVbaIdx() {
+        return noAllocatedVoxelEntries--;
+    }
+#endif
+
+    int noAllocatedExcessEntries;
+#ifdef __CUDACC__
+    __device__ int allocExlIdx() {
+        return atomicSub(&noAllocatedExcessEntries, 1);
+    }
+#else
+    int allocExlIdx() {
+        return noAllocatedExcessEntries--;
+    }
+#endif
+
+    int noVisibleEntries;
+};
+
+
+/// \returns false when the list is full
+#ifdef __CUDACC__
+__device__
+#endif
+inline void allocateVoxelBlock(
+    int targetIdx,
+    int *voxelAllocationList,
+    int *excessAllocationList,
+    ITMHashEntry *hashTable,
+    AllocationTempData *allocData, 
+
+    uchar *entriesAllocType,
+    uchar *entriesVisibleType,
+    Vector4s *blockCoords)
+{
+    unsigned char hashChangeType = entriesAllocType[targetIdx];
+    if (hashChangeType == 0) return;
+    int vbaIdx = allocData->allocVbaIdx();
+    if (vbaIdx < 0) return; //there is no room in the voxel block array
+    Vector4s pt_block_all = blockCoords[targetIdx];
+
+    ITMHashEntry hashEntry;
+    hashEntry.pos = TO_SHORT3(pt_block_all);
+    hashEntry.ptr = voxelAllocationList[vbaIdx];
+    hashEntry.offset = 0;
+
+    int exlIdx;
+    switch (hashChangeType)
+    {
+    case AT_NEEDS_ALLOC_FITS: //needs allocation, fits in the ordered list
+        hashTable[targetIdx] = hashEntry;
+        entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
+        break;
+
+    case AT_NEEDS_ALLOC_EXCESS: //needs allocation in the excess list
+        exlIdx = allocData->allocExlIdx();
+
+        if (exlIdx >= 0) //there is room in the excess list
+        {
+            int exlOffset = excessAllocationList[exlIdx];
+            hashTable[targetIdx].offset = exlOffset + 1; //connect to child
+            hashTable[SDF_BUCKET_NUM + exlOffset] = hashEntry; //add child to the excess list
+            entriesVisibleType[SDF_BUCKET_NUM + exlOffset] = 1; //make child visible
+        }
+        break;
+    }
 }
 
 template<bool useSwapping>
