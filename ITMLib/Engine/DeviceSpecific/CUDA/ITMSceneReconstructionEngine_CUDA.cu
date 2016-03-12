@@ -20,7 +20,7 @@ __global__ void integrateIntoScene_device(TVoxel *voxelArray, const ITMPlainVoxe
     int z = blockIdx.z*blockDim.z + threadIdx.z;
 
     Vector4f pt_model; int locId;
-
+    
     locId = x + y * arrayInfo->size.x + z * arrayInfo->size.x * arrayInfo->size.y;
 
     if (stopIntegratingAtMaxW) if (voxelArray[locId].w_depth == maxW) return;
@@ -77,7 +77,8 @@ __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int 
     entriesVisibleType[visibleEntryIDs[entryId]] = 3;
 }
 
-__global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, int *excessAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
+__global__ void allocateVoxelBlocksList_device(int *voxelAllocationList, 
+    ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
     AllocationTempData *allocData, uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
 {
     int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
@@ -164,9 +165,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITM
 	memsetKernel<TVoxel>(voxelBlocks_ptr, TVoxel(), numBlocks * blockSize);
 
     // Reset voxel allocation list
-	int *vbaAllocationList_ptr = scene->localVBA.GetAllocationList();
-	fillArrayKernel<int>(vbaAllocationList_ptr, numBlocks);
-	scene->localVBA.lastFreeBlockId = numBlocks - 1;
+    scene->
 
     // Reset hash entries
     ITMHashEntry tmpEntry = ITMHashEntry::createIllegalEntry();
@@ -174,9 +173,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITM
 	memsetKernel<ITMHashEntry>(hashEntry_ptr, tmpEntry, scene->index.noTotalEntries);
 
     // Reset excess allocation list
-	int *excessList_ptr = scene->index.GetExcessAllocationList();
-	fillArrayKernel<int>(excessList_ptr, SDF_EXCESS_LIST_SIZE);
-	scene->index.SetLastFreeExcessListId(SDF_EXCESS_LIST_SIZE - 1);
+    scene->index.excessAllocationList->Reset();
 }
 
 template<class TVoxel>
@@ -202,7 +199,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	float *depth = view->depth->GetData(MEMORYDEVICE_CUDA);
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();
-	int *excessAllocationList = scene->index.GetExcessAllocationList();
+    ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList = scene->index.excessAllocationList;
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
 
@@ -229,7 +226,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	AllocationTempData *tempData = (AllocationTempData*)allocationTempData_host;
 	tempData->noAllocatedVoxelEntries = scene->localVBA.lastFreeBlockId;
-	tempData->noAllocatedExcessEntries = scene->index.GetLastFreeExcessListId();
 	tempData->noVisibleEntries = 0;
 	ITMSafeCall(cudaMemcpyAsync(allocationTempData_device, tempData, sizeof(AllocationTempData), cudaMemcpyHostToDevice));
 
@@ -265,7 +261,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	ITMSafeCall(cudaMemcpy(tempData, allocationTempData_device, sizeof(AllocationTempData), cudaMemcpyDeviceToHost));
 	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
 	scene->localVBA.lastFreeBlockId = tempData->noAllocatedVoxelEntries;
-	scene->index.SetLastFreeExcessListId(tempData->noAllocatedExcessEntries);
 }
 
 template<class TVoxel>

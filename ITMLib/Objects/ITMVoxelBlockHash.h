@@ -2,8 +2,10 @@
 
 #pragma once
 
-#ifndef __METALC__
-#include <stdlib.h>
+#ifdef __CUDACC__
+#include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
+#else 
+struct Managed {};
 #endif
 
 #include "../Utils/ITMLibDefines.h"
@@ -41,22 +43,47 @@ namespace ITMLib
 			/** The actual data in the hash table. */
 			ORUtils::MemoryBlock<ITMHashEntry> hashEntries;
 
-			/** Identifies which entries of the overflow
-			list are allocated. This is used if too
-			many hash collisions caused the buckets to
-			overflow.
-			*/
-			ORUtils::MemoryBlock<int> excessAllocationList;
-			int lastFreeExcessListId;
 
 			const MemoryDeviceType memoryType;
 
 		public:
+            /// Allocation list generating sequential ids
+            // Implemented as a countdown semaphore in CUDA unified memory
+            class ExcessAllocationList : Managed {
+            private:
+                /// This index is considered free 
+                /// Return it and change it when allocation is requested.
+                int lastFreeEntry;
+                const int capacity;
+            public:
+                ExcessAllocationList(int capacity) : capacity(capacity) {
+                    Reset();
+                }
+
+#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+                __device__ int Allocate() {
+                    return atomicSub(&lastFreeEntry, 1);
+                }
+#else
+                // Assume single threaded
+                int Allocate() {
+                    return lastFreeEntry--;
+                }
+#endif
+                void Reset() {
+                    lastFreeEntry = capacity - 1;
+                }
+            } * excessAllocationList;
+            
 			ITMVoxelBlockHash(MemoryDeviceType memoryType) :
                 memoryType(memoryType),
-                hashEntries(noTotalEntries, memoryType),
-                excessAllocationList(SDF_EXCESS_LIST_SIZE, memoryType)
-			{
+                hashEntries(noTotalEntries, memoryType)
+            {
+                excessAllocationList = new ExcessAllocationList(SDF_EXCESS_LIST_SIZE);
+            }
+
+            ~ITMVoxelBlockHash() {
+                delete excessAllocationList;
             }
 
 			/** Get the list of actual entries in the hash table. */
@@ -66,15 +93,7 @@ namespace ITMLib
 			const IndexData *getIndexData(void) const { return hashEntries.GetData(memoryType); }
 			IndexData *getIndexData(void) { return hashEntries.GetData(memoryType); }
 
-			/** Get the list that identifies which entries of the
-			overflow list are allocated. This is used if too
-			many hash collisions caused the buckets to overflow.
-			*/
-			const int *GetExcessAllocationList(void) const { return excessAllocationList.GetData(memoryType); }
-            int *GetExcessAllocationList(void) { return excessAllocationList.GetData(memoryType); }
-			int GetLastFreeExcessListId(void) { return lastFreeExcessListId; }
-			void SetLastFreeExcessListId(int lastFreeExcessListId) { this->lastFreeExcessListId = lastFreeExcessListId; }
-
+			
 			/** Maximum number of locally allocated entries. */
 			int getNumAllocatedVoxelBlocks(void) { return SDF_LOCAL_BLOCK_NUM; }
             /// Amount of voxels per block

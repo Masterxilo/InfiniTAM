@@ -60,7 +60,8 @@ struct ITMHashEntry
     and by ITMSceneParams::voxelSize to get world coordinates.
     */
 	Vector3s pos;
-	/** 1-based offset to next entry in the excess list. 
+	/** 1-based position of the 'next'
+    entry in the excess list. 
     Used as SDF_BUCKET_NUM + hashEntry.offset - 1
     to compute the next hashIdx.
     This value is at most SDF_EXCESS_LIST_SIZE.*/

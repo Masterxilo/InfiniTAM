@@ -103,12 +103,11 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSce
     int *neededEntryIDs_global       = globalCache->transferBuffer_host->neededEntryIDs;
 
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
-	int *voxelAllocationList = scene->localVBA.GetAllocationList();
+    ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList = scene->localVBA.voxelAllocationList;
 
 	int noTotalEntries = globalCache->noTotalEntries;
 	
 	int noNeededEntries = 0;
-	int noAllocatedVoxelEntries = scene->localVBA.lastFreeBlockId;
 
     // Check all allocated, invisible entries in the hash table (voxel blocks)
     // and copy them to the transfer buffer
@@ -133,20 +132,16 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSce
 
             // Free the corresponding local vba entry as allocatable 
             // and mark the hashTable entry as swapped out
-			int vbaIdx = noAllocatedVoxelEntries;
-			if (vbaIdx < SDF_BUCKET_NUM - 1)
 			{
-				noAllocatedVoxelEntries++;
-				voxelAllocationList[vbaIdx + 1] = localPtr;
+                voxelAllocationList->Free(localPtr);
                 hashTable[entryDestId].setSwappedOut();
 
-				for (int i = 0; i < SDF_BLOCK_SIZE3; i++) localVBALocation[i] = TVoxel();
+				for (int i = 0; i < SDF_BLOCK_SIZE3; i++)
+                    localVBALocation[i] = TVoxel();
 			}
 
 		}
 	}
-
-	scene->localVBA.lastFreeBlockId = noAllocatedVoxelEntries;
 
 	// would copy neededEntryIDs_local, hasSyncedData_local and syncedVoxelBlocks_local into *_global here
 

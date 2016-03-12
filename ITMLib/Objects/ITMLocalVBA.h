@@ -20,37 +20,81 @@ namespace ITMLib
 		{
 		private:
 			ORUtils::MemoryBlock<TVoxel> *voxelBlocks;
-			ORUtils::MemoryBlock<int> *allocationList;
 
-			MemoryDeviceType memoryType;
+            const MemoryDeviceType memoryType;
 
 		public:
 			inline TVoxel *GetVoxelBlocks(void) { return voxelBlocks->GetData(memoryType); }
 			inline const TVoxel *GetVoxelBlocks(void) const { return voxelBlocks->GetData(memoryType); }
-			int *GetAllocationList(void) { return allocationList->GetData(memoryType); }
 
-#ifdef COMPILE_WITH_METAL
-			const void* GetVoxelBlocks_MB() const { return voxelBlocks->GetMetalBuffer(); }
-			const void* GetAllocationList_MB(void) const { return allocationList->GetMetalBuffer(); }
+			const int allocatedSize;
+
+            /// Allocation list generating sequential ids
+            // Implemented as a countdown semaphore in CUDA unified memory
+            // Filled from the top
+            class VoxelAllocationList : Managed {
+            private:
+                /// This index is considered free in the list
+                int lastFreeEntry;
+                const int capacity;
+                ORUtils::MemoryBlock<int> _allocationList;
+                int* allocationList;
+
+            public:
+                VoxelAllocationList(int capacity, MemoryDeviceType memoryType) : 
+                    capacity(capacity), _allocationList(capacity, memoryType) {
+                    allocationList = _allocationList.GetData(memoryType);
+                    Reset();
+                }
+
+#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+                __device__ int Allocate() {
+                    return atomicSub(&lastFreeEntry, 1);
+                }
+
+                __device__ void Free(int ptr) {
+                    return atomicSub(&lastFreeEntry, 1);
+                }
+#else
+                /// Returns a free ptr in the local voxel block array
+                // Assume single threaded
+                int Allocate() {
+                    int ptr = allocationList[lastFreeEntry];
+                    allocationList[lastFreeEntry] = -1; // now illegal - updating this is not strictly necessary
+                    lastFreeEntry--;
+                    return ptr;
+                }
+
+                void Free(int ptr) {
+                    // TODO dont accept when list is full already or when this was never allocated
+                    printf("voxel block %d freed\n", ptr);
+                    lastFreeEntry++;
+                    allocationList[lastFreeEntry] = ptr;
+                }
 #endif
-			int lastFreeBlockId;
+                void Reset() {
+                    lastFreeEntry = capacity - 1;
+#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+                    fillArrayKernel<int>(allocationList, capacity);
+#else
+                    for (int i = 0; i < capacity; ++i) allocationList[i] = i;
+#endif
+                }
+            } *voxelAllocationList;
 
-			int allocatedSize;
 
-			ITMLocalVBA(MemoryDeviceType memoryType, int noBlocks, int blockSize)
+            ITMLocalVBA(MemoryDeviceType memoryType, int noBlocks, int blockSize) :
+                memoryType(memoryType),
+                allocatedSize(noBlocks * blockSize)
 			{
-				this->memoryType = memoryType;
-
-				allocatedSize = noBlocks * blockSize;
-
 				voxelBlocks = new ORUtils::MemoryBlock<TVoxel>(allocatedSize, memoryType);
-				allocationList = new ORUtils::MemoryBlock<int>(noBlocks, memoryType);
+                voxelAllocationList = new VoxelAllocationList(noBlocks, memoryType);
 			}
 
 			~ITMLocalVBA(void)
 			{
 				delete voxelBlocks;
-				delete allocationList;
+                delete voxelAllocationList;
 			}
 
 			// Suppress the default copy constructor and assignment operator

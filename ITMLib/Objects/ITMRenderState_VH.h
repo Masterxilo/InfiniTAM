@@ -51,6 +51,8 @@ namespace ITMLib
 
 			/** Get the list of "visible entries", that are currently
 			processed by the tracker.
+
+            noTotalEntries == SDF_GLOBAL_BLOCK_NUM many
 			*/
 			const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs.GetData(memoryType); }
 			int *GetVisibleEntryIDs(void) { return visibleEntryIDs.GetData(memoryType); }

@@ -6,6 +6,7 @@
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
 
+#include "../../Objects/ITMLocalVBA.h"
 
 
 /// Fusion Stage - Camera Data Integration
@@ -226,42 +227,22 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 
 #include <cuda_runtime.h>
 struct AllocationTempData {
-    int noAllocatedVoxelEntries;
-#ifdef __CUDACC__
-    __device__ int allocVbaIdx() {
-        return atomicSub(&noAllocatedVoxelEntries, 1);
-    }
-#else
-    int allocVbaIdx() {
-        return noAllocatedVoxelEntries--;
-    }
-#endif
-
-    int noAllocatedExcessEntries;
-#ifdef __CUDACC__
-    __device__ int allocExlIdx() {
-        return atomicSub(&noAllocatedExcessEntries, 1);
-    }
-#else
-    int allocExlIdx() {
-        return noAllocatedExcessEntries--;
-    }
-#endif
 
     int noVisibleEntries;
 };
-
 
 /// \returns false when the list is full
 #ifdef __CUDACC__
 __device__
 #endif
+template<typename TVoxel>
 inline void allocateVoxelBlock(
     int targetIdx,
-    int *voxelAllocationList,
-    int *excessAllocationList,
+
+    typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
+    ITMVoxelBlockHash::ExcessAllocationList* excessAllocationList,
     ITMHashEntry *hashTable,
-    AllocationTempData *allocData, 
+    AllocationTempData *allocData,
 
     uchar *entriesAllocType,
     uchar *entriesVisibleType,
@@ -269,35 +250,29 @@ inline void allocateVoxelBlock(
 {
     unsigned char hashChangeType = entriesAllocType[targetIdx];
     if (hashChangeType == 0) return;
-    int vbaIdx = allocData->allocVbaIdx();
-    if (vbaIdx < 0) return; //there is no room in the voxel block array
+    int ptr = voxelAllocationList->Allocate();
+    if (ptr < 0) return; //there is no room in the voxel block array
 
 
     ITMHashEntry hashEntry;
     hashEntry.pos = TO_SHORT3(blockCoords[targetIdx]);
-    hashEntry.ptr = voxelAllocationList[vbaIdx];
+    hashEntry.ptr = ptr;
     hashEntry.offset = 0;
 
-    int exlIdx;
-    switch (hashChangeType)
-    {
-    case AT_NEEDS_ALLOC_FITS: //needs allocation, fits in the ordered list
-        hashTable[targetIdx] = hashEntry;
-        entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
-        break;
+    int exlOffset;
+    if (hashChangeType ==  AT_NEEDS_ALLOC_EXCESS) { //needs allocation in the excess list
+        exlOffset = excessAllocationList->Allocate();
 
-    case AT_NEEDS_ALLOC_EXCESS: //needs allocation in the excess list
-        exlIdx = allocData->allocExlIdx();
-
-        if (exlIdx >= 0) //there is room in the excess list
+        if (exlOffset >= 0) //there is room in the excess list
         {
-            int exlOffset = excessAllocationList[exlIdx];
-            hashTable[targetIdx].offset = exlOffset + 1; //connect to child
-            hashTable[SDF_BUCKET_NUM + exlOffset] = hashEntry; //add child to the excess list
-            entriesVisibleType[SDF_BUCKET_NUM + exlOffset] = 1; //make child visible
+            hashTable[targetIdx].offset = exlOffset + 1; //connect parent to child
+
+            targetIdx = SDF_BUCKET_NUM + exlOffset; // target index is in excess part
         }
-        break;
     }
+
+    hashTable[targetIdx] = hashEntry;
+    entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
 }
 
 template<bool useSwapping>
@@ -377,11 +352,15 @@ _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible, 
 #ifdef __CUDACC__
 __device__
 #endif
-inline void reAllocateSwappedOutVoxelBlock(int *voxelAllocationList, int targetIdx, uchar *entriesVisibleType, ITMHashEntry *hashTable, AllocationTempData *allocData) {
+template<typename TVoxel>
+inline void reAllocateSwappedOutVoxelBlock(
+    typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
+int targetIdx, uchar *entriesVisibleType, 
+ITMHashEntry *hashTable, AllocationTempData *allocData) {
     if (entriesVisibleType[targetIdx] > 0 && hashTable[targetIdx].isSwappedOut()) //it is visible and has been previously allocated inside the hash, but deallocated from VBA
     {
-        int vbaIdx = allocData->allocVbaIdx();
-        if (vbaIdx >= 0) hashTable[targetIdx].ptr = voxelAllocationList[vbaIdx];
+        int ptr = voxelAllocationList->Allocate();
+        if (ptr >= 0) hashTable[targetIdx].ptr = ptr;
     }
 }
 

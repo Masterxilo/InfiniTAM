@@ -4,6 +4,21 @@
 #pragma once
 
 #include <cuda_runtime.h>
+class Managed {
+public:
+    void *operator new(size_t len){
+        void *ptr;
+        cudaMallocManaged(&ptr, len);
+        cudaDeviceSynchronize();
+        return ptr;
+    }
+
+        void operator delete(void *ptr) {
+        cudaDeviceSynchronize();
+        cudaFree(ptr);
+    }
+};
+
 inline __device__ void warpReduce(volatile float* sdata, int tid) {
 	sdata[tid] += sdata[tid + 32];
 	sdata[tid] += sdata[tid + 16];
@@ -134,6 +149,8 @@ __global__ void fillArrayKernel_device(T *devPtr, size_t nwords)
 	devPtr[offset] = offset;
 }
 
+/// Fill array at devPtr with 0:nwords-1
+/// T must be of number type (convertible from size_t)
 template<typename T>
 inline void fillArrayKernel(T *devPtr, size_t nwords)
 {

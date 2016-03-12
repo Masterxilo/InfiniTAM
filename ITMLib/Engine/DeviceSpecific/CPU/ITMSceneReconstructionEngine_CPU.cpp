@@ -32,9 +32,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel,ITMVoxelBlockHash>::ResetScene(ITMS
 	for (int i = 0; i < numBlocks * blockSize; ++i) voxelBlocks_ptr[i] = TVoxel();
 
     // Reset voxel allocation list
-	int *vbaAllocationList_ptr = scene->localVBA.GetAllocationList();
-	for (int i = 0; i < numBlocks; ++i) vbaAllocationList_ptr[i] = i;
-	scene->localVBA.lastFreeBlockId = numBlocks - 1;
+    scene->localVBA.voxelAllocationList->Reset();
 
     // Reset hash entries
     ITMHashEntry tmpEntry = ITMHashEntry::createIllegalEntry();
@@ -42,9 +40,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel,ITMVoxelBlockHash>::ResetScene(ITMS
 	for (int i = 0; i < scene->index.noTotalEntries; ++i) hashEntry_ptr[i] = tmpEntry;
 
     // Reset excess allocation list
-	int *excessList_ptr = scene->index.GetExcessAllocationList();
-	for (int i = 0; i < SDF_EXCESS_LIST_SIZE; ++i) excessList_ptr[i] = i;
-	scene->index.SetLastFreeExcessListId(SDF_EXCESS_LIST_SIZE - 1);
+    scene->index.excessAllocationList->Reset();
 }
 
 template<class TVoxel>
@@ -145,8 +141,8 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 
     uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 
-    int *voxelAllocationList = scene->localVBA.GetAllocationList();
-    int *excessAllocationList = scene->index.GetExcessAllocationList();
+    ITMLocalVBA<TVoxel>::VoxelAllocationList *voxelAllocationList = scene->localVBA.voxelAllocationList;
+    ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList = scene->index.excessAllocationList;
 	uchar *entriesAllocType = this->entriesAllocType->GetData(MEMORYDEVICE_CPU);
 
     // Of blocks that need allocation
@@ -157,8 +153,6 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
     AllocationTempData allocData;
-    allocData.noAllocatedVoxelEntries = scene->localVBA.lastFreeBlockId;
-    allocData.noAllocatedExcessEntries = scene->index.GetLastFreeExcessListId();
     allocData.noVisibleEntries = 0;
 
 	memset(entriesAllocType, 0, noTotalEntries);
@@ -191,7 +185,7 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 		// allocate
 		for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
 		{
-            allocateVoxelBlock(targetIdx,
+            allocateVoxelBlock<TVoxel>(targetIdx,
                 voxelAllocationList,
                 excessAllocationList,
                 hashTable,
@@ -219,15 +213,13 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	{
 		for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
 		{
-            reAllocateSwappedOutVoxelBlock(voxelAllocationList,
+            reAllocateSwappedOutVoxelBlock<TVoxel>(voxelAllocationList,
                 targetIdx, entriesVisibleType, hashTable, &allocData);
 		}
 	}
 
     // Copy back AllocationTempData
     renderState_vh->noVisibleEntries = allocData.noVisibleEntries;
-    scene->localVBA.lastFreeBlockId = allocData.noAllocatedVoxelEntries;
-    scene->index.SetLastFreeExcessListId(allocData.noAllocatedExcessEntries);
 }
 
 template<class TVoxel>
