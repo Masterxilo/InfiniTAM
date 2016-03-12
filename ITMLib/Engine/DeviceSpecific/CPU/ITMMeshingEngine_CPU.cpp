@@ -5,15 +5,6 @@
 
 using namespace ITMLib::Engine;
 
-template<class TVoxel>
-ITMMeshingEngine_CPU<TVoxel,ITMVoxelBlockHash>::ITMMeshingEngine_CPU(void) 
-{
-}
-
-template<class TVoxel>
-ITMMeshingEngine_CPU<TVoxel,ITMVoxelBlockHash>::~ITMMeshingEngine_CPU(void) 
-{
-}
 
 template<class TVoxel>
 void ITMMeshingEngine_CPU<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMVoxelBlockHash> *scene)
@@ -58,15 +49,9 @@ void ITMMeshingEngine_CPU<TVoxel, ITMVoxelBlockHash>::MeshScene(ITMMesh *mesh, c
 }
 
 template<class TVoxel>
-ITMMeshingEngine_CPU<TVoxel,ITMPlainVoxelArray>::ITMMeshingEngine_CPU(void) 
-{}
-
-template<class TVoxel>
-ITMMeshingEngine_CPU<TVoxel,ITMPlainVoxelArray>::~ITMMeshingEngine_CPU(void) 
-{}
-
-template<class TVoxel>
 void ITMMeshingEngine_CPU<TVoxel, ITMPlainVoxelArray>::MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMPlainVoxelArray> *scene)
-{}
+{
+    puts("ITMMeshingEngine_CPU<TVoxel, ITMPlainVoxelArray>::MeshScene NOT IMPLEMENTED");
+}
 
 template class ITMLib::Engine::ITMMeshingEngine_CPU<ITMVoxel, ITMVoxelIndex>;

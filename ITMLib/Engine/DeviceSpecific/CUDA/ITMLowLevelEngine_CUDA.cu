@@ -10,13 +10,45 @@ using namespace ITMLib::Engine;
 ITMLowLevelEngine_CUDA::ITMLowLevelEngine_CUDA(void) { }
 ITMLowLevelEngine_CUDA::~ITMLowLevelEngine_CUDA(void) { }
 
-__global__ void filterSubsample_device(Vector4u *imageData_out, Vector2i newDims, const Vector4u *imageData_in, Vector2i oldDims);
 
-__global__ void filterSubsampleWithHoles_device(float *imageData_out, Vector2i newDims, const float *imageData_in, Vector2i oldDims);
-__global__ void filterSubsampleWithHoles_device(Vector4f *imageData_out, Vector2i newDims, const Vector4f *imageData_in, Vector2i oldDims);
+// device functions
 
-__global__ void gradientX_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize);
-__global__ void gradientY_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize);
+__global__ void filterSubsample_device(Vector4u *imageData_out, Vector2i newDims, const Vector4u *imageData_in, Vector2i oldDims)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x > newDims.x - 1 || y > newDims.y - 1) return;
+
+    filterSubsample(imageData_out, x, y, newDims, imageData_in, oldDims);
+}
+
+__global__ void filterSubsampleWithHoles_device(float *imageData_out, Vector2i newDims, const float *imageData_in, Vector2i oldDims)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x > newDims.x - 1 || y > newDims.y - 1) return;
+
+    filterSubsampleWithHoles(imageData_out, x, y, newDims, imageData_in, oldDims);
+}
+
+__global__ void filterSubsampleWithHoles_device(Vector4f *imageData_out, Vector2i newDims, const Vector4f *imageData_in, Vector2i oldDims)
+{
+    int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x > newDims.x - 1 || y > newDims.y - 1) return;
+
+    filterSubsampleWithHoles(imageData_out, x, y, newDims, imageData_in, oldDims);
+}
+
+#define gradient__device(X_or_Y) \
+__global__ void gradient## X_or_Y ##_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize) { \
+    int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;\
+    if (x < 2 || x > imgSize.x - 2 || y < 2 || y > imgSize.y - 2) return;\
+    gradient ## X_or_Y (grad, x, y, image, imgSize);\
+}
+
+gradient__device(X);
+gradient__device(Y);
 
 // host methods
 
@@ -122,51 +154,4 @@ void ITMLowLevelEngine_CUDA::GradientY(ITMShort4Image *grad_out, const ITMUChar4
 	ITMSafeCall(cudaMemset(grad, 0, imgSize.x * imgSize.y * sizeof(Vector4s)));
 
 	gradientY_device << <gridSize, blockSize >> >(grad, image, imgSize);
-}
-
-// device functions
-
-__global__ void filterSubsample_device(Vector4u *imageData_out, Vector2i newDims, const Vector4u *imageData_in, Vector2i oldDims)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
-
-	if (x > newDims.x - 1 || y > newDims.y - 1) return;
-
-	filterSubsample(imageData_out, x, y, newDims, imageData_in, oldDims);
-}
-
-__global__ void filterSubsampleWithHoles_device(float *imageData_out, Vector2i newDims, const float *imageData_in, Vector2i oldDims)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
-
-	if (x > newDims.x - 1 || y > newDims.y - 1) return;
-
-	filterSubsampleWithHoles(imageData_out, x, y, newDims, imageData_in, oldDims);
-}
-
-__global__ void filterSubsampleWithHoles_device(Vector4f *imageData_out, Vector2i newDims, const Vector4f *imageData_in, Vector2i oldDims)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
-
-	if (x > newDims.x - 1 || y > newDims.y - 1) return;
-
-	filterSubsampleWithHoles(imageData_out, x, y, newDims, imageData_in, oldDims);
-}
-
-__global__ void gradientX_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
-
-	if (x < 2 || x > imgSize.x - 2 || y < 2 || y > imgSize.y - 2) return;
-
-	gradientX(grad, x, y, image, imgSize);
-}
-
-__global__ void gradientY_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize)
-{
-	int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
-
-	if (x < 2 || x > imgSize.x - 2 || y < 2 || y > imgSize.y - 2) return;
-
-	gradientY(grad, x, y, image, imgSize);
 }

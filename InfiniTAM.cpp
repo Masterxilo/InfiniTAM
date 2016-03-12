@@ -78,14 +78,6 @@ static void CreateDefaultImageSource(ImageSourceEngine* & imageSource, IMUSource
 			imageSource = NULL;
 		}
 	}
-
-	// this is a hack to ensure backwards compatibility in certain configurations
-	if (imageSource == NULL) return;
-	if (imageSource->calib.disparityCalib.params == Vector2f(0.0f, 0.0f))
-	{
-		imageSource->calib.disparityCalib.type = ITMDisparityCalib::TRAFO_AFFINE;
-		imageSource->calib.disparityCalib.params = Vector2f(1.0f/1000.0f, 0.0f);
-	}
 }
 
 void pause() {
@@ -95,9 +87,7 @@ void record();
 
 // Files\Calibrations\Kinect2\calib.txt
 // Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/%2504i.ppm Files/Scenes/Teddy/Frames/%2504i.pgm
-int main(int argc, char** argv)
-try
-{
+int main(int argc, char** argv) {
     atexit(pause);
 	const char *arg1 = "";
 	const char *arg2 = NULL;
@@ -143,7 +133,7 @@ try
 
     
 	UIEngine::Instance()->Initialise(argc, argv, imageSource, imuSource, mainEngine, 
-        // out sir must use backslashes for internal system("rmdir" calls
+        // out dir must use backslashes for internal system("rmdir" calls
         "Files\\Scenes\\Out", 
         internalSettings->deviceType);
 	
@@ -153,6 +143,7 @@ try
         UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_VIDEO;
     }
    
+    // Start recording anything that happens
     //record();
 
     UIEngine::Instance()->Run();
@@ -163,10 +154,5 @@ try
 	delete imageSource;
 	if (imuSource != NULL) delete imuSource;
 	return 0;
-}
-catch(std::exception& e)
-{
-	std::cerr << e.what() << '\n';
-	return EXIT_FAILURE;
 }
 

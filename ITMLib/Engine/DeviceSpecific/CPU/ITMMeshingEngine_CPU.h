@@ -8,7 +8,10 @@ namespace ITMLib
 {
 	namespace Engine
 	{
-		template<class TVoxel, class TIndex>
+		template<
+        class TVoxel, 
+        class TIndex //<! ITMVoxelBlockHash or ITMPlainVoxelArray
+        >
 		class ITMMeshingEngine_CPU : public ITMMeshingEngine < TVoxel, TIndex >
 		{};
 
@@ -18,8 +21,6 @@ namespace ITMLib
 		public:
 			void MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
 
-			ITMMeshingEngine_CPU(void);
-			~ITMMeshingEngine_CPU(void);
 		};
 
 		template<class TVoxel>
@@ -28,8 +29,6 @@ namespace ITMLib
 		public:
 			void MeshScene(ITMMesh *mesh, const ITMScene<TVoxel, ITMPlainVoxelArray> *scene);
 
-			ITMMeshingEngine_CPU(void);
-			~ITMMeshingEngine_CPU(void);
 		};
 	}
 }

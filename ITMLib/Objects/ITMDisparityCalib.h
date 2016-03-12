@@ -30,7 +30,7 @@ namespace ITMLib
 
 			TrafoType type;
 
-			/** These are the actual parameters. */
+			/** These are the actual parameters \f$(c_1, c_2)\f$. */
 			Vector2f params;
 
 			/** Setup from given arguments. */

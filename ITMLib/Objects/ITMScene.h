@@ -16,7 +16,9 @@ namespace ITMLib
 		Represents the 3D world model as a hash of small voxel
 		blocks
 		*/
-		template<class TVoxel, class TIndex>
+		template<class TVoxel, //!< any of the ITMVoxel_ classes
+        class TIndex //!< 
+        >
 		class ITMScene
 		{
 		public:

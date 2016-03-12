@@ -27,20 +27,23 @@ void ITMSceneReconstructionEngine_CPU<TVoxel,ITMVoxelBlockHash>::ResetScene(ITMS
 	int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
 	int blockSize = scene->index.getVoxelBlockSize();
 
+    // Reset all voxels in all voxel blocks
 	TVoxel *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
 	for (int i = 0; i < numBlocks * blockSize; ++i) voxelBlocks_ptr[i] = TVoxel();
+
+    // Reset voxel allocation list
 	int *vbaAllocationList_ptr = scene->localVBA.GetAllocationList();
 	for (int i = 0; i < numBlocks; ++i) vbaAllocationList_ptr[i] = i;
 	scene->localVBA.lastFreeBlockId = numBlocks - 1;
 
-	ITMHashEntry tmpEntry;
-	memset(&tmpEntry, 0, sizeof(ITMHashEntry));
-	tmpEntry.ptr = -2;
+    // Reset hash entries
+    ITMHashEntry tmpEntry = ITMHashEntry::createIllegalEntry();
 	ITMHashEntry *hashEntry_ptr = scene->index.GetEntries();
 	for (int i = 0; i < scene->index.noTotalEntries; ++i) hashEntry_ptr[i] = tmpEntry;
+
+    // Reset excess allocation list
 	int *excessList_ptr = scene->index.GetExcessAllocationList();
 	for (int i = 0; i < SDF_EXCESS_LIST_SIZE; ++i) excessList_ptr[i] = i;
-
 	scene->index.SetLastFreeExcessListId(SDF_EXCESS_LIST_SIZE - 1);
 }
 
@@ -109,6 +112,8 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
 	}
 }
 
+
+/// allocation & visible list update
 template<class TVoxel>
 void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneFromDepth(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view,
 	const ITMTrackingState *trackingState, const ITMRenderState *renderState, bool onlyUpdateVisibleList)
@@ -132,9 +137,11 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
+    // [swapping[
 	ITMHashSwapState *swapStates = scene->useSwapping ? 
         scene->globalCache->GetSwapStates(false) : 0;
 	/* not const, changed later */ bool useSwapping = scene->useSwapping;
+    // ]swapping]
 
     uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 

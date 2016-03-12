@@ -47,15 +47,17 @@ void ITMDenseMapper<TVoxel,TIndex>::ResetScene(ITMScene<TVoxel,TIndex> *scene)
 	sceneRecoEngine->ResetScene(scene);
 }
 
+/// Fusion stage of the system
 template<class TVoxel, class TIndex>
 void ITMDenseMapper<TVoxel,TIndex>::ProcessFrame(const ITMView *view, const ITMTrackingState *trackingState, ITMScene<TVoxel,TIndex> *scene, ITMRenderState *renderState)
 {
-	// allocation
+	// allocation & visible list update
 	sceneRecoEngine->AllocateSceneFromDepth(scene, view, trackingState, renderState);
 
-	// integration
+	// camera data integration
 	sceneRecoEngine->IntegrateIntoScene(scene, view, trackingState, renderState);
 
+    // host / device swapping
 	if (swappingEngine != NULL) {
 		// swapping: CPU -> GPU
 		swappingEngine->IntegrateGlobalIntoLocal(scene, renderState);

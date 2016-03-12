@@ -30,6 +30,8 @@ namespace ITMLib
 			intersection with the actual surface. Should be
 			updated by a ITMLib::Engine::ITMVisualisationEngine
 			before any raycasting operation.
+
+            Initialized to (vf_min, vf_max)
 			*/
 			ORUtils::Image<Vector2f> *renderingRangeImage;
 

@@ -35,7 +35,7 @@
 // Voxel Hashing definition and helper functions
 //////////////////////////////////////////////////////////////////////////
 
-#define SDF_BLOCK_SIZE 8				// SDF block size
+#define SDF_BLOCK_SIZE 8
 #define SDF_BLOCK_SIZE3 (SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE)
 #define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks
 
@@ -43,7 +43,7 @@
 #define SDF_HASH_MASK (SDF_BUCKET_NUM-1)// Used for get hashing value of the bucket index, "x & (uint)SDF_HASH_MASK" is the same as "x % SDF_BUCKET_NUM"
 #define SDF_EXCESS_LIST_SIZE 0x20000	// Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
 
-#define SDF_GLOBAL_BLOCK_NUM (SDF_BUCKET_NUM+SDF_EXCESS_LIST_SIZE)	// Number of globally stored blocks
+#define SDF_GLOBAL_BLOCK_NUM (SDF_BUCKET_NUM+SDF_EXCESS_LIST_SIZE)	// Number of globally stored blocks == size of ordered + unordered part of hash table
 #define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
 
 //////////////////////////////////////////////////////////////////////////
@@ -92,6 +92,14 @@ struct ITMHashEntry
     _CPU_AND_GPU_CODE_ bool isAllocated() { return ptr >= -1; }
 
     _CPU_AND_GPU_CODE_ bool isUnallocated() { return ptr < -1; }
+
+    // an unallocated entry, used for resetting
+    static ITMHashEntry createIllegalEntry() {
+        ITMHashEntry tmpEntry;
+        memset(&tmpEntry, 0, sizeof(ITMHashEntry));
+        tmpEntry.ptr = -2;
+        return tmpEntry;
+    }
 };
 /// 0 - most recent data is on host, data not currently in active
 ///     memory
@@ -239,9 +247,6 @@ typedef ITMLib::Objects::ITMVoxelBlockHash ITMVoxelIndex;
 
 #include "../../ORUtils/Image.h"
 
-//////////////////////////////////////////////////////////////////////////
-// Do not change below this point
-//////////////////////////////////////////////////////////////////////////
 #ifndef ITMFloatImage
 #define ITMFloatImage ORUtils::Image<float>
 #endif
@@ -288,15 +293,6 @@ typedef ITMLib::Objects::ITMVoxelBlockHash ITMVoxelIndex;
 
 #ifndef ITMBoolImage
 #define ITMBoolImage ORUtils::Image<bool>
-#endif
-
-//debug
-#ifndef DEBUGBREAK
-#define DEBUGBREAK \
-{ \
-	int ryifrklaeybfcklarybckyar=0; \
-	ryifrklaeybfcklarybckyar++; \
-}
 #endif
 
 #ifndef TRACKER_ITERATION_TYPE

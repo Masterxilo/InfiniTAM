@@ -7,27 +7,19 @@
 using namespace ITMLib::Engine;
 
 template<class TVoxel>
-ITMSwappingEngine_CPU<TVoxel,ITMVoxelBlockHash>::ITMSwappingEngine_CPU(void)
-{
-}
-
-template<class TVoxel>
-ITMSwappingEngine_CPU<TVoxel,ITMVoxelBlockHash>::~ITMSwappingEngine_CPU(void)
-{
-}
-
-template<class TVoxel>
 int ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::LoadFromGlobalMemory(ITMScene<TVoxel, ITMVoxelBlockHash> *scene)
 {
 	ITMGlobalCache<TVoxel> *globalCache = scene->globalCache;
 
 	ITMHashSwapState *swapStates = globalCache->GetSwapStates(false);
 
-	int *neededEntryIDs_local = globalCache->GetNeededEntryIDs(false);
+    TVoxel *syncedVoxelBlocks_local = globalCache->transferBuffer_host->syncedVoxelBlocks;
+    bool *hasSyncedData_local = globalCache->transferBuffer_host->hasSyncedData;
+    int *neededEntryIDs_local = globalCache->transferBuffer_host->neededEntryIDs;
 
-	TVoxel *syncedVoxelBlocks_global = globalCache->GetSyncedVoxelBlocks(false);
-	bool *hasSyncedData_global = globalCache->GetHasSyncedData(false);
-	int *neededEntryIDs_global = globalCache->GetNeededEntryIDs(false);
+    TVoxel *syncedVoxelBlocks_global = globalCache->transferBuffer_host->syncedVoxelBlocks;
+    bool *hasSyncedData_global = globalCache->transferBuffer_host->hasSyncedData;
+    int *neededEntryIDs_global = globalCache->transferBuffer_host->neededEntryIDs;
 
 	int noTotalEntries = globalCache->noTotalEntries;
 
@@ -44,21 +36,7 @@ int ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::LoadFromGlobalMemory(ITMSc
 
 	// would copy neededEntryIDs_local into neededEntryIDs_global here
 
-	if (noNeededEntries > 0)
-	{
-		memset(syncedVoxelBlocks_global, 0, noNeededEntries * SDF_BLOCK_SIZE3 * sizeof(TVoxel));
-		memset(hasSyncedData_global, 0, noNeededEntries * sizeof(bool));
-		for (int i = 0; i < noNeededEntries; i++)
-		{
-			int entryId = neededEntryIDs_global[i];
-
-			if (globalCache->HasStoredData(entryId))
-			{
-				hasSyncedData_global[i] = true;
-				memcpy(syncedVoxelBlocks_global + i * SDF_BLOCK_SIZE3, globalCache->GetStoredVoxelBlock(entryId), SDF_BLOCK_SIZE3 * sizeof(TVoxel));
-			}
-		}
-	}
+    FillTransferBuffer(globalCache, noNeededEntries);
 
 	// would copy syncedVoxelBlocks_global and hasSyncedData_global 
     // to syncedVoxelBlocks_local and hasSyncedData_local here
@@ -75,9 +53,9 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateGlobalIntoLocal(
 
 	ITMHashSwapState *swapStates = globalCache->GetSwapStates(false);
 
-	TVoxel *syncedVoxelBlocks_local = globalCache->GetSyncedVoxelBlocks(false);
-	bool *hasSyncedData_local = globalCache->GetHasSyncedData(false);
-	int *neededEntryIDs_local = globalCache->GetNeededEntryIDs(false);
+    TVoxel *syncedVoxelBlocks_local = globalCache->transferBuffer_host->syncedVoxelBlocks;
+    bool *hasSyncedData_local = globalCache->transferBuffer_host->hasSyncedData;
+    int *neededEntryIDs_local = globalCache->transferBuffer_host->neededEntryIDs;
 
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 
@@ -116,13 +94,13 @@ void ITMSwappingEngine_CPU<TVoxel, ITMVoxelBlockHash>::SaveToGlobalMemory(ITMSce
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 	uchar *entriesVisibleType = ((ITMRenderState_VH*)renderState)->GetEntriesVisibleType();
 
-	TVoxel *syncedVoxelBlocks_local = globalCache->GetSyncedVoxelBlocks(false);
-	bool *hasSyncedData_local = globalCache->GetHasSyncedData(false);
-	int *neededEntryIDs_local = globalCache->GetNeededEntryIDs(false);
+    TVoxel *syncedVoxelBlocks_local = globalCache->transferBuffer_host->syncedVoxelBlocks;
+    bool *hasSyncedData_local       = globalCache->transferBuffer_host->hasSyncedData;
+    int *neededEntryIDs_local       = globalCache->transferBuffer_host->neededEntryIDs;
 
-	TVoxel *syncedVoxelBlocks_global = globalCache->GetSyncedVoxelBlocks(false);
-	bool *hasSyncedData_global = globalCache->GetHasSyncedData(false);
-	int *neededEntryIDs_global = globalCache->GetNeededEntryIDs(false);
+    TVoxel *syncedVoxelBlocks_global = globalCache->transferBuffer_host->syncedVoxelBlocks;
+    bool *hasSyncedData_global       = globalCache->transferBuffer_host->hasSyncedData;
+    int *neededEntryIDs_global       = globalCache->transferBuffer_host->neededEntryIDs;
 
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	int *voxelAllocationList = scene->localVBA.GetAllocationList();

@@ -45,7 +45,7 @@ _CPU_AND_GPU_CODE_ inline float getColorDifference(DEVICEPTR(Vector4f) *location
     return true;
 }
 
-/// Compute squared difference between color in rgb image and on model (colours)
+/// Compute squared difference between color in rgb image (rgb) and on model (colours)
 /// \f[||I_C(\pi(M p)) - C(p)||_2^2\f]
 /// where p and C(p) are the 3D points and their colours, as extracted in
 /// the raycasting stage, and \f$I_C\f$ is the current colour image.
@@ -75,7 +75,7 @@ _CPU_AND_GPU_CODE_ inline bool computePerPointGH_rt_Color(THREADPTR(float) *loca
     int locId_global, Vector4f projParams, Matrix4f M, DEVICEPTR(Vector4s) *gx, DEVICEPTR(Vector4s) *gy, int numPara, int startPara)
 {
     Vector4f pt_camera, gx_obs, gy_obs;
-    Vector3f colour_diff_d, d_pt_cam_dpi, d[6];
+    Vector3f colour_diff_d, d[6];
     Vector2f pt_image, d_proj_dpi;
 
 
@@ -89,6 +89,7 @@ _CPU_AND_GPU_CODE_ inline bool computePerPointGH_rt_Color(THREADPTR(float) *loca
 
     for (int para = 0, counter = 0; para < numPara; para++)
     {
+        Vector3f d_pt_cam_dpi;
         switch (para + startPara)
         {
         case 0: d_pt_cam_dpi.x = pt_camera.w;  d_pt_cam_dpi.y = 0.0f;         d_pt_cam_dpi.z = 0.0f;         break;

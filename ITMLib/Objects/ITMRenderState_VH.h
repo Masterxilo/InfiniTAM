@@ -22,46 +22,39 @@ namespace ITMLib
 
 			/** A list of "visible entries", that are currently
 			being processed by the tracker.
+
+            at most SDF_LOCAL_BLOCK_NUM many, valid up to noVisibleEntries-1 
 			*/
-			ORUtils::MemoryBlock<int> *visibleEntryIDs;
+			ORUtils::MemoryBlock<int> visibleEntryIDs;
 
 			/** A list of "visible entries", that are
 			currently being processed by integration
 			and tracker.
+
+            SDF_GLOBAL_BLOCK_NUM many
 			*/
-			ORUtils::MemoryBlock<uchar> *entriesVisibleType;
+			ORUtils::MemoryBlock<uchar> entriesVisibleType;
             
 		public:
 			/** Number of entries in the live list. */
 			int noVisibleEntries;
             
-			ITMRenderState_VH(int noTotalEntries, const Vector2i & imgSize, float vf_min, float vf_max, MemoryDeviceType memoryType = MEMORYDEVICE_CPU)
-				: ITMRenderState(imgSize, vf_min, vf_max, memoryType)
-            {
-				this->memoryType = memoryType;
-
-				visibleEntryIDs = new ORUtils::MemoryBlock<int>(SDF_LOCAL_BLOCK_NUM, memoryType);
-				entriesVisibleType = new ORUtils::MemoryBlock<uchar>(noTotalEntries, memoryType);
-				
+			ITMRenderState_VH(int noTotalEntries, const Vector2i & imgSize, float vf_min, float vf_max,
+                MemoryDeviceType memoryType = MEMORYDEVICE_CPU)
+                : ITMRenderState(imgSize, vf_min, vf_max, memoryType),
+                memoryType(memoryType),
+                visibleEntryIDs(SDF_LOCAL_BLOCK_NUM, memoryType),
+            entriesVisibleType(noTotalEntries, memoryType)
+            {				
 				noVisibleEntries = 0;
-            }
-            
-			~ITMRenderState_VH()
-            {
-				delete visibleEntryIDs;
-				delete entriesVisibleType;
             }
 
 			/** Get the list of "visible entries", that are currently
 			processed by the tracker.
 			*/
-			const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs->GetData(memoryType); }
-			int *GetVisibleEntryIDs(void) { return visibleEntryIDs->GetData(memoryType); }
-
-			/** Get the list of "visible entries", that are
-			currently processed by integration and tracker.
-			*/
-			uchar *GetEntriesVisibleType(void) { return entriesVisibleType->GetData(memoryType); }
+			const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs.GetData(memoryType); }
+			int *GetVisibleEntryIDs(void) { return visibleEntryIDs.GetData(memoryType); }
+            uchar *GetEntriesVisibleType(void) { return entriesVisibleType.GetData(memoryType); }
 
 #ifdef COMPILE_WITH_METAL
 			const void* GetVisibleEntryIDs_MB(void) { return visibleEntryIDs->GetMetalBuffer(); }

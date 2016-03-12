@@ -22,7 +22,7 @@ namespace ITMLib
 		{
 		private:
 			bool *hasStoredData;
-            /// Large buffer for SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE voxel blocks,
+            /// Large buffer for SDF_GLOBAL_BLOCK_NUM voxel blocks,
             /// enough to accommodate all blocks that could possibly exist
 			TVoxel *storedVoxelBlocks;
             inline TVoxel *GetStoredVoxelBlockPtr(int address) { 
@@ -31,18 +31,6 @@ namespace ITMLib
 
 			ITMHashSwapState *swapStates_host, *swapStates_device;
 
-            /// Transfer buffer. At most SDF_TRANSFER_BLOCK_NUM entries.
-            struct TransferBuffer {
-                bool *hasSyncedData;
-                TVoxel *syncedVoxelBlocks;
-                int *neededEntryIDs;
-            };
-            TransferBuffer* transferBuffer_host;
-            TransferBuffer* transferBuffer_device;
-
-			bool *hasSyncedData_host, *hasSyncedData_device;
-			TVoxel *syncedVoxelBlocks_host, *syncedVoxelBlocks_device;
-            int *neededEntryIDs_host, *neededEntryIDs_device;
             
 		public:
             /** Copy the voxel block (SDF_BLOCK_SIZE3 * TVoxel voxels) at 
@@ -58,19 +46,35 @@ namespace ITMLib
             /// noTotalEntries many
 			ITMHashSwapState *GetSwapStates(bool useGPU) { return useGPU ? swapStates_device : swapStates_host; }
 			
-            /// Transfer buffer. At most SDF_TRANSFER_BLOCK_NUM entries.
-			bool *GetHasSyncedData(bool useGPU) const { return useGPU ? hasSyncedData_device : hasSyncedData_host; }
 
             /// Transfer buffer. At most SDF_TRANSFER_BLOCK_NUM entries.
-            TVoxel *GetSyncedVoxelBlocks(bool useGPU) const { return useGPU ? syncedVoxelBlocks_device : syncedVoxelBlocks_host; }
+            struct TransferBuffer {
+                bool *hasSyncedData;
+                TVoxel *syncedVoxelBlocks;
+                int *neededEntryIDs;
 
-            /// Transfer buffer. At most SDF_TRANSFER_BLOCK_NUM entries.
-            int *GetNeededEntryIDs(bool useGPU) { return useGPU ? neededEntryIDs_device : neededEntryIDs_host; }
+                void clearHasSynchedDataAndBlocks_host(int noNeededEntries) {
+                    memset(syncedVoxelBlocks, 0, noNeededEntries * sizeof(TVoxel::VoxelBlock));
+                    memset(hasSyncedData, 0, noNeededEntries * sizeof(bool));
+                }
+
+                void setSyncedVoxelBlockFrom_host(int i, TVoxel* voxelBlockBase) {
+                    hasSyncedData[i] = true;
+                    memcpy(syncedVoxelBlocks + i * SDF_BLOCK_SIZE3,
+                        voxelBlockBase,
+                        sizeof(TVoxel::VoxelBlock));
+                }
+            };
+            /// global
+            TransferBuffer* transferBuffer_host;
+            /// local
+            TransferBuffer* transferBuffer_device;
 
 			const int noTotalEntries; 
 
-			ITMGlobalCache() : noTotalEntries(SDF_BUCKET_NUM + SDF_EXCESS_LIST_SIZE)
+            ITMGlobalCache() : noTotalEntries(SDF_GLOBAL_BLOCK_NUM)
 			{	
+                // Global store
 				hasStoredData = (bool*)malloc(noTotalEntries * sizeof(bool));
                 size_t storageBytes = noTotalEntries * sizeof(TVoxel) * SDF_BLOCK_SIZE3;
                 storedVoxelBlocks = (TVoxel*)malloc(storageBytes);
@@ -82,18 +86,22 @@ namespace ITMLib
 
 				swapStates_host = (ITMHashSwapState *)malloc(noTotalEntries * sizeof(ITMHashSwapState));
 				memset(swapStates_host, 0, sizeof(ITMHashSwapState) * noTotalEntries);
-
-				syncedVoxelBlocks_host = (TVoxel *)malloc(SDF_TRANSFER_BLOCK_NUM * sizeof(TVoxel) * SDF_BLOCK_SIZE3);
-				hasSyncedData_host = (bool*)malloc(SDF_TRANSFER_BLOCK_NUM * sizeof(bool));
-				neededEntryIDs_host = (int*)malloc(SDF_TRANSFER_BLOCK_NUM * sizeof(int));
 #ifndef COMPILE_WITHOUT_CUDA
-				ITMSafeCall(cudaMalloc((void**)&swapStates_device, noTotalEntries * sizeof(ITMHashSwapState)));
-				ITMSafeCall(cudaMemset(swapStates_device, 0, noTotalEntries * sizeof(ITMHashSwapState)));
+                ITMSafeCall(cudaMalloc((void**)&swapStates_device, noTotalEntries * sizeof(ITMHashSwapState)));
+                ITMSafeCall(cudaMemset(swapStates_device, 0, noTotalEntries * sizeof(ITMHashSwapState)));
+#endif
 
-				ITMSafeCall(cudaMalloc((void**)&syncedVoxelBlocks_device, SDF_TRANSFER_BLOCK_NUM * sizeof(TVoxel) * SDF_BLOCK_SIZE3));
-				ITMSafeCall(cudaMalloc((void**)&hasSyncedData_device, SDF_TRANSFER_BLOCK_NUM * sizeof(bool)));
+                // Transfer buffers
+                transferBuffer_host = new TransferBuffer;
+				transferBuffer_host->syncedVoxelBlocks = (TVoxel *)malloc(SDF_TRANSFER_BLOCK_NUM * sizeof(TVoxel::VoxelBlock));
+				transferBuffer_host->hasSyncedData = (bool*)malloc(SDF_TRANSFER_BLOCK_NUM * sizeof(bool));
+				transferBuffer_host->neededEntryIDs = (int*)malloc(SDF_TRANSFER_BLOCK_NUM * sizeof(int));
 
-				ITMSafeCall(cudaMalloc((void**)&neededEntryIDs_device, SDF_TRANSFER_BLOCK_NUM * sizeof(int)));
+#ifndef COMPILE_WITHOUT_CUDA
+                transferBuffer_device = new TransferBuffer;
+                ITMSafeCall(cudaMalloc((void**)&transferBuffer_device->syncedVoxelBlocks, SDF_TRANSFER_BLOCK_NUM * sizeof(TVoxel::VoxelBlock)));
+				ITMSafeCall(cudaMalloc((void**)&transferBuffer_device->hasSyncedData, SDF_TRANSFER_BLOCK_NUM * sizeof(bool)));
+				ITMSafeCall(cudaMalloc((void**)&transferBuffer_device->neededEntryIDs, SDF_TRANSFER_BLOCK_NUM * sizeof(int)));
 #endif
 			}
 
@@ -137,14 +145,14 @@ namespace ITMLib
 
 				free(swapStates_host);
 
-				free(hasSyncedData_host);
-				free(syncedVoxelBlocks_host);
-				free(neededEntryIDs_host);
+				free(transferBuffer_host->hasSyncedData);
+				free(transferBuffer_host->syncedVoxelBlocks);
+				free(transferBuffer_host->neededEntryIDs);
 #ifndef COMPILE_WITHOUT_CUDA
 				ITMSafeCall(cudaFree(swapStates_device));
-				ITMSafeCall(cudaFree(syncedVoxelBlocks_device));
-				ITMSafeCall(cudaFree(hasSyncedData_device));
-				ITMSafeCall(cudaFree(neededEntryIDs_device));
+				ITMSafeCall(cudaFree(transferBuffer_device->syncedVoxelBlocks));
+				ITMSafeCall(cudaFree(transferBuffer_device->hasSyncedData));
+				ITMSafeCall(cudaFree(transferBuffer_device->neededEntryIDs));
 #endif
 			}
 		};
