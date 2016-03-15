@@ -4,8 +4,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
-class Managed {
-public:
+struct Managed {
     void *operator new(size_t len){
         void *ptr;
         cudaMallocManaged(&ptr, len);
@@ -13,7 +12,7 @@ public:
         return ptr;
     }
 
-        void operator delete(void *ptr) {
+    void operator delete(void *ptr) {
         cudaDeviceSynchronize();
         cudaFree(ptr);
     }

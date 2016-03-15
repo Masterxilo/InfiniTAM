@@ -2,6 +2,14 @@
 
 #pragma once
 
+
+#ifndef COMPILE_WITHOUT_CUDA
+#include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
+#else 
+struct Managed {};
+#define __device__
+#endif
+
 #include <stdlib.h>
 
 #include "../Utils/ITMLibDefines.h"
@@ -32,7 +40,7 @@ namespace ITMLib
             /// Allocation list generating sequential ids
             // Implemented as a countdown semaphore in CUDA unified memory
             // Filled from the top
-            class VoxelAllocationList : Managed {
+            class VoxelAllocationList : public Managed {
             private:
                 /// This index is considered free in the list
                 int lastFreeEntry;
@@ -47,33 +55,42 @@ namespace ITMLib
                     Reset();
                 }
 
-#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
-                __device__ int Allocate() {
-                    return atomicSub(&lastFreeEntry, 1);
-                }
-
-                __device__ void Free(int ptr) {
-                    return atomicSub(&lastFreeEntry, 1);
-                }
-#else
                 /// Returns a free ptr in the local voxel block array
+                /// to be used as the .ptr attribut
                 // Assume single threaded
-                int Allocate() {
-                    int ptr = allocationList[lastFreeEntry];
-                    allocationList[lastFreeEntry] = -1; // now illegal - updating this is not strictly necessary
-                    lastFreeEntry--;
+                // TODO return 0 when nothing can be allocated (full)
+                __device__ int Allocate() {
+                    int ptr;
+#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+                    // Must atomically decrease lastFreeEntry, but retrieve the value at the previous
+                    int newlyReservedEntry = atomicSub(&lastFreeEntry, 1);
+#else
+                    int newlyReservedEntry = lastFreeEntry--;
+#endif
+                    ptr = allocationList[newlyReservedEntry];
+                    allocationList[newlyReservedEntry] = -1; // now illegal - updating this is not strictly necessary
+
                     return ptr;
                 }
 
-                void Free(int ptr) {
+                __device__ void Free(int ptr) {
                     // TODO dont accept when list is full already or when this was never allocated
-                    printf("voxel block %d freed\n", ptr);
-                    lastFreeEntry++;
-                    allocationList[lastFreeEntry] = ptr;
-                }
+                    // that is, when lastFreeEntry >= SDF_LOCAL_BLOCK_NUM - 1
+                    // ^^ should never happen
+
+#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+                    int newlyFreedEntry = atomicAdd(&lastFreeEntry, 1) + 1; // atomicAdd returns the last value, but the new value
+                    // is what is newly free. We should not read the changed lastFreeEntry as it might have changed yet again!
+#else
+                    int newlyFreedEntry = lastFreeEntry++;
 #endif
+                    allocationList[newlyFreedEntry] = ptr;
+                }
+
                 void Reset() {
                     lastFreeEntry = capacity - 1;
+
+                    // allocationList initially contains [0:capacity-1]
 #if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
                     fillArrayKernel<int>(allocationList, capacity);
 #else
