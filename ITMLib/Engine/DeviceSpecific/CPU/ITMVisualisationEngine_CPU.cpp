@@ -61,8 +61,8 @@ void ITMVisualisationEngine_CPU<TVoxel,ITMVoxelBlockHash>::FindVisibleBlocks(con
 
 		if (hashEntry.ptr >= 0)
 		{
-			bool isVisible, isVisibleEnlarged;
-			checkBlockVisibility<false>(isVisible, isVisibleEnlarged, hashEntry.pos, M, projParams, voxelSize, imgSize);
+			bool isVisible;
+			checkBlockVisibility(isVisible, hashEntry.pos, M, projParams, voxelSize, imgSize);
 			hashVisibleType = isVisible;
 		}
 

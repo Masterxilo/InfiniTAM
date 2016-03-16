@@ -18,6 +18,7 @@ struct Managed {
     }
 };
 
+#ifdef __CUDACC__
 inline __device__ void warpReduce(volatile float* sdata, int tid) {
 	sdata[tid] += sdata[tid + 32];
 	sdata[tid] += sdata[tid + 16];
@@ -158,3 +159,4 @@ inline void fillArrayKernel(T *devPtr, size_t nwords)
 	fillArrayKernel_device<T> <<<gridSize,blockSize>>>(devPtr, nwords);
 }
 
+#endif

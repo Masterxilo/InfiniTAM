@@ -44,7 +44,7 @@
 #define SDF_EXCESS_LIST_SIZE 0x20000	// Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
 
 #define SDF_GLOBAL_BLOCK_NUM (SDF_BUCKET_NUM+SDF_EXCESS_LIST_SIZE)	// Number of globally stored blocks == size of ordered + unordered part of hash table
-#define SDF_TRANSFER_BLOCK_NUM 0x1000	// Maximum number of blocks transfered in one swap operation
+
 
 //////////////////////////////////////////////////////////////////////////
 // Voxel Hashing data structures
@@ -84,10 +84,7 @@ struct ITMHashEntry
     int ptr;
 
     _CPU_AND_GPU_CODE_ bool isAllocatedAndActive() { return ptr >= 0; }
-    /// Was once allocated, but is not in active memory.
-    _CPU_AND_GPU_CODE_ bool isSwappedOut() { return ptr == -1; }
-    /// Was once allocated, but is not in active memory.
-    _CPU_AND_GPU_CODE_ void setSwappedOut() { ptr = -1; }
+
     /// Was once allocated, but is maybe not in active memory.
     /// But this space is permanently reserved.
     _CPU_AND_GPU_CODE_ bool isAllocated() { return ptr >= -1; }
@@ -101,26 +98,6 @@ struct ITMHashEntry
         tmpEntry.ptr = -2;
         return tmpEntry;
     }
-};
-/// 0 - most recent data is on host, data not currently in active
-///     memory
-#define HSS_NOT_ACTIVE 0
-/// 1 - data both on host and in active memory, information has not
-///     yet been combined
-/// TODO seems more like this is data that is missing on the device? aah no, in that case it just reallocates
-#define HSS_HOST_AND_ACTIVE_NOT_COMBINED 1
-/// 2 - most recent data is in active memory, should save this data
-///     back to host at some point
-#define HSS_ACTIVE 2
-struct ITMHashSwapState
-{
-	/// 0 - most recent data is on host, data not currently in active
-	///     memory
-	/// 1 - data both on host and in active memory, information has not
-	///     yet been combined
-	/// 2 - most recent data is in active memory, should save this data
-	///     back to host at some point
-	uchar state;
 };
 
 #include "../Objects/ITMVoxelBlockHash.h"

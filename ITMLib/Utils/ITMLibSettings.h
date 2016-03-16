@@ -22,9 +22,6 @@ namespace ITMLib
 			/// Select the type of device to use
 			DeviceType deviceType;
 
-			/// Enables swapping between host and device.
-			bool useSwapping;
-
 			bool useApproximateRaycast;
 
 			bool useBilateralFilter;

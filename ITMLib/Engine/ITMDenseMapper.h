@@ -11,7 +11,6 @@
 
 #include "../Engine/ITMSceneReconstructionEngine.h"
 #include "../Engine/ITMVisualisationEngine.h"
-#include "../Engine/ITMSwappingEngine.h"
 
 namespace ITMLib
 {
@@ -24,7 +23,6 @@ namespace ITMLib
 		{
 		private:
 			ITMSceneReconstructionEngine<TVoxel,TIndex> *sceneRecoEngine;
-			ITMSwappingEngine<TVoxel,TIndex> *swappingEngine;
 
 		public:
 			void ResetScene(ITMScene<TVoxel,TIndex> *scene);

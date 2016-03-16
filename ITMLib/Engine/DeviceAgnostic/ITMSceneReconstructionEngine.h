@@ -126,7 +126,7 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 #define VT_VISIBLE_AND_STREAMED_OUT 2//entry has been streamed out but is visible
 #define VT_VISIBLE_PREVIOUS_AND_UNSTREAMED 3 // visible at previous frame and unstreamed
 
-/// For allocation and visibility determination. Also for judging what to swap in.
+/// For allocation and visibility determination. 
 ///
 /// Determine the blocks around a given depth sample that are currently visible
 /// and need to be allocated.
@@ -191,8 +191,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
             hashEntry = hashTable[hashIdx]; \
             if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.isAllocated()) \
             {\
-                entriesVisibleType[hashIdx] = (hashEntry.isSwappedOut()) ? \
-            VT_VISIBLE_AND_STREAMED_OUT : VT_VISIBLE_AND_IN_MEMORY; \
+                entriesVisibleType[hashIdx] = VT_VISIBLE_AND_IN_MEMORY; \
                 isFound = true; \
                 BREAK;\
             }
@@ -277,101 +276,73 @@ void allocateVoxelBlock(
     entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
 }
 
-template<bool useSwapping>
-_CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible, THREADPTR(bool) &isVisibleEnlarged,
+_CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible,
     const THREADPTR(Vector4f) &pt_model, const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) &projParams_d,
     const CONSTPTR(Vector2i) &imgSize)
 {
     Vector4f pt_camera; Vector2f pt_image;
     if (projectModel(projParams_d, M_d, imgSize, pt_model, pt_camera, pt_image)) {
-        isVisible = true; isVisibleEnlarged = true;
-    }
-    else if (useSwapping)
-    {
-        // If swapping is used, consider the block visible when in the following enlarged region (enlarge by 1/8).
-        Vector4i lims;
-        lims.x = -imgSize.x / 8; lims.y = imgSize.x + imgSize.x / 8;
-        lims.z = -imgSize.y / 8; lims.w = imgSize.y + imgSize.y / 8;
-
-        if (pt_image.x >= lims.x && pt_image.x < lims.y && pt_image.y >= lims.z && pt_image.y < lims.w) isVisibleEnlarged = true;
+        isVisible = true;
     }
 }
 
 /// project the eight corners of the given voxel block
 /// into the camera viewpoint and check their visibility
-template<bool useSwapping>
-_CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible, THREADPTR(bool) &isVisibleEnlarged,
+_CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible,
     const THREADPTR(Vector3s) &hashPos, const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) &projParams_d,
     const CONSTPTR(float) &voxelSize, const CONSTPTR(Vector2i) &imgSize)
 {
     Vector4f pt_model;
     const float factor = (float)SDF_BLOCK_SIZE * voxelSize;
 
-    isVisible = false; isVisibleEnlarged = false;
+    isVisible = false;
 
     // 0 0 0
     pt_model.x = (float)hashPos.x * factor; pt_model.y = (float)hashPos.y * factor;
     pt_model.z = (float)hashPos.z * factor; pt_model.w = 1.0f;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 0 0 1
     pt_model.z += factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 0 1 1
     pt_model.y += factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 1 1 1
     pt_model.x += factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 1 1 0 
     pt_model.z -= factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 1 0 0 
     pt_model.y -= factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 0 1 0
     pt_model.x -= factor; pt_model.y += factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
 
     // 1 0 1
     pt_model.x += factor; pt_model.y -= factor; pt_model.z += factor;
-    checkPointVisibility<useSwapping>(isVisible, isVisibleEnlarged, pt_model, M_d, projParams_d, imgSize);
+    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
     if (isVisible) return;
-}
-
-
-template<typename TVoxel>
-inline
-#ifdef __CUDACC__
-__device__
-#endif
-void reAllocateSwappedOutVoxelBlock(
-    typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
-int targetIdx, uchar *entriesVisibleType, 
-ITMHashEntry *hashTable, AllocationTempData *allocData) {
-    if (entriesVisibleType[targetIdx] > 0 && hashTable[targetIdx].isSwappedOut()) //it is visible and has been previously allocated inside the hash, but deallocated from VBA
-    {
-        int ptr = voxelAllocationList->Allocate();
-        if (ptr >= 0) hashTable[targetIdx].ptr = ptr;
-    }
 }
 
 /// \returns hashVisibleType > 0
 _CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
-    int targetIdx, uchar *entriesVisibleType, bool useSwapping,
-    ITMHashEntry *hashTable, ITMHashSwapState *swapStates,
+    int targetIdx, uchar *entriesVisibleType, 
+    ITMHashEntry *hashTable,
     Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize
     ) {
     unsigned char hashVisibleType = entriesVisibleType[targetIdx];
@@ -382,27 +353,12 @@ _CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
     // (many of these will actually not be visible anymore)
     if (hashVisibleType == VT_VISIBLE_PREVIOUS_AND_UNSTREAMED)
     {
-        bool isVisibleEnlarged, isVisible;
+        bool isVisible;        
+        checkBlockVisibility(isVisible, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
+        if (!isVisible) hashVisibleType = entriesVisibleType[targetIdx] = 0; // no longer visible
 
-#define cbv(useSwapping) checkBlockVisibility<useSwapping>(isVisible, isVisibleEnlarged, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
-#define hide() hashVisibleType = entriesVisibleType[targetIdx] = 0; // no longer visible
-        if (useSwapping)
-        {
-            cbv(true);
-            if (!isVisibleEnlarged) hide();
-        }
-        else {
-            cbv(true);
-            if (!isVisible) hide();
-        }
-#undef cbv
     }
 
-    if (useSwapping)
-    {
-        if (hashVisibleType > 0 && swapStates[targetIdx].state != HSS_ACTIVE)
-            swapStates[targetIdx].state = HSS_HOST_AND_ACTIVE_NOT_COMBINED;
-    }
     return hashVisibleType > 0;
 }
 

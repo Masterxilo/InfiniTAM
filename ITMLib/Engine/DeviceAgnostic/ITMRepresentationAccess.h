@@ -37,7 +37,7 @@ _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(
     // This works too: [[
 	Vector3i locPos = point - blockPos * SDF_BLOCK_SIZE; // localized coordinate
 	return locPos.x + locPos.y * SDF_BLOCK_SIZE + locPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
-    // ]
+    // ]]
 
     // TODO what does this do? Avoid bank conflicts in cache by reindexing?
 	return 

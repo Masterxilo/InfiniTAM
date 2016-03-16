@@ -2,11 +2,9 @@
 
 #pragma once
 
-
 #ifndef COMPILE_WITHOUT_CUDA
 #include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
 #else 
-struct Managed {};
 #define __device__
 #endif
 
@@ -40,7 +38,11 @@ namespace ITMLib
             /// Allocation list generating sequential ids
             // Implemented as a countdown semaphore in CUDA unified memory
             // Filled from the top
-            class VoxelAllocationList : public Managed {
+            class VoxelAllocationList
+#ifndef COMPILE_WITHOUT_CUDA
+                : public Managed 
+#endif
+            {
             private:
                 /// This index is considered free in the list
                 int lastFreeEntry;
@@ -61,7 +63,7 @@ namespace ITMLib
                 // TODO return 0 when nothing can be allocated (full)
                 __device__ int Allocate() {
                     int ptr;
-#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+#if defined(__CUDACC__)
                     // Must atomically decrease lastFreeEntry, but retrieve the value at the previous
                     int newlyReservedEntry = atomicSub(&lastFreeEntry, 1);
 #else
@@ -78,7 +80,7 @@ namespace ITMLib
                     // that is, when lastFreeEntry >= SDF_LOCAL_BLOCK_NUM - 1
                     // ^^ should never happen
 
-#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+#if defined(__CUDACC__)
                     int newlyFreedEntry = atomicAdd(&lastFreeEntry, 1) + 1; // atomicAdd returns the last value, but the new value
                     // is what is newly free. We should not read the changed lastFreeEntry as it might have changed yet again!
 #else
@@ -88,10 +90,11 @@ namespace ITMLib
                 }
 
                 void Reset() {
+                    cudaDeviceSynchronize(); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
                     lastFreeEntry = capacity - 1;
 
                     // allocationList initially contains [0:capacity-1]
-#if !defined(COMPILE_WITHOUT_CUDA) && defined(__CUDACC__)
+#if !defined(COMPILE_WITHOUT_CUDA)
                     fillArrayKernel<int>(allocationList, capacity);
 #else
                     for (int i = 0; i < capacity; ++i) allocationList[i] = i;

@@ -11,24 +11,16 @@ using namespace ITMLib::Engine;
 template<class TVoxel, class TIndex>
 ITMDenseMapper<TVoxel, TIndex>::ITMDenseMapper(const ITMLibSettings *settings)
 {
-	swappingEngine = NULL;
-
 	switch (settings->deviceType)
 	{
-	case ITMLibSettings::DEVICE_CPU:
-		sceneRecoEngine = new ITMSceneReconstructionEngine_CPU<TVoxel,TIndex>();
-		if (settings->useSwapping) swappingEngine = new ITMSwappingEngine_CPU<TVoxel,TIndex>();
-		break;
+    case ITMLibSettings::DEVICE_CPU:
+#ifdef COMPILE_WITHOUT_CUDA
+		scen#endifeRecoEngine = new ITMSceneReconstructionEngine_CPU<TVoxel,TIndex>();
+#endif
+        break;
 	case ITMLibSettings::DEVICE_CUDA:
 #ifndef COMPILE_WITHOUT_CUDA
 		sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA<TVoxel,TIndex>();
-		if (settings->useSwapping) swappingEngine = new ITMSwappingEngine_CUDA<TVoxel,TIndex>();
-#endif
-		break;
-	case ITMLibSettings::DEVICE_METAL:
-#ifdef COMPILE_WITH_METAL
-		sceneRecoEngine = new ITMSceneReconstructionEngine_Metal<TVoxel, TIndex>();
-		if (settings->useSwapping) swappingEngine = new ITMSwappingEngine_CPU<TVoxel, TIndex>();
 #endif
 		break;
 	}
@@ -38,7 +30,6 @@ template<class TVoxel, class TIndex>
 ITMDenseMapper<TVoxel,TIndex>::~ITMDenseMapper()
 {
 	delete sceneRecoEngine;
-	if (swappingEngine!=NULL) delete swappingEngine;
 }
 
 template<class TVoxel, class TIndex>
@@ -56,14 +47,6 @@ void ITMDenseMapper<TVoxel,TIndex>::ProcessFrame(const ITMView *view, const ITMT
 
 	// camera data integration
 	sceneRecoEngine->IntegrateIntoScene(scene, view, trackingState, renderState);
-
-    // host / device swapping
-	if (swappingEngine != NULL) {
-		// swapping: CPU -> GPU
-		swappingEngine->IntegrateGlobalIntoLocal(scene, renderState);
-		// swapping: GPU -> CPU
-		swappingEngine->SaveToGlobalMemory(scene, renderState);
-	}
 }
 
 template<class TVoxel, class TIndex>

@@ -97,20 +97,16 @@ namespace ITMLib
         {
           case ITMLibSettings::DEVICE_CPU:
           {
+#ifdef COMPILE_WITHOUT_CUDA
             return new ITMColorTracker_CPU(trackedImageSize, settings->trackingRegime, settings->noHierarchyLevels, lowLevelEngine);
+#else
+              break;
+#endif
           }
           case ITMLibSettings::DEVICE_CUDA:
           {
 #ifndef COMPILE_WITHOUT_CUDA
             return new ITMColorTracker_CUDA(trackedImageSize, settings->trackingRegime, settings->noHierarchyLevels, lowLevelEngine);
-#else
-            break;
-#endif
-          }
-          case ITMLibSettings::DEVICE_METAL:
-          {
-#ifdef COMPILE_WITH_METAL
-            return new ITMColorTracker_CPU(trackedImageSize, settings->trackingRegime, settings->noHierarchyLevels, lowLevelEngine);
 #else
             break;
 #endif
@@ -131,6 +127,7 @@ namespace ITMLib
         {
           case ITMLibSettings::DEVICE_CPU:
           {
+#ifdef COMPILE_WITHOUT_CUDA
             return new ITMDepthTracker_CPU(
               trackedImageSize,
               settings->trackingRegime,
@@ -139,7 +136,10 @@ namespace ITMLib
               settings->depthTrackerICPThreshold,
               settings->depthTrackerTerminationThreshold,
               lowLevelEngine
-            );
+              );
+#else
+              break;
+#endif
           }
           case ITMLibSettings::DEVICE_CUDA:
           {
@@ -187,7 +187,8 @@ namespace ITMLib
 		  switch (settings->deviceType)
 		  {
 		  case ITMLibSettings::DEVICE_CPU:
-		  {
+          {
+#ifdef COMPILE_WITHOUT_CUDA
 			  return new ITMWeightedICPTracker_CPU(
 				  trackedImageSize,
 				  settings->trackingRegime,
@@ -196,7 +197,10 @@ namespace ITMLib
 				  settings->depthTrackerICPThreshold,
 				  settings->depthTrackerTerminationThreshold,
 				  lowLevelEngine
-				  );
+                  );
+#else
+              break;
+#endif
 		  }
 		  case ITMLibSettings::DEVICE_CUDA:
 		  {
@@ -246,6 +250,7 @@ namespace ITMLib
         {
           case ITMLibSettings::DEVICE_CPU:
           {
+#ifdef COMPILE_WITHOUT_CUDA
             ITMCompositeTracker *compositeTracker = new ITMCompositeTracker(2);
             compositeTracker->SetTracker(new ITMIMUTracker(imuCalibrator), 0);
             compositeTracker->SetTracker(
@@ -260,6 +265,9 @@ namespace ITMLib
               ), 1
             );
             return compositeTracker;
+#else
+              break;
+#endif
           }
           case ITMLibSettings::DEVICE_CUDA:
           {
@@ -319,12 +327,16 @@ namespace ITMLib
         {
           case ITMLibSettings::DEVICE_CPU:
           {
+#ifdef COMPILE_WITHOUT_CUDA
             return new ITMRenTracker_CPU<TVoxel, TIndex>(
               trackedImageSize,
               settings->trackingRegime,
               2,
               lowLevelEngine, scene
-            );
+              );
+#else
+              break;
+#endif
           }
           case ITMLibSettings::DEVICE_CUDA:
           {

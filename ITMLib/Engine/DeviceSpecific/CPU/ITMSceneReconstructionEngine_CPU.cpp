@@ -112,7 +112,9 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::IntegrateIntoS
 /// allocation & visible list update
 template<class TVoxel>
 void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneFromDepth(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view,
-	const ITMTrackingState *trackingState, const ITMRenderState *renderState, bool onlyUpdateVisibleList)
+	const ITMTrackingState *trackingState,
+    const ITMRenderState *renderState,
+    bool onlyUpdateVisibleList)
 {
 	const float voxelSize = scene->sceneParams->voxelSize;
 
@@ -132,12 +134,6 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	float *depth = view->depth->GetData(MEMORYDEVICE_CPU);
 
 	ITMHashEntry *hashTable = scene->index.GetEntries();
-
-    // [swapping[
-	ITMHashSwapState *swapStates = scene->useSwapping ? 
-        scene->globalCache->GetSwapStates(false) : 0;
-	/* not const, changed later */ bool useSwapping = scene->useSwapping;
-    // ]swapping]
 
     uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
 
@@ -178,8 +174,6 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	}
 
     // Use results
-
-	if (onlyUpdateVisibleList) useSwapping = false;
 	if (!onlyUpdateVisibleList)
 	{
 		// allocate
@@ -201,20 +195,10 @@ void ITMSceneReconstructionEngine_CPU<TVoxel, ITMVoxelBlockHash>::AllocateSceneF
 	for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
 	{
         if (visibilityTestIfNeeded(
-            targetIdx, entriesVisibleType, useSwapping, hashTable, swapStates,
+            targetIdx, entriesVisibleType, hashTable,
             M_d, projParams_d, depthImgSize, voxelSize))
 		{	
             visibleEntryIDs[allocData.noVisibleEntries++] = targetIdx;
-		}
-	}
-
-	//reallocate deleted ones from previous swap operation
-	if (useSwapping)
-	{
-		for (int targetIdx = 0; targetIdx < noTotalEntries; targetIdx++)
-		{
-            reAllocateSwappedOutVoxelBlock<TVoxel>(voxelAllocationList,
-                targetIdx, entriesVisibleType, hashTable, &allocData);
 		}
 	}
 
