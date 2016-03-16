@@ -232,11 +232,13 @@ struct AllocationTempData {
 };
 
 /// \returns false when the list is full
+
+template<typename TVoxel>
+inline
 #ifdef __CUDACC__
 __device__
 #endif
-template<typename TVoxel>
-inline void allocateVoxelBlock(
+void allocateVoxelBlock(
     int targetIdx,
 
     typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
@@ -349,11 +351,13 @@ _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible, 
     if (isVisible) return;
 }
 
+
+template<typename TVoxel>
+inline
 #ifdef __CUDACC__
 __device__
 #endif
-template<typename TVoxel>
-inline void reAllocateSwappedOutVoxelBlock(
+void reAllocateSwappedOutVoxelBlock(
     typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
 int targetIdx, uchar *entriesVisibleType, 
 ITMHashEntry *hashTable, AllocationTempData *allocData) {
