@@ -65,7 +65,9 @@ namespace ITMLib
 			ITMTrackingState *trackingState;
 
 			ITMScene<ITMVoxel, ITMVoxelIndex> *scene;
+            /// Describes the tracked camera position and possibly a frame rendered from that position
 			ITMRenderState *renderState_live;
+            /// Describes a free camera position and frame rendered from that position
 			ITMRenderState *renderState_freeview;
 
 		public:

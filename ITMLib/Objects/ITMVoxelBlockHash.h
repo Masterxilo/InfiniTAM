@@ -46,6 +46,8 @@ namespace ITMLib
 		public:
             /// Allocation list generating sequential ids
             // Implemented as a countdown semaphore in CUDA unified memory
+            // TODO we might as well count up.
+            // TODO we dont currently check for underflow, clients are assumed to test returned values
             class ExcessAllocationList : public Managed
             {
             private:
@@ -63,10 +65,10 @@ namespace ITMLib
                 }
 
                 void Reset() {
-                    cudaDeviceSynchronize(); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
+                    cudaDeviceSynchronize(); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be pagelocked)
                     lastFreeEntry = capacity - 1;
                 }
-            } * excessAllocationList;
+            } * excessAllocationList; // Must be allocated with new for Managed memory management to kick in.
             
 			ITMVoxelBlockHash(MemoryDeviceType memoryType) :
                 memoryType(memoryType),

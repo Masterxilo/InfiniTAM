@@ -77,7 +77,7 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 	// fusion
 	if (fusionActive) denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
 
-	// raycast to renderState_live for tracking and free visualisation
+	// raycast to renderState_live for tracking in next iteration
 	trackingController->Prepare(trackingState, view, renderState_live);
 }
 

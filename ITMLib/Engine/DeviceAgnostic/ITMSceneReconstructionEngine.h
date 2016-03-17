@@ -142,7 +142,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
     Vector4f invProjParams_d, //!< Note: Inverse projection parameters to avoid division by fx, fy.
     float mu, 
     Vector2i imgSize,
-    float oneOverVoxelSize, //!< 1 / (voxelSize * SDF_BLOCK_SIZE)
+    float oneOverVoxelBlockWorldspaceSize, //!< 1 / (voxelSize * SDF_BLOCK_SIZE)
     const CONSTPTR(ITMHashEntry) *hashTable, //<! [in] hash table buckets, indexed by values computed from hashIndex
     float viewFrustum_min, //!< znear
     float viewFrustum_max  //!< zfar
@@ -161,8 +161,9 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
     float norm = length(pt_camera_f.toVector3());
 
     // Transform into block coordinates the found point +- mu
-    point = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f - mu / norm))) * oneOverVoxelSize;
-    point_e = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f + mu / norm))) * oneOverVoxelSize;
+    // TODO why /norm? An adhoc fix to not allocate too much when far away and allocate more when nearby?
+    point = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f - mu / norm))) * oneOverVoxelBlockWorldspaceSize;
+    point_e = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f + mu / norm))) * oneOverVoxelBlockWorldspaceSize;
 
     // We will step along point -> point_e and add all voxel blocks we encounter to the visible list
     // "Create a segment on the line of sight in the range of the T-SDF truncation band"
@@ -286,6 +287,7 @@ _CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible,
     }
 }
 
+#define indicator(x) (x ? 1.f : 0.f)
 /// project the eight corners of the given voxel block
 /// into the camera viewpoint and check their visibility
 _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible,
@@ -293,50 +295,18 @@ _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible,
     const CONSTPTR(float) &voxelSize, const CONSTPTR(Vector2i) &imgSize)
 {
     Vector4f pt_model;
-    const float factor = (float)SDF_BLOCK_SIZE * voxelSize;
+    const float voxelBlockWorldSize = (float)SDF_BLOCK_SIZE * voxelSize;
 
     isVisible = false;
 
-    // 0 0 0
-    pt_model.x = (float)hashPos.x * factor; pt_model.y = (float)hashPos.y * factor;
-    pt_model.z = (float)hashPos.z * factor; pt_model.w = 1.0f;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 0 0 1
-    pt_model.z += factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 0 1 1
-    pt_model.y += factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 1 1 1
-    pt_model.x += factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 1 1 0 
-    pt_model.z -= factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 1 0 0 
-    pt_model.y -= factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 0 1 0
-    pt_model.x -= factor; pt_model.y += factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
-
-    // 1 0 1
-    pt_model.x += factor; pt_model.y -= factor; pt_model.z += factor;
-    checkPointVisibility(isVisible, pt_model, M_d, projParams_d, imgSize);
-    if (isVisible) return;
+    pt_model = Vector4f(hashPos.toFloat() * voxelBlockWorldSize, 1);
+    // loop over corners
+    for (int xyz = 0; xyz <= 7; xyz++) {
+        checkPointVisibility(isVisible, 
+            pt_model + voxelBlockWorldSize * Vector4f(indicator(xyz & 4), indicator(xyz & 2), indicator(xyz & 1), 0),
+            M_d, projParams_d, imgSize);
+        if (isVisible) return;
+    }
 }
 
 /// \returns hashVisibleType > 0

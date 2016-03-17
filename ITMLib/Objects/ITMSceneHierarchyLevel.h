@@ -11,7 +11,7 @@ namespace ITMLib
 		class ITMSceneHierarchyLevel
 		{
 		public:
-			int levelId;
+			const int levelId;
 
 			TrackerIterationType iterationType;
 
@@ -21,10 +21,10 @@ namespace ITMLib
 
 			bool manageData;
 
-			ITMSceneHierarchyLevel(Vector2i imgSize, int levelId, TrackerIterationType iterationType, MemoryDeviceType memoryType, bool skipAllocation = false)
+			ITMSceneHierarchyLevel(Vector2i imgSize, int levelId, TrackerIterationType iterationType, MemoryDeviceType memoryType, bool skipAllocation = false) :
+                levelId(levelId)
 			{
 				this->manageData = !skipAllocation;
-				this->levelId = levelId;
 				this->iterationType = iterationType;
 
 				if (!skipAllocation) {

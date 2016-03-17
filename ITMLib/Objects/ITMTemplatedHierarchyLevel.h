@@ -10,7 +10,7 @@ namespace ITMLib
 		class ITMTemplatedHierarchyLevel
 		{
 		public:
-			int levelId;
+			const int levelId;
 
 			TrackerIterationType iterationType;
 
@@ -19,10 +19,9 @@ namespace ITMLib
 			bool manageData;
 
 			ITMTemplatedHierarchyLevel(Vector2i imgSize, int levelId, TrackerIterationType iterationType, 
-				MemoryDeviceType memoryType, bool skipAllocation = false)
+                MemoryDeviceType memoryType, bool skipAllocation = false) : levelId(levelId)
 			{
 				this->manageData = !skipAllocation;
-				this->levelId = levelId;
 				this->iterationType = iterationType;
 
 				if (!skipAllocation) this->depth = new ImageType(imgSize, memoryType);

@@ -11,6 +11,7 @@ namespace ITMLib
 {
 	namespace Objects
 	{
+        /// Output from visualisationengine for next tracker iteration
 		class ITMPointCloud
 		{
 		public:

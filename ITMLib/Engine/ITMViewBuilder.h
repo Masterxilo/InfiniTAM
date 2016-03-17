@@ -14,7 +14,7 @@ namespace ITMLib
 {
 	namespace Engine
 	{
-		/** \brief
+		/** Takes a disparity image and turns it into a depth image, 
 		*/
 		class ITMViewBuilder
 		{

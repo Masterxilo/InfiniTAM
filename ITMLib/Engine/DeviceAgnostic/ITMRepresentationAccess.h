@@ -235,6 +235,7 @@ _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(const CONSTPTR(TVo
     /* using xyzw components of vector4f to store 4 sdf values as follows:
     
     *---0--1-> x
+    |
     0   x--y
     |   |  |
     1   z--w

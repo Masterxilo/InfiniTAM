@@ -92,17 +92,16 @@ namespace png {
     bool ReadImageFromFile(ITMShortImage *image, const char *fileName)
     {
         unsigned int xsize, ysize;
-        unsigned char* data;
-        lodepng_decode_file(&data, &xsize, &ysize, fileName, LCT_GREY, 16);
+        short* data;
+        lodepng_decode_file((unsigned char**)&data, &xsize, &ysize, fileName, LCT_GREY, 16);
 
 
         Vector2i newSize(xsize, ysize);
         image->ChangeDims(newSize);
 
-        for (int i = 0; i < image->noDims.x*image->noDims.y; ++i) {
-            image->GetData(MEMORYDEVICE_CPU)[i] = (data[i] << 8) | ((data[i] >> 8) & 255);
-        }
-
+        memcpy(image->GetData(MEMORYDEVICE_CPU),
+            data,
+            image->noDims.x*image->noDims.y * sizeof(short));
 
         free(data);
 

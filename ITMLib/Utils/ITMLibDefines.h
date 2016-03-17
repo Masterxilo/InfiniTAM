@@ -21,9 +21,9 @@
 
 #define SDF_BLOCK_SIZE 8
 #define SDF_BLOCK_SIZE3 (SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE)
-#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks
+#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks (maximum load the hash-table can have)
 
-#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, must be 2^n and bigger than SDF_LOCAL_BLOCK_NUM, SDF_HASH_MASK = SDF_BUCKET_NUM - 1
+#define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, must be 2^n and bigger than SDF_LOCAL_BLOCK_NUM
 #define SDF_HASH_MASK (SDF_BUCKET_NUM-1)// Used for get hashing value of the bucket index, "x & (uint)SDF_HASH_MASK" is the same as "x % SDF_BUCKET_NUM"
 #define SDF_EXCESS_LIST_SIZE 0x20000	// Size of excess list, used to handle collisions. Also max offset (unsigned short) value.
 
@@ -232,3 +232,7 @@ enum TrackerIterationType
 #define ITMBoolImage ORUtils::Image<bool>
 
 #include "ITMLibSettings.h" // must be included after tracker iteration type is defined
+
+struct ITMHierarchyLevel {
+
+};

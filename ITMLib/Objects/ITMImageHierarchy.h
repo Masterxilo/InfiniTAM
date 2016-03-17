@@ -10,19 +10,25 @@ namespace ITMLib
 	{
         /// Generic image (T) hierarchy for pyramid scheme/coarse-to-fine solving of various optimization problems.
         /// Level 0 has the highest resolution, then lower
-		template <class T> class ITMImageHierarchy
+		template <class T //!< Hierarchy level class. 
+            //! Constructed as T(Vector2i imgSize, int levelId, TrackerIterationType iterationType, 
+            //! MemoryDeviceType memoryType, bool skipAllocation = (i == 0) && skipAllocationForLevel0)
+            //!
+            //! Needs to have methods void UpdateHostFromDevice(), void UpdateDeviceFromHost()
+            //! Use either ITMTemplatedHierarchyLevel or ITMSceneHierarchyLevel
+            //!
+
+        > class ITMImageHierarchy
 		{
 		public:
-			int noLevels;
-			T **levels;
+			const int noLevels;
+			T * * const levels;
 
 			ITMImageHierarchy(Vector2i imgSize, TrackerIterationType *trackingRegime, int noHierarchyLevels, 
-				MemoryDeviceType memoryType, bool skipAllocationForLevel0 = false)
+                MemoryDeviceType memoryType, bool skipAllocationForLevel0 = false) :
+                noLevels(noHierarchyLevels),
+                levels(new T*[noHierarchyLevels])
 			{
-				this->noLevels = noHierarchyLevels;
-
-				levels = new T*[noHierarchyLevels];
-
 				for (int i = noHierarchyLevels - 1; i >= 0; i--)
 					levels[i] = new T(imgSize, i, trackingRegime[i], memoryType, (i == 0) && skipAllocationForLevel0);
 			}

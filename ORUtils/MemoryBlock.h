@@ -30,19 +30,24 @@ namespace ORUtils
 		/** Pointer to memory on GPU, if available. */
 		DEVICEPTR(T)* data_cuda;
 
-	public:
+
+        size_t _dataSize;
+
+    public:
+        size_t getDataSize() const { return _dataSize; } // getter must be public
+        /** Total number of allocated entries in the data array. Read-only. */
+        __declspec(property(get = getDataSize)) size_t dataSize;
+
 		enum MemoryCopyDirection { CPU_TO_CPU, CPU_TO_CUDA, CUDA_TO_CPU, CUDA_TO_CUDA };
 
-		/** Total number of allocated entries in the data array. */
-		size_t dataSize;
 
 		/** Get the data pointer on CPU or GPU. */
 		inline DEVICEPTR(T)* GetData(MemoryDeviceType memoryType)
 		{
 			switch (memoryType)
 			{
-			case MEMORYDEVICE_CPU: return data_cpu;
-			case MEMORYDEVICE_CUDA: return data_cuda;
+            case MEMORYDEVICE_CPU: assert(isAllocated_CPU()); return data_cpu;
+            case MEMORYDEVICE_CUDA: assert(isAllocated_CUDA()); return data_cuda;
 			}
             assert(false);
             return 0;
@@ -51,10 +56,10 @@ namespace ORUtils
 		/** Get the data pointer on CPU or GPU. */
 		inline const DEVICEPTR(T)* GetData(MemoryDeviceType memoryType) const
 		{
-			switch (memoryType)
-			{
-			case MEMORYDEVICE_CPU: return data_cpu;
-			case MEMORYDEVICE_CUDA: return data_cuda;
+            switch (memoryType)
+            {
+            case MEMORYDEVICE_CPU: assert(isAllocated_CPU()); return data_cpu;
+            case MEMORYDEVICE_CUDA: assert(isAllocated_CUDA()); return data_cuda;
             }
             assert(false);
             return 0;
@@ -137,7 +142,7 @@ namespace ORUtils
             assert(dataSize);
             assert(allocate_CPU || allocate_CUDA);
 			Free();
-			this->dataSize = dataSize;
+            this->_dataSize = dataSize;
 			if (allocate_CPU) data_cpu = new T[dataSize];
 			if (allocate_CUDA) ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataSize * sizeof(T)));
 		}
