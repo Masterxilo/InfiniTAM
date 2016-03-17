@@ -96,7 +96,7 @@ void ITMPose::SetModelViewFromParams()
 
 	A = lim_{t -> theta} Sin[t]/t
 	B = lim_{t -> theta} (1 - Cos[t])/t^2
-	C = lim_{t -> theta} (1 - a)/t^2
+	C = lim_{t -> theta} (1 - A)/t^2
 	*/
     if (theta_sq < 1e-6f) // dont divide by very small theta - use taylor series expansion of involved functions instead
     {
@@ -113,26 +113,29 @@ void ITMPose::SetModelViewFromParams()
 	const Vector3f cross2 = cross(w, crossV);
 	const Vector3f T = t +  B * crossV + C * cross2;
 	
-
+	// w = t u, u \in S^2
+	// R = exp(w . L) = I + sin(t) (u . L) + (1 - cos(t)) (u . L)^2
+	// c.f. https://en.wikipedia.org/wiki/Rotation_group_SO(3)#Exponential_map
 	Matrix3f R;
+#define setR(row, col) R.m[row + 3 * col]
 
 	const float wx2 = w.x * w.x, wy2 = w.y * w.y, wz2 = w.z * w.z;
-	R.m[0 + 3 * 0] = 1.0f - B*(wy2 + wz2);
-	R.m[1 + 3 * 1] = 1.0f - B*(wx2 + wz2);
-	R.m[2 + 3 * 2] = 1.0f - B*(wx2 + wy2);
+	setR(0, 0) = 1.0f - B*(wy2 + wz2);
+	setR(1, 1) = 1.0f - B*(wx2 + wz2);
+	setR(2, 2) = 1.0f - B*(wx2 + wy2);
 
 	float a, b;
 	a = A * w.z, b = B * (w.x * w.y);
-	R.m[0 + 3 * 1] = b - a;
-	R.m[1 + 3 * 0] = b + a;
+	setR(0, 1) = b - a;
+	setR(1, 0) = b + a;
 
 	a = A * w.y, b = B * (w.x * w.z);
-	R.m[0 + 3 * 2] = b + a;
-	R.m[2 + 3 * 0] = b - a;
+	setR(0, 2) = b + a;
+	setR(2, 0) = b - a;
 
 	a = A * w.x, b = B * (w.y * w.z);
-	R.m[1 + 3 * 2] = b - a;
-	R.m[2 + 3 * 1] = b + a;
+	setR(1, 2) = b - a;
+	setR(2, 1) = b + a;
 
 	// Copy to M
 	SetRPartOfM(R);
@@ -159,7 +162,7 @@ void ITMPose::SetParamsFromModelView()
 		if (sin_angle_abs) 
 		{
 			float p = asinf(sin_angle_abs) / sin_angle_abs;
-			resultRot.x *= p; resultRot.y *= p; resultRot.z *= p;
+			resultRot *= p;
 		}
 	}
 	else
@@ -167,7 +170,7 @@ void ITMPose::SetParamsFromModelView()
 		if (cos_angle > -M_SQRT1_2)
 		{
 			float p = acosf(cos_angle) / sin_angle_abs;
-			resultRot.x *= p; resultRot.y *= p; resultRot.z *= p;
+			resultRot *= p;
 		}
 		else
 		{
@@ -187,16 +190,16 @@ void ITMPose::SetParamsFromModelView()
 				else { r2.x = (R.m[0 + 3 * 2] + R.m[2 + 3 * 0]) * 0.5f; r2.y = (R.m[2 + 3 * 1] + R.m[1 + 3 * 2]) * 0.5f; r2.z = d2; }
 			}
 
-			if (dot(r2, resultRot) < 0.0f) { r2.x *= -1.0f; r2.y *= -1.0f; r2.z *= -1.0f; }
+			if (dot(r2, resultRot) < 0.0f) { r2 *= -1.0f; }
 
 			r2 = normalize(r2);
 
-			resultRot.x = angle * r2.x; resultRot.y = angle * r2.y; resultRot.z = angle * r2.z;
+			resultRot = angle * r2; 
 		}
 	}
 
 	float shtot = 0.5f;
-	float theta = sqrt(dot(resultRot, resultRot));
+	float theta = length(resultRot);
 
 	if (theta > 0.00001f) shtot = sinf(theta * 0.5f) / theta;
 
@@ -209,18 +212,18 @@ void ITMPose::SetParamsFromModelView()
 		float denom = dot(resultRot, resultRot);
 		float param = dot(T, resultRot) * (1 - 2 * shtot) / denom;
 		
-		rottrans.x -= resultRot.x * param; rottrans.y -= resultRot.y * param; rottrans.z -= resultRot.z * param;
+		rottrans -= resultRot * param;
 	}
 	else
 	{
 		float param = dot(T, resultRot) / 24;
-		rottrans.x -= resultRot.x * param; rottrans.y -= resultRot.y * param; rottrans.z -= resultRot.z * param;
+		rottrans -= resultRot * param;
 	}
 
-	rottrans.x /= 2 * shtot; rottrans.y /= 2 * shtot; rottrans.z /= 2 * shtot;
+	rottrans /= 2 * shtot;
 
-	this->params.each.rx = resultRot.x; this->params.each.ry = resultRot.y; this->params.each.rz = resultRot.z;
-	this->params.each.tx = rottrans.x; this->params.each.ty = rottrans.y; this->params.each.tz = rottrans.z; 
+	this->params.r = resultRot;
+	this->params.t = rottrans;
 }
 
 ITMPose ITMPose::exp(const Vector6f& tangent)
