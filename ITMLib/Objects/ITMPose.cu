@@ -115,6 +115,8 @@ void ITMPose::SetModelViewFromParams()
 	
 	// w = t u, u \in S^2
 	// R = exp(w . L) = I + sin(t) (u . L) + (1 - cos(t)) (u . L)^2
+	// u . L == [u]_x, the matrix computing the left cross product with u (u x *)
+	// L = (L_x, L_y, L_z) the lie algebra basis
 	// c.f. https://en.wikipedia.org/wiki/Rotation_group_SO(3)#Exponential_map
 	Matrix3f R;
 	const float wx2 = w.x * w.x, wy2 = w.y * w.y, wz2 = w.z * w.z;
@@ -144,22 +146,22 @@ void ITMPose::SetModelViewFromParams()
 
 void ITMPose::SetParamsFromModelView()
 {
+	// Compute this->params.r = resultRot;
 	Vector3f resultRot;
-	Matrix3f R = GetR();
-	Vector3f T = GetT();
+	const Matrix3f R = GetR();
 
-	float cos_angle = (R.m00  + R.m11 + R.m22 - 1.0f) * 0.5f;
+	const float cos_angle = (R.m00  + R.m11 + R.m22 - 1.0f) * 0.5f;
 	resultRot.x = (Rij(2, 1) - Rij(1, 2)) * 0.5f;
 	resultRot.y = (Rij(0, 2) - Rij(2, 0)) * 0.5f;
 	resultRot.z = (Rij(1, 0) - Rij(0, 1)) * 0.5f;
 
-	float sin_angle_abs = sqrt(dot(resultRot, resultRot));
+	const float sin_angle_abs = length(resultRot);
 
 	if (cos_angle > M_SQRT1_2)
 	{
 		if (sin_angle_abs) 
 		{
-			float p = asinf(sin_angle_abs) / sin_angle_abs;
+			const float p = asinf(sin_angle_abs) / sin_angle_abs;
 			resultRot *= p;
 		}
 	}
@@ -167,25 +169,33 @@ void ITMPose::SetParamsFromModelView()
 	{
 		if (cos_angle > -M_SQRT1_2)
 		{
-			float p = acosf(cos_angle) / sin_angle_abs;
+			const float p = acosf(cos_angle) / sin_angle_abs;
 			resultRot *= p;
 		}
 		else
 		{
-			float angle = (float)M_PI - asinf(sin_angle_abs);
-			float d0 = Rij(0, 0) - cos_angle;
-			float d1 = Rij(1, 1) - cos_angle;
-			float d2 = Rij(2, 2) - cos_angle;
+			const float angle = (float)M_PI - asinf(sin_angle_abs);
+			const float d0 = Rij(0, 0) - cos_angle;
+			const float d1 = Rij(1, 1) - cos_angle;
+			const float d2 = Rij(2, 2) - cos_angle;
 
 			Vector3f r2;
 
-			if(fabsf(d0) > fabsf(d1) && fabsf(d0) > fabsf(d2))
-			{ r2.x = d0; r2.y = (Rij(1, 0) + Rij(0, 1)) * 0.5f; r2.z = (Rij(0, 2) + Rij(2, 0)) * 0.5f; } 
-			else 
-			{
-				if(fabsf(d1) > fabsf(d2)) 
-				{ r2.x = (Rij(1, 0) + Rij(0, 1)) * 0.5f; r2.y = d1; r2.z = (Rij(2, 1) + Rij(1, 2)) * 0.5f; }
-				else { r2.x = (Rij(0, 2) + Rij(2, 0)) * 0.5f; r2.y = (Rij(2, 1) + Rij(1, 2)) * 0.5f; r2.z = d2; }
+			if(fabsf(d0) > fabsf(d1) && fabsf(d0) > fabsf(d2)) {
+				r2.x = d0;
+				r2.y = (Rij(1, 0) + Rij(0, 1)) * 0.5f;
+				r2.z = (Rij(0, 2) + Rij(2, 0)) * 0.5f; 
+			} else {
+				if(fabsf(d1) > fabsf(d2)) {
+					r2.x = (Rij(1, 0) + Rij(0, 1)) * 0.5f; 
+					r2.y = d1; 
+					r2.z = (Rij(2, 1) + Rij(1, 2)) * 0.5f; 
+				}
+				else {
+					r2.x = (Rij(0, 2) + Rij(2, 0)) * 0.5f;
+					r2.y = (Rij(2, 1) + Rij(1, 2)) * 0.5f; 
+					r2.z = d2;
+				}
 			}
 
 			if (dot(r2, resultRot) < 0.0f) { r2 *= -1.0f; }
@@ -196,12 +206,19 @@ void ITMPose::SetParamsFromModelView()
 		}
 	}
 
+	this->params.r = resultRot;
+
+	// Compute this->params.t = rottrans
+	const Vector3f T = GetT();
 	float shtot = 0.5f;
-	float theta = length(resultRot);
+	const float theta = length(resultRot);
 
 	if (theta > 0.00001f) shtot = sinf(theta * 0.5f) / theta;
 
-	ITMPose halfrotor(0.0f, 0.0f, 0.0f, resultRot.x * -0.5f, resultRot.y * -0.5f, resultRot.z * -0.5f);
+	const ITMPose halfrotor(
+		0.0f, 0.0f, 0.0f, 
+		resultRot.x * -0.5f, resultRot.y * -0.5f, resultRot.z * -0.5f
+		);
 
 	Vector3f rottrans = halfrotor.GetR() * T;
 
@@ -220,7 +237,6 @@ void ITMPose::SetParamsFromModelView()
 
 	rottrans /= 2 * shtot;
 
-	this->params.r = resultRot;
 	this->params.t = rottrans;
 }
 
