@@ -83,7 +83,7 @@ void ITMPose::SetFrom(const ITMPose *pose)
 
 void ITMPose::SetModelViewFromParams()
 {
-	// w is an "Euler vector", i.e. the vector axis of rotation * theta
+	// w is an "Euler vector", i.e. the vector "axis of rotation (u) * theta" (axis angle representation)
 	const Vector3f w = params.r;
     const float theta_sq = dot(w,w), theta = sqrt(theta_sq);
 	const float inv_theta = 1.0f / theta;
@@ -98,7 +98,7 @@ void ITMPose::SetModelViewFromParams()
 	B = lim_{t -> theta} (1 - Cos[t])/t^2
 	C = lim_{t -> theta} (1 - A)/t^2
 	*/
-    if (theta_sq < 1e-6f) // dont divide by very small theta - use taylor series expansion of involved functions instead
+    if (theta_sq < 1e-6f) // dont divide by very small or zero theta - use taylor series expansion of involved functions instead
     {
         A = 1     - theta_sq / 6 + theta_sq*theta_sq / 120; // Series[a, {t, 0, 4}]
         B = 1/2.f - theta_sq / 24;  //  Series[b, {t, 0, 2}]
@@ -109,6 +109,7 @@ void ITMPose::SetModelViewFromParams()
         B = (1.0f - cosf(theta)) * (inv_theta * inv_theta);
         C = (1.0f - A) * (inv_theta * inv_theta);
     }
+    // TODO why isnt T = t?
 	const Vector3f crossV = cross(w, t);
 	const Vector3f cross2 = cross(w, crossV);
 	const Vector3f T = t +  B * crossV + C * cross2;

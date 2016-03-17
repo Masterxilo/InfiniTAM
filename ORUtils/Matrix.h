@@ -328,12 +328,12 @@ namespace ORUtils {
 			return r;
 		}
 
-		// Matrix determinant
+		/// Matrix determinant
 		_CPU_AND_GPU_CODE_ inline T det() const {
 			return (this->m11*this->m22 - this->m12*this->m21)*this->m00 + (this->m12*this->m20 - this->m10*this->m22)*this->m01 + (this->m10*this->m21 - this->m11*this->m20)*this->m02;
 		}
 
-		// The inverse matrix for float/double type
+		/// The inverse matrix for float/double type
 		_CPU_AND_GPU_CODE_ inline bool inv(Matrix3 &out) const {
 			T determinant = det();
 			if (determinant == 0) {
