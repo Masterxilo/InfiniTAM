@@ -15,6 +15,12 @@ namespace ITMLib
 		class ITMPose
 		{
 		private:
+			void SetRPartOfM(const Matrix3f& R) {
+				M.m[0 + 4 * 0] = R.m[0 + 3 * 0]; M.m[1 + 4 * 0] = R.m[1 + 3 * 0]; M.m[2 + 4 * 0] = R.m[2 + 3 * 0];
+				M.m[0 + 4 * 1] = R.m[0 + 3 * 1]; M.m[1 + 4 * 1] = R.m[1 + 3 * 1]; M.m[2 + 4 * 1] = R.m[2 + 3 * 1];
+				M.m[0 + 4 * 2] = R.m[0 + 3 * 2]; M.m[1 + 4 * 2] = R.m[1 + 3 * 2]; M.m[2 + 4 * 2] = R.m[2 + 3 * 2];
+			}
+
 			/** This is the minimal representation of the pose with
 			    six parameters. The three rotation parameters are
 			    the Lie algebra representation of SO3.
@@ -26,6 +32,10 @@ namespace ITMLib
 					float tx, ty, tz;
 					float rx, ry, rz;
 				}each;
+				struct {
+					Vector3f t;
+					Vector3f r;
+				};
 			} params;
 
 			/** The pose as a 4x4 transformation matrix ("modelview

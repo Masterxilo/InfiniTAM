@@ -83,48 +83,24 @@ void ITMPose::SetFrom(const ITMPose *pose)
 
 void ITMPose::SetModelViewFromParams()
 {
-	float one_6th = 1.0f/6.0f;
-	float one_20th = 1.0f/20.0f;
+	// w Euler vector, axis of rotation * theta
+	const Vector3f w = params.r;
+	const float theta = length(w);
+	const float inv_theta = 1.0f / theta;
 
-	Vector3f w; w.x = params.each.rx; w.y = params.each.ry; w.z = params.each.rz;
-	Vector3f t; t.x = params.each.tx; t.y = params.each.ty; t.z = params.each.tz;
+	const Vector3f t = params.t;
 
-	float theta_sq = dot(w, w);
-	float theta = sqrt(theta_sq);
+	const float A = sinf(theta) * inv_theta;
+	const float B = (1.0f - cosf(theta)) * (inv_theta * inv_theta);
+	const float C = (1.0f - A) * (inv_theta * inv_theta);
+	const Vector3f crossV = cross(w, t);
+	const Vector3f cross2 = cross(w, crossV);
+	const Vector3f T = t +  B * crossV + C * cross2;
+	
 
-	float A, B;
+	Matrix3f R;
 
-	Matrix3f R; Vector3f T;
-
-	Vector3f crossV = cross(w, t);
-	if (theta_sq < 1e-8f)
-	{
-		A = 1.0f - one_6th * theta_sq; B = 0.5f;
-		T.x = t.x + 0.5f * crossV.x; T.y = t.y + 0.5f * crossV.y; T.z = t.z + 0.5f * crossV.z;
-	}
-	else
-	{
-		float C;
-		if (theta_sq < 1e-6f)
-		{
-			C = one_6th * (1.0f - one_20th * theta_sq);
-			A = 1.0f - theta_sq * C;
-			B = 0.5f - 0.25f * one_6th * theta_sq;
-		}
-		else
-		{
-			float inv_theta = 1.0f / theta;
-			A = sinf(theta) * inv_theta;
-			B = (1.0f - cosf(theta)) * (inv_theta * inv_theta);
-			C = (1.0f - A) * (inv_theta * inv_theta);
-		}
-
-		Vector3f cross2 = cross(w, crossV);
-
-		T.x = t.x + B * crossV.x + C * cross2.x; T.y = t.y + B * crossV.y + C * cross2.y; T.z = t.z + B * crossV.z + C * cross2.z;
-	}
-
-	float wx2 = w.x * w.x, wy2 = w.y * w.y, wz2 = w.z * w.z;
+	const float wx2 = w.x * w.x, wy2 = w.y * w.y, wz2 = w.z * w.z;
 	R.m[0 + 3 * 0] = 1.0f - B*(wy2 + wz2);
 	R.m[1 + 3 * 1] = 1.0f - B*(wx2 + wz2);
 	R.m[2 + 3 * 2] = 1.0f - B*(wx2 + wy2);
@@ -142,11 +118,9 @@ void ITMPose::SetModelViewFromParams()
 	R.m[1 + 3 * 2] = b - a;
 	R.m[2 + 3 * 1] = b + a;
 
-	M.m[0 + 4*0] = R.m[0 + 3*0]; M.m[1 + 4*0] = R.m[1 + 3*0]; M.m[2 + 4*0] = R.m[2 + 3*0];
-	M.m[0 + 4*1] = R.m[0 + 3*1]; M.m[1 + 4*1] = R.m[1 + 3*1]; M.m[2 + 4*1] = R.m[2 + 3*1];
-	M.m[0 + 4*2] = R.m[0 + 3*2]; M.m[1 + 4*2] = R.m[1 + 3*2]; M.m[2 + 4*2] = R.m[2 + 3*2];
-
-	M.m[0 + 4*3] = T.v[0]; M.m[1 + 4*3] = T.v[1]; M.m[2 + 4*3] = T.v[2];
+	// Copy to M
+	SetRPartOfM(R);
+	M.setTranslate(T); 
 
 	M.m[3 + 4*0] = 0.0f; M.m[3 + 4*1] = 0.0f; M.m[3 + 4*2] = 0.0f; M.m[3 + 4*3] = 1.0f;
 }
@@ -281,27 +255,21 @@ void ITMPose::SetM(const Matrix4f & src)
 
 void ITMPose::SetR(const Matrix3f & R)
 {
-	M.m[0 + 4*0] = R.m[0 + 3*0]; M.m[1 + 4*0] = R.m[1 + 3*0]; M.m[2 + 4*0] = R.m[2 + 3*0];
-	M.m[0 + 4*1] = R.m[0 + 3*1]; M.m[1 + 4*1] = R.m[1 + 3*1]; M.m[2 + 4*1] = R.m[2 + 3*1];
-	M.m[0 + 4*2] = R.m[0 + 3*2]; M.m[1 + 4*2] = R.m[1 + 3*2]; M.m[2 + 4*2] = R.m[2 + 3*2];
-
+	SetRPartOfM(R);
 	SetParamsFromModelView();
 }
 
 void ITMPose::SetT(const Vector3f & t)
 {
-	M.m[0 + 4*3] = t.v[0]; M.m[1 + 4*3] = t.v[1]; M.m[2 + 4*3] = t.v[2];
+	M.setTranslate(t);
 
 	SetParamsFromModelView();
 }
 
 void ITMPose::SetRT(const Matrix3f & R, const Vector3f & t)
 {
-	M.m[0 + 4*0] = R.m[0 + 3*0]; M.m[1 + 4*0] = R.m[1 + 3*0]; M.m[2 + 4*0] = R.m[2 + 3*0];
-	M.m[0 + 4*1] = R.m[0 + 3*1]; M.m[1 + 4*1] = R.m[1 + 3*1]; M.m[2 + 4*1] = R.m[2 + 3*1];
-	M.m[0 + 4*2] = R.m[0 + 3*2]; M.m[1 + 4*2] = R.m[1 + 3*2]; M.m[2 + 4*2] = R.m[2 + 3*2];
-
-	M.m[0 + 4*3] = t.v[0]; M.m[1 + 4*3] = t.v[1]; M.m[2 + 4*3] = t.v[2];
+	SetRPartOfM(R);
+	M.setTranslate(t);
 
 	SetParamsFromModelView();
 }
