@@ -117,25 +117,23 @@ void ITMPose::SetModelViewFromParams()
 	// R = exp(w . L) = I + sin(t) (u . L) + (1 - cos(t)) (u . L)^2
 	// c.f. https://en.wikipedia.org/wiki/Rotation_group_SO(3)#Exponential_map
 	Matrix3f R;
-#define setR(row, col) R.m[row + 3 * col]
-
 	const float wx2 = w.x * w.x, wy2 = w.y * w.y, wz2 = w.z * w.z;
-	setR(0, 0) = 1.0f - B*(wy2 + wz2);
-	setR(1, 1) = 1.0f - B*(wx2 + wz2);
-	setR(2, 2) = 1.0f - B*(wx2 + wy2);
+	Rij(0, 0) = 1.0f - B*(wy2 + wz2);
+	Rij(1, 1) = 1.0f - B*(wx2 + wz2);
+	Rij(2, 2) = 1.0f - B*(wx2 + wy2);
 
 	float a, b;
 	a = A * w.z, b = B * (w.x * w.y);
-	setR(0, 1) = b - a;
-	setR(1, 0) = b + a;
+	Rij(0, 1) = b - a;
+	Rij(1, 0) = b + a;
 
 	a = A * w.y, b = B * (w.x * w.z);
-	setR(0, 2) = b + a;
-	setR(2, 0) = b - a;
+	Rij(0, 2) = b + a;
+	Rij(2, 0) = b - a;
 
 	a = A * w.x, b = B * (w.y * w.z);
-	setR(1, 2) = b - a;
-	setR(2, 1) = b + a;
+	Rij(1, 2) = b - a;
+	Rij(2, 1) = b + a;
 
 	// Copy to M
 	SetRPartOfM(R);
@@ -151,9 +149,9 @@ void ITMPose::SetParamsFromModelView()
 	Vector3f T = GetT();
 
 	float cos_angle = (R.m00  + R.m11 + R.m22 - 1.0f) * 0.5f;
-	resultRot.x = (R.m[2 + 3 * 1] - R.m[1 + 3 * 2]) * 0.5f;
-	resultRot.y = (R.m[0 + 3 * 2] - R.m[2 + 3 * 0]) * 0.5f;
-	resultRot.z = (R.m[1 + 3 * 0] - R.m[0 + 3 * 1]) * 0.5f;
+	resultRot.x = (Rij(2, 1) - Rij(1, 2)) * 0.5f;
+	resultRot.y = (Rij(0, 2) - Rij(2, 0)) * 0.5f;
+	resultRot.z = (Rij(1, 0) - Rij(0, 1)) * 0.5f;
 
 	float sin_angle_abs = sqrt(dot(resultRot, resultRot));
 
@@ -175,19 +173,19 @@ void ITMPose::SetParamsFromModelView()
 		else
 		{
 			float angle = (float)M_PI - asinf(sin_angle_abs);
-			float d0 = R.m[0 + 3 * 0] - cos_angle;
-			float d1 = R.m[1 + 3 * 1] - cos_angle;
-			float d2 = R.m[2 + 3 * 2] - cos_angle;
+			float d0 = Rij(0, 0) - cos_angle;
+			float d1 = Rij(1, 1) - cos_angle;
+			float d2 = Rij(2, 2) - cos_angle;
 
 			Vector3f r2;
 
 			if(fabsf(d0) > fabsf(d1) && fabsf(d0) > fabsf(d2))
-			{ r2.x = d0; r2.y = (R.m[1 + 3 * 0] + R.m[0 + 3 * 1]) * 0.5f; r2.z = (R.m[0 + 3 * 2] + R.m[2 + 3 * 0]) * 0.5f; } 
+			{ r2.x = d0; r2.y = (Rij(1, 0) + Rij(0, 1)) * 0.5f; r2.z = (Rij(0, 2) + Rij(2, 0)) * 0.5f; } 
 			else 
 			{
 				if(fabsf(d1) > fabsf(d2)) 
-				{ r2.x = (R.m[1 + 3 * 0] + R.m[0 + 3 * 1]) * 0.5f; r2.y = d1; r2.z = (R.m[2 + 3 * 1] + R.m[1 + 3 * 2]) * 0.5f; }
-				else { r2.x = (R.m[0 + 3 * 2] + R.m[2 + 3 * 0]) * 0.5f; r2.y = (R.m[2 + 3 * 1] + R.m[1 + 3 * 2]) * 0.5f; r2.z = d2; }
+				{ r2.x = (Rij(1, 0) + Rij(0, 1)) * 0.5f; r2.y = d1; r2.z = (Rij(2, 1) + Rij(1, 2)) * 0.5f; }
+				else { r2.x = (Rij(0, 2) + Rij(2, 0)) * 0.5f; r2.y = (Rij(2, 1) + Rij(1, 2)) * 0.5f; r2.z = d2; }
 			}
 
 			if (dot(r2, resultRot) < 0.0f) { r2 *= -1.0f; }
@@ -240,9 +238,9 @@ void ITMPose::MultiplyWith(const ITMPose *pose)
 Matrix3f ITMPose::GetR(void) const
 {
 	Matrix3f R;
-	R.m[0 + 3*0] = M.m[0 + 4*0]; R.m[1 + 3*0] = M.m[1 + 4*0]; R.m[2 + 3*0] = M.m[2 + 4*0];
-	R.m[0 + 3*1] = M.m[0 + 4*1]; R.m[1 + 3*1] = M.m[1 + 4*1]; R.m[2 + 3*1] = M.m[2 + 4*1];
-	R.m[0 + 3*2] = M.m[0 + 4*2]; R.m[1 + 3*2] = M.m[1 + 4*2]; R.m[2 + 3*2] = M.m[2 + 4*2];
+	Rij(0, 0) = M.m[0 + 4*0]; Rij(1, 0) = M.m[1 + 4*0]; Rij(2, 0) = M.m[2 + 4*0];
+	Rij(0, 1) = M.m[0 + 4*1]; Rij(1, 1) = M.m[1 + 4*1]; Rij(2, 1) = M.m[2 + 4*1];
+	Rij(0, 2) = M.m[0 + 4*2]; Rij(1, 2) = M.m[1 + 4*2]; Rij(2, 2) = M.m[2 + 4*2];
 
 	return R;
 }

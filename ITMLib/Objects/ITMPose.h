@@ -4,6 +4,8 @@
 
 #include "../Utils/ITMLibDefines.h"
 
+#define Rij(row, col) R.m[row + 3 * col]
+
 namespace ITMLib
 {
 	namespace Objects
@@ -16,9 +18,9 @@ namespace ITMLib
 		{
 		private:
 			void SetRPartOfM(const Matrix3f& R) {
-				M.m[0 + 4 * 0] = R.m[0 + 3 * 0]; M.m[1 + 4 * 0] = R.m[1 + 3 * 0]; M.m[2 + 4 * 0] = R.m[2 + 3 * 0];
-				M.m[0 + 4 * 1] = R.m[0 + 3 * 1]; M.m[1 + 4 * 1] = R.m[1 + 3 * 1]; M.m[2 + 4 * 1] = R.m[2 + 3 * 1];
-				M.m[0 + 4 * 2] = R.m[0 + 3 * 2]; M.m[1 + 4 * 2] = R.m[1 + 3 * 2]; M.m[2 + 4 * 2] = R.m[2 + 3 * 2];
+				M.m[0 + 4 * 0] = Rij(0, 0); M.m[1 + 4 * 0] = Rij(1, 0); M.m[2 + 4 * 0] = Rij(2, 0);
+				M.m[0 + 4 * 1] = Rij(0, 1); M.m[1 + 4 * 1] = Rij(1, 1); M.m[2 + 4 * 1] = Rij(2, 1);
+				M.m[0 + 4 * 2] = Rij(0, 2); M.m[1 + 4 * 2] = Rij(1, 2); M.m[2 + 4 * 2] = Rij(2, 2);
 			}
 
 			/** This is the minimal representation of the pose with
