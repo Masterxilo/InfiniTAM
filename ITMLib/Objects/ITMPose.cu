@@ -85,14 +85,26 @@ void ITMPose::SetModelViewFromParams()
 {
 	// w Euler vector, axis of rotation * theta
 	const Vector3f w = params.r;
-	const float theta = length(w);
+    const float theta_sq = dot(w,w), theta = sqrt(theta_sq);
 	const float inv_theta = 1.0f / theta;
 
 	const Vector3f t = params.t;
 
-	const float A = sinf(theta) * inv_theta;
-	const float B = (1.0f - cosf(theta)) * (inv_theta * inv_theta);
-	const float C = (1.0f - A) * (inv_theta * inv_theta);
+    float A, B, C;
+    if (theta_sq < 1e-6f) // dont divide by vers small theta - use second order taylor expansion of involved functions instead
+    {
+        const float one_6th = 1 / 6.f;
+        const float one_20th = 1 / 20.f;
+
+        C = one_6th * (1.0f - one_20th * theta_sq);
+        A = 1.0f - theta_sq * C;
+        B = 0.5f - 0.25f * one_6th * theta_sq;
+    }
+    else {
+        A = sinf(theta) * inv_theta;
+        B = (1.0f - cosf(theta)) * (inv_theta * inv_theta);
+        C = (1.0f - A) * (inv_theta * inv_theta);
+    }
 	const Vector3f crossV = cross(w, t);
 	const Vector3f cross2 = cross(w, crossV);
 	const Vector3f T = t +  B * crossV + C * cross2;
