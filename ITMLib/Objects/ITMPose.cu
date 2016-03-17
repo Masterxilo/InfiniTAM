@@ -83,7 +83,7 @@ void ITMPose::SetFrom(const ITMPose *pose)
 
 void ITMPose::SetModelViewFromParams()
 {
-	// w Euler vector, axis of rotation * theta
+	// w is an "Euler vector", i.e. the vector axis of rotation * theta
 	const Vector3f w = params.r;
     const float theta_sq = dot(w,w), theta = sqrt(theta_sq);
 	const float inv_theta = 1.0f / theta;
@@ -91,14 +91,18 @@ void ITMPose::SetModelViewFromParams()
 	const Vector3f t = params.t;
 
     float A, B, C;
-    if (theta_sq < 1e-6f) // dont divide by vers small theta - use second order taylor expansion of involved functions instead
-    {
-        const float one_6th = 1 / 6.f;
-        const float one_20th = 1 / 20.f;
+	/*
+	Limit for t approximating theta
 
-        C = one_6th * (1.0f - one_20th * theta_sq);
-        A = 1.0f - theta_sq * C;
-        B = 0.5f - 0.25f * one_6th * theta_sq;
+	A = lim_{t -> theta} Sin[t]/t
+	B = lim_{t -> theta} (1 - Cos[t])/t^2
+	C = lim_{t -> theta} (1 - a)/t^2
+	*/
+    if (theta_sq < 1e-6f) // dont divide by very small theta - use taylor series expansion of involved functions instead
+    {
+        A = 1     - theta_sq / 6 + theta_sq*theta_sq / 120; // Series[a, {t, 0, 4}]
+        B = 1/2.f - theta_sq / 24;  //  Series[b, {t, 0, 2}]
+		C = 1/6.f - theta_sq / 120; // Series[c, {t, 0, 2}]
     }
     else {
         A = sinf(theta) * inv_theta;
