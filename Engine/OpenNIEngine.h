@@ -4,10 +4,6 @@
 
 #include "ImageSourceEngine.h"
 
-#if (!defined USING_CMAKE) && (defined _MSC_VER)
-#pragma comment(lib, "OpenNI2")
-#endif
-
 namespace InfiniTAM
 {
 	namespace Engine

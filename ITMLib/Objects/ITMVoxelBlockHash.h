@@ -3,11 +3,7 @@
 #pragma once
 
 
-#ifndef COMPILE_WITHOUT_CUDA
 #include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
-#else 
-#define __device__
-#endif
 
 #include "../Utils/ITMLibDefines.h"
 
@@ -50,10 +46,7 @@ namespace ITMLib
 		public:
             /// Allocation list generating sequential ids
             // Implemented as a countdown semaphore in CUDA unified memory
-            class ExcessAllocationList
-#ifndef COMPILE_WITHOUT_CUDA
-                : public Managed
-#endif 
+            class ExcessAllocationList : public Managed
             {
             private:
                 /// This index is considered free 
@@ -66,12 +59,7 @@ namespace ITMLib
                 }
 
                 __device__ int Allocate() {
-#if defined(__CUDACC__)
                     return atomicSub(&lastFreeEntry, 1);
-#else
-                    // CPU: Assume single threaded
-                    return lastFreeEntry--;
-#endif
                 }
 
                 void Reset() {

@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <string>
-
 #include "../Utils/ITMLibDefines.h"
 
 namespace ITMLib

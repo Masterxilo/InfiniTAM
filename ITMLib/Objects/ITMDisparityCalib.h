@@ -4,7 +4,6 @@
 
 #include "../Utils/ITMLibDefines.h"
 
-#include <stdlib.h>
 
 namespace ITMLib
 {

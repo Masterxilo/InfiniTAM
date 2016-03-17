@@ -1,10 +1,9 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
 #pragma once
-#ifndef __METALC__
+
 #include <math.h>
 #include <ostream>
-#endif
 
 #include "../../Utils/ITMLibDefines.h"
 

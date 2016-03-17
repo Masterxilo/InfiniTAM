@@ -55,15 +55,11 @@ namespace ITMLib
 			ITMLowLevelEngine *lowLevelEngine;
 			IITMVisualisationEngine *visualisationEngine;
 
-			ITMMeshingEngine<ITMVoxel, ITMVoxelIndex> *meshingEngine;
-			ITMMesh *mesh;
-
 			ITMViewBuilder *viewBuilder;		
 			ITMDenseMapper<ITMVoxel,ITMVoxelIndex> *denseMapper;
 			ITMTrackingController *trackingController;
 
 			ITMTracker *tracker;
-			ITMIMUCalibrator *imuCalibrator;
 
 			ITMView *view;
 			ITMTrackingState *trackingState;
@@ -98,16 +94,7 @@ namespace ITMLib
 
 			/// Process a frame with rgb and depth images and optionally a corresponding imu measurement.
             /// Key method.
-			void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage, ITMIMUMeasurement *imuMeasurement = NULL);
-
-			// Gives access to the data structure used internally to store any created meshes
-			ITMMesh* GetMesh(void) { return mesh; }
-
-			/// Update the internally stored mesh data structure and return a pointer to it
-			ITMMesh* UpdateMesh(void);
-
-			/// Extracts a mesh from the current scene and saves it to the obj file specified by the file name
-			void SaveSceneToMesh(const char *objFileName);
+			void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage);
 
 			/// Get a result image as output
 			Vector2i GetImageSize(void) const;
@@ -124,8 +111,7 @@ namespace ITMLib
 
 			explicit ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib *calib, 
                 Vector2i imgSize_rgb, 
-                Vector2i imgSize_d = Vector2i(-1,-1) //!< Optional. Omitting a separate image size for the depth images will assume same resolution as for the RGB images.
-                
+                Vector2i imgSize_d
                 );
 			~ITMMainEngine();
 		};

@@ -34,7 +34,6 @@
 #define MY_INF 0x7f800000
 #endif
 
-#ifndef __METALC__
 
 /// Whether a is not -Inf, Inf or NaN
 inline bool portable_finite(float a)
@@ -55,5 +54,3 @@ inline void matmul(const float *A, const float *b, float *x, int numRows, int nu
 		x[r] = res;
 	}
 }
-
-#endif

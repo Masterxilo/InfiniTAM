@@ -38,10 +38,6 @@ namespace ITMLib
 				for (int i = 0; i < noLevels; i++) delete levels[i];
 				delete [] levels;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMImageHierarchy(const ITMImageHierarchy&);
-			ITMImageHierarchy& operator=(const ITMImageHierarchy&);
 		};
 	}
 }

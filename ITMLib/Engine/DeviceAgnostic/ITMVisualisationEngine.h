@@ -4,6 +4,8 @@
 #pragma once
 
 #include "ITMPixelUtils.h"
+
+#include "../DeviceAgnostic/ITMRepresentationAccess.h"
 #include "../../Utils/ITMLibDefines.h"
 
 struct RenderingBlock {

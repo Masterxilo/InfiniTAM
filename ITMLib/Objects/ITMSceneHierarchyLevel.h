@@ -52,10 +52,6 @@ namespace ITMLib
 					delete normalsMap;
 				}
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMSceneHierarchyLevel(const ITMSceneHierarchyLevel&);
-			ITMSceneHierarchyLevel& operator=(const ITMSceneHierarchyLevel&);
 		};
 	}
 }

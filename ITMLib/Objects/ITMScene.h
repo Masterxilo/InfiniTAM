@@ -36,13 +36,6 @@ namespace ITMLib
 			{
 				this->sceneParams = sceneParams;
 			}
-
-			~ITMScene(void)
-			{}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMScene(const ITMScene&);
-			ITMScene& operator=(const ITMScene&);
 		};
 	}
 }

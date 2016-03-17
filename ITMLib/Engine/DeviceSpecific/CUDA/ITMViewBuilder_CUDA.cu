@@ -92,23 +92,6 @@ void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImag
 	view->depth->UpdateDeviceFromHost();
 }
 
-void ITMViewBuilder_CUDA::UpdateView(ITMView **view_ptr, ITMUChar4Image *rgbImage, ITMShortImage *depthImage, bool useBilateralFilter, ITMIMUMeasurement *imuMeasurement)
-{
-	if (*view_ptr == NULL) 
-	{
-		*view_ptr = new ITMViewIMU(calib, rgbImage->noDims, depthImage->noDims, true);
-		if (this->shortImage != NULL) delete this->shortImage;
-		this->shortImage = new ITMShortImage(depthImage->noDims, true, true);
-		if (this->floatImage != NULL) delete this->floatImage;
-		this->floatImage = new ITMFloatImage(depthImage->noDims, true, true);
-	}
-
-	ITMViewIMU* imuView = (ITMViewIMU*)(*view_ptr);
-	imuView->imu->SetFrom(imuMeasurement);
-
-	this->UpdateView(view_ptr, rgbImage, depthImage, useBilateralFilter);
-}
-
 void ITMViewBuilder_CUDA::ConvertDisparityToDepth(ITMFloatImage *depth_out, const ITMShortImage *depth_in, const ITMIntrinsics *depthIntrinsics,
 	Vector2f disparityCalibParams)
 {

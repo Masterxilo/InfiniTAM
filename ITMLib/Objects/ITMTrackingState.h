@@ -78,10 +78,6 @@ namespace ITMLib
 				delete pose_d;
 				delete pose_pointCloud;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMTrackingState(const ITMTrackingState&);
-			ITMTrackingState& operator=(const ITMTrackingState&);
 		};
 	}
 }

@@ -42,10 +42,6 @@ namespace ITMLib
 			{
 				if (manageData) delete depth;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMTemplatedHierarchyLevel(const ITMTemplatedHierarchyLevel&);
-			ITMTemplatedHierarchyLevel& operator=(const ITMTemplatedHierarchyLevel&);
 		};
 	}
 }

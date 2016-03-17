@@ -37,7 +37,7 @@ __global__ void buildVisibleList_device(const ITMHashEntry *hashTable, int noTot
     {
         shouldPrefix = true;
 
-        bool isVisible, isVisibleEnlarged;
+        bool isVisible;
         checkBlockVisibility(isVisible, hashEntry.pos, M, projParams, voxelSize, imgSize);
 
         hashVisibleType = isVisible;

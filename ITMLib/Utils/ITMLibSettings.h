@@ -3,7 +3,6 @@
 #pragma once
 
 #include "../Objects/ITMSceneParams.h"
-#include "../Engine/ITMTracker.h"
 
 namespace ITMLib
 {
@@ -12,38 +11,11 @@ namespace ITMLib
 		class ITMLibSettings
 		{
 		public:
-			/// The device used to run the DeviceAgnostic code
-			typedef enum {
-				DEVICE_CPU,
-				DEVICE_CUDA,
-				DEVICE_METAL
-			} DeviceType;
-
-			/// Select the type of device to use
-			DeviceType deviceType;
-
 			bool useApproximateRaycast;
 
 			bool useBilateralFilter;
 
 			bool modelSensorNoise;
-
-			/// Tracker types
-			typedef enum {
-				//! Identifies a tracker based on colour image
-				TRACKER_COLOR,
-				//! Identifies a tracker based on depth image
-				TRACKER_ICP,
-				//! Identifies a tracker based on depth image (Ren et al, 2012)
-				TRACKER_REN,
-				//! Identifies a tracker based on depth image and IMU measurement
-				TRACKER_IMU,
-				//! Identifies a tracker that use weighted ICP only on depth image
-				TRACKER_WICP
-			} TrackerType;
-
-			/// Select the type of tracker to use
-			TrackerType trackerType;
 
 			/// The tracking regime used by the tracking controller
 			TrackerIterationType *trackingRegime;
@@ -68,10 +40,6 @@ namespace ITMLib
 
 			ITMLibSettings(void);
 			~ITMLibSettings(void);
-
-			// Suppress the default copy constructor and assignment operator
-			ITMLibSettings(const ITMLibSettings&);
-			ITMLibSettings& operator=(const ITMLibSettings&);
 		};
 	}
 }

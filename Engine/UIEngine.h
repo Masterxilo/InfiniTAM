@@ -8,7 +8,6 @@
 #include "../Utils/NVTimer.h"
 
 #include "ImageSourceEngine.h"
-#include "IMUSourceEngine.h"
 
 #include <vector>
 
@@ -40,7 +39,6 @@ namespace InfiniTAM
 
 			ITMLibSettings internalSettings;
 			ImageSourceEngine *imageSource;
-			IMUSourceEngine *imuSource;
 			ITMMainEngine *mainEngine;
 
 			StopWatchInterface *timer_instant;
@@ -55,7 +53,6 @@ namespace InfiniTAM
 			ITMMainEngine::GetImageType outImageType[NUM_WIN];
 
 			ITMUChar4Image *inputRGBImage; ITMShortImage *inputRawDepthImage;
-			ITMIMUMeasurement *inputIMUMeasurement;
 
 			bool freeviewActive;
 			bool intergrationActive;
@@ -91,14 +88,12 @@ namespace InfiniTAM
 			bool needsRefresh;
 			ITMUChar4Image *saveImage;
 
-			void Initialise(int & argc, char** argv, ImageSourceEngine *imageSource, IMUSourceEngine *imuSource, ITMMainEngine *mainEngine,
-				const char *outFolder, ITMLibSettings::DeviceType deviceType);
+			void Initialise(int & argc, char** argv, ImageSourceEngine *imageSource, ITMMainEngine *mainEngine,
+				const char *outFolder);
 			void Shutdown();
 
 			void Run();
 			void ProcessFrame();
-
-			void SaveSceneToMesh(const char *filename) const;
 		};
 	}
 }

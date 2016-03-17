@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <math.h>
 struct Managed {
     void *operator new(size_t len){
         void *ptr;
@@ -18,7 +19,6 @@ struct Managed {
     }
 };
 
-#ifdef __CUDACC__
 inline __device__ void warpReduce(volatile float* sdata, int tid) {
 	sdata[tid] += sdata[tid + 32];
 	sdata[tid] += sdata[tid + 16];
@@ -158,5 +158,3 @@ inline void fillArrayKernel(T *devPtr, size_t nwords)
 	dim3 gridSize((int)ceil((float)nwords / (float)blockSize.x));
 	fillArrayKernel_device<T> <<<gridSize,blockSize>>>(devPtr, nwords);
 }
-
-#endif

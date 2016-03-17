@@ -196,7 +196,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
                 BREAK;\
             }
 
-        check_found();
+        check_found(NULL);
 
         if (!isFound)
         {

@@ -5,12 +5,12 @@
 #include "../Utils/ITMLibDefines.h"
 
 #include "../Objects/ITMTrackingState.h"
+#include "ITMTracker.h"
 #include "../Objects/ITMRenderState.h"
 
 #include "../Engine/ITMVisualisationEngine.h"
 #include "../Engine/ITMLowLevelEngine.h"
 
-#include "ITMTrackerFactory.h"
 
 namespace ITMLib
 {
@@ -41,7 +41,7 @@ namespace ITMLib
 				this->visualisationEngine = visualisationEngine;
 				this->lowLevelEngine = lowLevelEngine;
 
-				memoryType = settings->deviceType == ITMLibSettings::DEVICE_CUDA ? MEMORYDEVICE_CUDA : MEMORYDEVICE_CPU;
+				memoryType = MEMORYDEVICE_CUDA;
 			}
 
 			ITMTrackingState *BuildTrackingState(const Vector2i & trackedImageSize) const
@@ -51,12 +51,8 @@ namespace ITMLib
 
 			static Vector2i GetTrackedImageSize(const ITMLibSettings *settings, const Vector2i& imgSize_rgb, const Vector2i& imgSize_d)
 			{
-				return settings->trackerType == ITMLibSettings::TRACKER_COLOR ? imgSize_rgb : imgSize_d;
+				return imgSize_d;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMTrackingController(const ITMTrackingController&);
-			ITMTrackingController& operator=(const ITMTrackingController&);
 		};
 	}
 }

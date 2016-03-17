@@ -59,10 +59,6 @@ namespace ITMLib
 					delete gradientX_rgb; delete gradientY_rgb;
 				}
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMViewHierarchyLevel(const ITMViewHierarchyLevel&);
-			ITMViewHierarchyLevel& operator=(const ITMViewHierarchyLevel&);
 		};
 	}
 }

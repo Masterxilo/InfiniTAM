@@ -2,7 +2,6 @@
 
 #pragma once
 
-#ifndef __METALC__
 
 #include <stdlib.h>
 
@@ -54,18 +53,15 @@ namespace ITMLib
 				fwdProjMissingPoints = new ORUtils::Image<int>(imgSize, memoryType);
 				raycastImage = new ORUtils::Image<Vector4u>(imgSize, memoryType);
 
+                // Initialize renderingRangeImage to (vf_min, vf_max)
+                Vector2f v_lims(vf_min, vf_max);
 				ORUtils::Image<Vector2f> *buffImage = new ORUtils::Image<Vector2f>(imgSize, MEMORYDEVICE_CPU);
-
-				Vector2f v_lims(vf_min, vf_max);
 				for (int i = 0; i < imgSize.x * imgSize.y; i++) buffImage->GetData(MEMORYDEVICE_CPU)[i] = v_lims;
 
 				if (memoryType == MEMORYDEVICE_CUDA)
-				{
-#ifndef COMPILE_WITHOUT_CUDA
-					renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CUDA);
-#endif
-				}
-				else renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CPU);
+                    renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CUDA);
+				else
+                    renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CPU);
 
 				delete buffImage;
 
@@ -83,5 +79,3 @@ namespace ITMLib
 		};
 	}
 }
-
-#endif

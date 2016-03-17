@@ -2,12 +2,7 @@
 
 #pragma once
 
-#ifndef COMPILE_WITHOUT_CUDA
 #include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
-#else 
-#define __device__
-#endif
-
 #include <stdlib.h>
 
 #include "../Utils/ITMLibDefines.h"
@@ -38,10 +33,7 @@ namespace ITMLib
             /// Allocation list generating sequential ids
             // Implemented as a countdown semaphore in CUDA unified memory
             // Filled from the top
-            class VoxelAllocationList
-#ifndef COMPILE_WITHOUT_CUDA
-                : public Managed 
-#endif
+            class VoxelAllocationList : public Managed 
             {
             private:
                 /// This index is considered free in the list
@@ -63,12 +55,10 @@ namespace ITMLib
                 // TODO return 0 when nothing can be allocated (full)
                 __device__ int Allocate() {
                     int ptr;
-#if defined(__CUDACC__)
+
                     // Must atomically decrease lastFreeEntry, but retrieve the value at the previous
                     int newlyReservedEntry = atomicSub(&lastFreeEntry, 1);
-#else
-                    int newlyReservedEntry = lastFreeEntry--;
-#endif
+
                     ptr = allocationList[newlyReservedEntry];
                     allocationList[newlyReservedEntry] = -1; // now illegal - updating this is not strictly necessary
 
@@ -80,12 +70,9 @@ namespace ITMLib
                     // that is, when lastFreeEntry >= SDF_LOCAL_BLOCK_NUM - 1
                     // ^^ should never happen
 
-#if defined(__CUDACC__)
                     int newlyFreedEntry = atomicAdd(&lastFreeEntry, 1) + 1; // atomicAdd returns the last value, but the new value
                     // is what is newly free. We should not read the changed lastFreeEntry as it might have changed yet again!
-#else
-                    int newlyFreedEntry = lastFreeEntry++;
-#endif
+
                     allocationList[newlyFreedEntry] = ptr;
                 }
 
@@ -94,11 +81,7 @@ namespace ITMLib
                     lastFreeEntry = capacity - 1;
 
                     // allocationList initially contains [0:capacity-1]
-#if !defined(COMPILE_WITHOUT_CUDA)
                     fillArrayKernel<int>(allocationList, capacity);
-#else
-                    for (int i = 0; i < capacity; ++i) allocationList[i] = i;
-#endif
                 }
             } *voxelAllocationList;
 
@@ -116,10 +99,6 @@ namespace ITMLib
 				delete voxelBlocks;
                 delete voxelAllocationList;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMLocalVBA(const ITMLocalVBA&);
-			ITMLocalVBA& operator=(const ITMLocalVBA&);
 		};
 	}
 }

@@ -2,34 +2,18 @@
 
 #pragma once
 
-#ifndef __METALC__
-#ifdef NDEBUG
-#undef NDEBUG
-#include <assert.h>
-#define NDEBUG
-#else
-#include <assert.h>
-#endif // NDEBUG
-#endif
 
-/// Kinect2 support is disabled by default (to not add the Kinect2 SDK dependency)
-/*
-#ifndef COMPILE_WITHOUT_Kinect2
-#define COMPILE_WITHOUT_Kinect2
-#endif
-*/
 
-#ifndef COMPILE_WITHOUT_CUDA
+#include <assert.h>
 #include <cuda_runtime.h>
 
 #ifndef ITMSafeCall
 #define ITMSafeCall ORcudaSafeCall
 #endif
 
-#endif
-
 #include "../../ORUtils/PlatformIndependence.h"
 #include "ITMMath.h"
+
 
 //////////////////////////////////////////////////////////////////////////
 // Voxel Hashing definition and helper functions
@@ -57,7 +41,7 @@ struct ITMHashEntry
 {
 	/** Position of the corner of the 8x8x8 volume, that identifies the entry. 
     In voxel-block coordinates. Multiply by SDF_BLOCK_SIZE to get voxel coordinates,
-    and by ITMSceneParams::voxelSize to get world coordinates.
+    and then by ITMSceneParams::voxelSize to get world coordinates.
     */
 	Vector3s pos;
 	/** 1-based position of the 'next'
@@ -101,7 +85,6 @@ struct ITMHashEntry
 };
 
 #include "../Objects/ITMVoxelBlockHash.h"
-#include "../Objects/ITMPlainVoxelArray.h"
 
 /** \brief
     Stores the information of a single voxel in the volume
@@ -217,71 +200,35 @@ struct ITMVoxel_f
 struct ITMVoxel : public VOXELTYPE {
     typedef struct { VOXELTYPE blockVoxels[SDF_BLOCK_SIZE3]; }  VoxelBlock;
 };
-/** This chooses the way the voxels are addressed and indexed. At the moment,
-    valid options are ITMVoxelBlockHash and ITMPlainVoxelArray.
+/** This chooses the way the voxels are addressed and indexed.
 */
 typedef ITMLib::Objects::ITMVoxelBlockHash ITMVoxelIndex;
-//typedef ITMLib::Objects::ITMPlainVoxelArray ITMVoxelIndex;
+
+
+
+/// The tracker iteration type used to define the tracking iteration regime
+enum TrackerIterationType
+{
+    /// Update only the current rotation estimate. This is preferable for the coarse solution stages.
+    TRACKER_ITERATION_ROTATION = 1,
+    TRACKER_ITERATION_TRANSLATION = 2,
+    TRACKER_ITERATION_BOTH = 3,
+    TRACKER_ITERATION_NONE = 4
+};
 
 #include "../../ORUtils/Image.h"
 
-#ifndef ITMFloatImage
 #define ITMFloatImage ORUtils::Image<float>
-#endif
-
-#ifndef ITMFloat2Image
 #define ITMFloat2Image ORUtils::Image<Vector2f>
-#endif
-
-#ifndef ITMFloat4Image
 #define ITMFloat4Image ORUtils::Image<Vector4f>
-#endif
-
-#ifndef ITMShortImage
 #define ITMShortImage ORUtils::Image<short>
-#endif
-
-#ifndef ITMShort3Image
 #define ITMShort3Image ORUtils::Image<Vector3s>
-#endif
-
-#ifndef ITMShort4Image
 #define ITMShort4Image ORUtils::Image<Vector4s>
-#endif
-
-#ifndef ITMUShortImage
 #define ITMUShortImage ORUtils::Image<ushort>
-#endif
-
-#ifndef ITMUIntImage
 #define ITMUIntImage ORUtils::Image<uint>
-#endif
-
-#ifndef ITMIntImage
 #define ITMIntImage ORUtils::Image<int>
-#endif
-
-#ifndef ITMUCharImage
 #define ITMUCharImage ORUtils::Image<uchar>
-#endif
-
-#ifndef ITMUChar4Image
 #define ITMUChar4Image ORUtils::Image<Vector4u>
-#endif
-
-#ifndef ITMBoolImage
 #define ITMBoolImage ORUtils::Image<bool>
-#endif
 
-#ifndef TRACKER_ITERATION_TYPE
-#define TRACKER_ITERATION_TYPE
-/// The tracker iteration type used to define the tracking iteration regime
-typedef enum
-{
-    /// Update only the current rotation estimate. This is preferable for the coarse solution stages.
-	TRACKER_ITERATION_ROTATION = 1,
-	TRACKER_ITERATION_TRANSLATION = 2,
-	TRACKER_ITERATION_BOTH = 3,
-	TRACKER_ITERATION_NONE = 4
-} TrackerIterationType;
-#endif
+#include "ITMLibSettings.h" // must be included after tracker iteration type is defined

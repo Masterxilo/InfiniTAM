@@ -43,10 +43,6 @@ namespace ITMLib
 				delete locations;
 				delete colours;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMPointCloud(const ITMPointCloud&);
-			ITMPointCloud& operator=(const ITMPointCloud&);
 		};
 	}
 }

@@ -2,14 +2,8 @@
 
 #pragma once
 
-#ifndef COMPILE_WITHOUT_CUDA
-
-#if (!defined USING_CMAKE) && (defined _MSC_VER)
 #pragma comment( lib, "cuda.lib" )
 #pragma comment( lib, "cudart.lib" )
-#pragma comment( lib, "cublas.lib" )
-#pragma comment( lib, "cufft.lib" )
-#endif
 
 #include <cuda.h>
 #include <cuda_runtime_api.h>
@@ -38,8 +32,6 @@ inline void __cudaSafeCall( cudaError err, const char *file, const int line )
 }
 
 }
-
-#endif
 
 #endif
 

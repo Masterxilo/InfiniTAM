@@ -40,10 +40,11 @@ _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(
     // ]]
 
     // TODO what does this do? Avoid bank conflicts in cache by reindexing?
-	return 
+/*	return 
         point.x + 
         (point.y - blockPos.x) * SDF_BLOCK_SIZE +
         (point.z - blockPos.y) * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE - blockPos.z * SDF_BLOCK_SIZE3;
+        */
 }
 
 /// \returns linearIdx to be used in TVoxel* voxelData, voxelData[voxelAddress]
@@ -96,37 +97,9 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(const CONSTPTR(ITMLib::Objects::ITMVoxel
 	return findVoxel(voxelIndex, point, isFound, cache);
 }
 
-/// === ITMPlainVoxelArray methods (findVoxel) ===
-
-/// \returns linearIdx or voxelAddress to be used for accessing TVoxel* voxelData, voxelData[voxelAddress]
-_CPU_AND_GPU_CODE_ inline int findVoxel(
-    const CONSTPTR(ITMLib::Objects::ITMPlainVoxelArray::IndexData) *voxelIndex, //<! [in] hash table
-    const THREADPTR(Vector3i) & point_orig,
-	THREADPTR(bool) &isFound)
-{
-	Vector3i point = point_orig - voxelIndex->offset;
-
-	if ((point.x < 0) || (point.x >= voxelIndex->size.x) ||
-	    (point.y < 0) || (point.y >= voxelIndex->size.y) ||
-	    (point.z < 0) || (point.z >= voxelIndex->size.z)) {
-		isFound = false;
-		return -1;
-	}
-
-	int linearIdx = point.x + point.y * voxelIndex->size.x + point.z * voxelIndex->size.x * voxelIndex->size.y;
-
-	isFound = true;
-	return linearIdx;
-}
-
-_CPU_AND_GPU_CODE_ inline int findVoxel(const CONSTPTR(ITMLib::Objects::ITMPlainVoxelArray::IndexData) *voxelIndex, const THREADPTR(Vector3i) & point_orig,
-	THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMPlainVoxelArray::IndexCache) & cache)
-{
-	return findVoxel(voxelIndex, point_orig, isFound);
-}
 
 
-/// === ITMPlainVoxelArray/-Blockhash methods (readVoxel) ===
+/// === ITMBlockhash methods (readVoxel) ===
 template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
 	const THREADPTR(Vector3i) & point, THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
@@ -143,20 +116,6 @@ _CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, co
 	return readVoxel(voxelData, voxelIndex, point, isFound, cache);
 }
 
-template<class TVoxel>
-_CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMPlainVoxelArray::IndexData) *voxelIndex,
-	const THREADPTR(Vector3i) & point_orig, THREADPTR(bool) &isFound)
-{
-	int voxelAddress = findVoxel(voxelIndex, point_orig, isFound);
-	return isFound ? voxelData[voxelAddress] : TVoxel();
-}
-
-template<class TVoxel>
-_CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMPlainVoxelArray::IndexData) *voxelIndex,
-	const THREADPTR(Vector3i) & point_orig, THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMPlainVoxelArray::IndexCache) & cache)
-{
-	return readVoxel(voxelData, voxelIndex, point_orig, isFound);
-}
 
 /// === Generic methods (readSDF) ===
 template<class TVoxel, class TIndex>

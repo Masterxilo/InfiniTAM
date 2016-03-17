@@ -2,8 +2,24 @@
 
 #pragma once
 
+
+#include "../Utils/ITMLibDefines.h"
+#define ITMFloatImage ORUtils::Image<float>
+#define ITMFloat2Image ORUtils::Image<Vector2f>
+#define ITMFloat4Image ORUtils::Image<Vector4f>
+#define ITMShortImage ORUtils::Image<short>
+#define ITMShort3Image ORUtils::Image<Vector3s>
+#define ITMShort4Image ORUtils::Image<Vector4s>
+#define ITMUShortImage ORUtils::Image<ushort>
+#define ITMUIntImage ORUtils::Image<uint>
+#define ITMIntImage ORUtils::Image<int>
+#define ITMUCharImage ORUtils::Image<uchar>
+#define ITMUChar4Image ORUtils::Image<Vector4u>
+#define ITMBoolImage ORUtils::Image<bool>
+
 #include "../Objects/ITMRGBDCalib.h"
 #include "../Utils/ITMCalibIO.h"
+
 
 namespace ITMLib
 {
@@ -52,10 +68,6 @@ namespace ITMLib
 				if (depthNormal != NULL) delete depthNormal;
 				if (depthUncertainty != NULL) delete depthUncertainty;
 			}
-
-			// Suppress the default copy constructor and assignment operator
-			ITMView(const ITMView&);
-			ITMView& operator=(const ITMView&);
 		};
 	}
 }
