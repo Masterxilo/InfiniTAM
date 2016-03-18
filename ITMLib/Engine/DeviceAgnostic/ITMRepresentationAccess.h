@@ -173,7 +173,8 @@ _CPU_AND_GPU_CODE_ inline float readFromSDF_float_interpolated(
 	return TVoxel::SDF_valueToFloat((1.0f - coeff.z) * res1 + coeff.z * res2);
 }
 
-/// \returns [0,1]^4 color (w = 1)
+/// Assumes voxels store color in some type convertible to Vector3f (e.g. Vector3u) and that color values are in the range 0-255.
+/// \returns [0,1]^4 color (with w = 1)
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTPTR(TVoxel) *voxelData,
 	const CONSTPTR(typename TIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) & point, 

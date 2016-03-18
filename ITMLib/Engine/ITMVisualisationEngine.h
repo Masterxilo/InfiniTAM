@@ -27,9 +27,8 @@ namespace ITMLib
 
 			virtual ~IITMVisualisationEngine(void) {}
 
-			static void DepthToUchar4(ITMUChar4Image *dst, ITMFloatImage *src);
-			static void NormalToUchar4(ITMUChar4Image* dst, ITMFloat4Image *src);
-			static void WeightToUchar4(ITMUChar4Image *dst, ITMFloatImage *src);
+            /// Heatmap style color gradient for depth
+            static void DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src);
 
 			/** Given a scene, pose and intrinsics, compute the
 			visible subset of the scene and store it in an
@@ -66,12 +65,6 @@ namespace ITMLib
                 const ITMIntrinsics *intrinsics,
 				ITMRenderState *renderState //!< [out] initializes raycastResult
                 ) const = 0;
-
-			/** Create a point cloud as required by the
-			ITMLib::Engine::ITMColorTracker classes.
-			*/
-			virtual void CreatePointCloud(const ITMView *view, ITMTrackingState *trackingState, 
-				ITMRenderState *renderState, bool skipPoints) const = 0;
 
 			/** Create an image of reference points and normals as
 			required by the ITMLib::Engine::ITMDepthTracker classes.

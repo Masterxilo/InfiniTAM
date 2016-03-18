@@ -35,7 +35,8 @@ namespace ORUtils
 
     public:
         size_t getDataSize() const { return _dataSize; } // getter must be public
-        /** Total number of allocated entries in the data array. Read-only. */
+        /** Total #number of allocated entries in the data array. Read-only.
+        Number of allocated BYTES computes as dataSize * sizeof(T)*/
         __declspec(property(get = getDataSize)) size_t dataSize;
 
 		enum MemoryCopyDirection { CPU_TO_CPU, CPU_TO_CUDA, CUDA_TO_CPU, CUDA_TO_CUDA };

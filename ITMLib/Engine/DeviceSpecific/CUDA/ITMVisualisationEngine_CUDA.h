@@ -19,7 +19,6 @@ namespace ITMLib
 		class ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash> : public ITMVisualisationEngine < TVoxel, ITMVoxelBlockHash >
 		{
 		private:
-			uint *noTotalPoints_device;
 			RenderingBlock *renderingBlockList_device;
 			uint *noTotalBlocks_device;
 			int *noVisibleEntries_device;
@@ -44,10 +43,6 @@ namespace ITMLib
                 const ITMIntrinsics *intrinsics,
                 ITMRenderState *renderState //!< [out] initializes raycastResult
                 ) const; 
-            
-
-            void CreatePointCloud(const ITMView *view, ITMTrackingState *trackingState,
-                ITMRenderState *renderState, bool skipPoints) const; 
 
             void CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState) const;
 			

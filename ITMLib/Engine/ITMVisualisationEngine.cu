@@ -5,10 +5,17 @@
 
 using namespace ITMLib::Engine;
 
+/// as val goes from x0 to x1, output goes from y0 to y1 linearly
 inline float interpolate(float val, float y0, float x0, float y1, float x1) {
 	return (val - x0)*(y1 - y0) / (x1 - x0) + y0;
 }
 
+/**
+1   ---
+0__/   \___
+where the angles are at
+-.75, -.25, .25, .75
+*/
 inline float base(float val) {
 	if (val <= -0.75f) return 0.0f;
 	else if (val <= -0.25f) return interpolate(val, 0.0f, -0.75f, 1.0f, -0.25f);
@@ -17,18 +24,15 @@ inline float base(float val) {
 	else return 0.0;
 }
 
-void IITMVisualisationEngine::DepthToUchar4(ITMUChar4Image *dst, ITMFloatImage *src)
+void IITMVisualisationEngine::DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src)
 {
-	Vector4u *dest = dst->GetData(MEMORYDEVICE_CPU);
-	float *source = src->GetData(MEMORYDEVICE_CPU);
-	int dataSize = static_cast<int>(dst->dataSize);
+    dst->Clear();
+    Vector4u * const dest = dst->GetData(MEMORYDEVICE_CPU);
+	float const * const source = src->GetData(MEMORYDEVICE_CPU);
+	const int dataSize = static_cast<int>(dst->dataSize);
 
-	memset(dst->GetData(MEMORYDEVICE_CPU), 0, dataSize * 4);
-
-	Vector4u *destUC4;
-	float lims[2], scale;
-
-	destUC4 = (Vector4u*)dest;
+    // lims =  #@source & /@ {Min, Max}
+	float lims[2];
 	lims[0] = 100000.0f; lims[1] = -100000.0f;
 
 	for (int idx = 0; idx < dataSize; idx++)
@@ -36,71 +40,23 @@ void IITMVisualisationEngine::DepthToUchar4(ITMUChar4Image *dst, ITMFloatImage *
 		float sourceVal = source[idx];
 		if (sourceVal > 0.0f) { lims[0] = MIN(lims[0], sourceVal); lims[1] = MAX(lims[1], sourceVal); }
 	}
-
-	scale = ((lims[1] - lims[0]) != 0) ? 1.0f / (lims[1] - lims[0]) : 1.0f / lims[1];
-
 	if (lims[0] == lims[1]) return;
 
+    // Rescaled rgb-converted depth
+    const float scale = 1.0f / (lims[1] - lims[0]);
 	for (int idx = 0; idx < dataSize; idx++)
 	{
 		float sourceVal = source[idx];
 
-		if (sourceVal > 0.0f)
-		{
-			sourceVal = (sourceVal - lims[0]) * scale;
+        if (sourceVal <= 0.0f) continue;
+		sourceVal = (sourceVal - lims[0]) * scale;
 
-			destUC4[idx].r = (uchar)(base(sourceVal - 0.5f) * 255.0f);
-			destUC4[idx].g = (uchar)(base(sourceVal) * 255.0f);
-			destUC4[idx].b = (uchar)(base(sourceVal + 0.5f) * 255.0f);
-			destUC4[idx].a = 255;
-		}
-	}
-}
-
-void IITMVisualisationEngine::NormalToUchar4(ITMUChar4Image *dst, ITMFloat4Image *src)
-{
-	Vector4u *dest = dst->GetData(MEMORYDEVICE_CPU);
-	Vector4f *source = src->GetData(MEMORYDEVICE_CPU);
-	int dataSize = static_cast<int>(dst->dataSize);
-
-	memset(dst->GetData(MEMORYDEVICE_CPU), 0, dataSize * 4);
-	{
-		for (int idx = 0; idx < dataSize; idx++)
-		{
-			Vector4f sourceVal = source[idx];
-			if (sourceVal.w >= 0.0f)
-            {
-                drawPixelNormal(dest[idx], sourceVal.toVector3());
-			}
-		}
+        dest[idx].r = (uchar)(base(sourceVal - 0.5f) * 255.0f); // shows the range 0 to 1.25
+		dest[idx].g = (uchar)(base(sourceVal) * 255.0f); // shows the range 0 to .75
+		dest[idx].b = (uchar)(base(sourceVal + 0.5f) * 255.0f); // shows the range 
+		dest[idx].a = 255;
 	}
 }
 
 
-void IITMVisualisationEngine::WeightToUchar4(ITMUChar4Image *dst, ITMFloatImage *src)
-{
-	Vector4u *dest = dst->GetData(MEMORYDEVICE_CPU);
-	float *source = src->GetData(MEMORYDEVICE_CPU);
-	int dataSize = static_cast<int>(dst->dataSize);
-	
-	float mindepth = 1000;
-	for (size_t i = 0; i < src->dataSize; i++)
-		if (source[i]>0) mindepth = MIN(mindepth, source[i]);
-
-	memset(dst->GetData(MEMORYDEVICE_CPU), 0, dataSize * 4);
-	{
-		for (int idx = 0; idx < dataSize; idx++)
-		{
-			float sourceVal = source[idx];
-			if (sourceVal>0)
-			{
-				sourceVal = mindepth / sourceVal * 0.8f + 0.2f;
-				dest[idx].r = (uchar)((1 - sourceVal)*255.0f);
-				dest[idx].b = 0;
-				dest[idx].g = (uchar)(sourceVal*255.0f);
-			}
-
-		}
-	}
-}
 template class ITMLib::Engine::ITMVisualisationEngine<ITMVoxel, ITMVoxelIndex>;

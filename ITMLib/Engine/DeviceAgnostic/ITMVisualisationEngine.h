@@ -43,12 +43,12 @@ _CPU_AND_GPU_CODE_ inline bool ProjectSingleBlock(
     const THREADPTR(Vector4f) & intrinsics, 
 	const THREADPTR(Vector2i) & imgSize,
     float voxelSize, 
-    THREADPTR(Vector2i) & upperLeft, //!<
-    THREADPTR(Vector2i) & lowerRight,  //!<
-    THREADPTR(Vector2f) & zRange //!<
+    THREADPTR(Vector2i) & upperLeft, //!< [out]
+    THREADPTR(Vector2i) & lowerRight,  //!< [out]
+    THREADPTR(Vector2f) & zRange //!< [out]
     )
 {
-    Vector2i minmaxImgSize = imgSize / minmaximg_subsample;
+    const Vector2i minmaxImgSize = imgSize / minmaximg_subsample;
     upperLeft = minmaxImgSize;
 	lowerRight = Vector2i(-1, -1);
     // zMin, zmax
@@ -95,10 +95,12 @@ _CPU_AND_GPU_CODE_ inline bool ProjectSingleBlock(
 Split image-depth space bounding box described by (upperLeft, lowerRight, zRange)
 into (renderingBlockSizeX by renderingBlockSizeY) pixel (or less) RenderingBlocks of same zRange.
 
-Store the resulting blocks into renderingBlockList, incrementing the current position 'offset' in this list.
+Store the resulting blocks into renderingBlockList, 
+incrementing the current position 'offset' in this list.
 */
 _CPU_AND_GPU_CODE_ inline void CreateRenderingBlocks(
-    DEVICEPTR(RenderingBlock) *renderingBlockList, int offset,
+    DEVICEPTR(RenderingBlock) *renderingBlockList, //!< [out]
+    int offset, //!< [out]
 
 	const THREADPTR(Vector2i) & upperLeft,
     const THREADPTR(Vector2i) & lowerRight,
@@ -127,22 +129,25 @@ _CPU_AND_GPU_CODE_ inline void CreateRenderingBlocks(
 	}
 }
 
+/// \param x,y [in] camera space pixel determining ray direction
 /// \returns whether any intersection was found
 template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline bool castRay(
-    DEVICEPTR(Vector4f) &pt_out, //<! the intersection point. w is 1 for a valid point, 0 for no intersection; in voxel-fractional-world-coordinates
-    int x, int y,
+    DEVICEPTR(Vector4f) &pt_out, //!< [out] the intersection point. w is 1 for a valid point, 0 for no intersection; in voxel-fractional-world-coordinates
+    
+    const int x, const int y,
     const CONSTPTR(TVoxel) *voxelData,
 	const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
-    Matrix4f invM, //!< camera-to-world transform
-    Vector4f invProjParams, //!< camera-to-world transform
-    float oneOverVoxelSize, 
-	float mu, const CONSTPTR(Vector2f) & viewFrustum_minmax)
+    const Matrix4f invM, //!< camera-to-world transform
+    const Vector4f invProjParams, //!< camera-to-world transform
+    const float oneOverVoxelSize,
+    const float mu,
+    const CONSTPTR(Vector2f) & viewFrustum_minmax)
 {
 	Vector4f pt_camera_f;
     Vector3f pt_block_s, pt_block_e;
 	
-	float totalLength, stepLength, totalLengthMax;
+	float totalLength;
 
 
     // Starting point
@@ -154,7 +159,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
 
     // End point
     pt_camera_f = depthTo3DInvProjParams(invProjParams, x, y, viewFrustum_minmax.y);
-	totalLengthMax = length(TO_VECTOR3(pt_camera_f)) * oneOverVoxelSize;
+	const float totalLengthMax = length(TO_VECTOR3(pt_camera_f)) * oneOverVoxelSize;
 	pt_block_e = TO_VECTOR3(invM * pt_camera_f) * oneOverVoxelSize;
 
 
@@ -165,6 +170,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
 	typename TIndex::IndexCache cache;
     float sdfValue = 1.0f;
     bool hash_found;
+    float stepLength;
     while (totalLength < totalLengthMax) {
         // D(X)
 		sdfValue = readFromSDF_float_uninterpolated(voxelData, voxelIndex, pt_result, hash_found, cache);

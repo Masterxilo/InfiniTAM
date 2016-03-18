@@ -86,114 +86,50 @@ struct ITMHashEntry
 
 #include "../Objects/ITMVoxelBlockHash.h"
 
+// #define USE_FLOAT_SDF_STORAGE // uses 4 instead of 2 bytes
 /** \brief
     Stores the information of a single voxel in the volume
 */
-struct ITMVoxel_f_rgb
-{
-	_CPU_AND_GPU_CODE_ static float SDF_initialValue() { return 1.0f; }
-	_CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return x; }
-	_CPU_AND_GPU_CODE_ static float SDF_floatToValue(float x) { return x; }
+struct ITMVoxelT
+{    /** Value of the truncated signed distance transformation. */
+#ifdef USE_FLOAT_SDF_STORAGE
+    _CPU_AND_GPU_CODE_ static float SDF_initialValue() { return 1.0f; }
+    _CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return x; }
+    _CPU_AND_GPU_CODE_ static float SDF_floatToValue(float x) { return x; }
+    float sdf;
+#else
+	_CPU_AND_GPU_CODE_ static short SDF_initialValue() { return 32767; }
+	_CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return (float)(x) / 32767.0f; }
+	_CPU_AND_GPU_CODE_ static short SDF_floatToValue(float x) { return (short)((x) * 32767.0f); }
+    short sdf;
+#endif
 
-	static const CONSTPTR(bool) hasColorInformation = true;
-
-	/** Value of the truncated signed distance transformation. */
-	float sdf;
 	/** Number of fused observations that make up @p sdf. */
 	uchar w_depth;
+	/** Padding that may or may not improve performance on certain GPUs */
+	//uchar pad;
+
+
+    static const CONSTPTR(bool) hasColorInformation = true;
+
 	/** RGB colour information stored for this voxel. */
 	Vector3u clr;
 	/** Number of observations that made up @p clr. */
 	uchar w_color;
 
-	_CPU_AND_GPU_CODE_ ITMVoxel_f_rgb()
+    _CPU_AND_GPU_CODE_ ITMVoxelT()
 	{
 		sdf = SDF_initialValue();
 		w_depth = 0;
 		clr = (uchar)0;
 		w_color = 0;
-	}
-};
-
-/** \brief
-    Stores the information of a single voxel in the volume
-*/
-struct ITMVoxel_s_rgb
-{
-	_CPU_AND_GPU_CODE_ static short SDF_initialValue() { return 32767; }
-	_CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return (float)(x) / 32767.0f; }
-	_CPU_AND_GPU_CODE_ static short SDF_floatToValue(float x) { return (short)((x) * 32767.0f); }
-
-	static const CONSTPTR(bool) hasColorInformation = true;
-
-	/** Value of the truncated signed distance transformation. */
-	short sdf;
-	/** Number of fused observations that make up @p sdf. */
-	uchar w_depth;
-	/** Padding that may or may not improve performance on certain GPUs */
-	//uchar pad;
-	/** RGB colour information stored for this voxel. */
-	Vector3u clr;
-	/** Number of observations that made up @p clr. */
-	uchar w_color;
-
-	_CPU_AND_GPU_CODE_ ITMVoxel_s_rgb()
-	{
-		sdf = SDF_initialValue();
-		w_depth = 0;
-		clr = (uchar)0;
-		w_color = 0;
-	}
-};
-
-struct ITMVoxel_s
-{
-	_CPU_AND_GPU_CODE_ static short SDF_initialValue() { return 32767; }
-	_CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return (float)(x) / 32767.0f; }
-	_CPU_AND_GPU_CODE_ static short SDF_floatToValue(float x) { return (short)((x) * 32767.0f); }
-
-	static const CONSTPTR(bool) hasColorInformation = false;
-
-	/** Value of the truncated signed distance transformation. */
-	short sdf;
-	/** Number of fused observations that make up @p sdf. */
-	uchar w_depth;
-	/** Padding that may or may not improve performance on certain GPUs */
-	//uchar pad;
-
-	_CPU_AND_GPU_CODE_ ITMVoxel_s()
-	{
-		sdf = SDF_initialValue();
-		w_depth = 0;
-	}
-};
-
-struct ITMVoxel_f
-{
-	_CPU_AND_GPU_CODE_ static float SDF_initialValue() { return 1.0f; }
-	_CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return x; }
-	_CPU_AND_GPU_CODE_ static float SDF_floatToValue(float x) { return x; }
-
-	static const CONSTPTR(bool) hasColorInformation = false;
-
-	/** Value of the truncated signed distance transformation. */
-	float sdf;
-	/** Number of fused observations that make up @p sdf. */
-	uchar w_depth;
-	/** Padding that may or may not improve performance on certain GPUs */
-	//uchar pad;
-
-	_CPU_AND_GPU_CODE_ ITMVoxel_f()
-	{
-		sdf = SDF_initialValue();
-		w_depth = 0;
 	}
 };
 
 /** This chooses the information stored at each voxel. At the moment, valid
     options are ITMVoxel_s, ITMVoxel_f, ITMVoxel_s_rgb and ITMVoxel_f_rgb 
 */
-#define VOXELTYPE ITMVoxel_s_rgb // ITMVoxel_s
+#define VOXELTYPE ITMVoxelT // ITMVoxel_s
 #define _str(s) #s // note that s will not be macro expanded prior to stringification
 #define _xstr(s) _str(s) // force evaluation of s prior to 'calling' str
 #define sVOXELTYPE _xstr(VOXELTYPE) 
