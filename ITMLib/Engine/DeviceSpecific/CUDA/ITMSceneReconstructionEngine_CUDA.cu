@@ -3,16 +3,13 @@
 #include "ITMSceneReconstructionEngine_CUDA.h"
 #include "ITMCUDAUtils.h"
 #include "../../DeviceAgnostic/ITMSceneReconstructionEngine.h"
-#include "../../../Objects/ITMRenderState_VH.h"
 
 
 using namespace ITMLib::Engine;
 
 // device functions
-
-
 template<class TVoxel, bool stopIntegratingAtMaxW, bool approximateIntegration>
-__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, int *visibleEntryIDs,
+__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, const int *visibleEntryIDs,
     const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i depthImgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d,
     Vector4f projParams_rgb, float voxelSize, float mu, int maxW)
 {
@@ -51,7 +48,7 @@ __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int 
 {
     int entryId = threadIdx.x + blockIdx.x * blockDim.x;
     if (entryId > noVisibleEntries - 1) return;
-    entriesVisibleType[visibleEntryIDs[entryId]] = 3;
+    entriesVisibleType[visibleEntryIDs[entryId]] = VT_VISIBLE_PREVIOUS_AND_UNSTREAMED;
 }
 
 
@@ -59,7 +56,7 @@ template<typename TVoxel>
 __global__ void allocateVoxelBlocksList_device(
     typename ITMLocalVBA<TVoxel>::VoxelAllocationList *voxelAllocationList,
     ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
-    AllocationTempData *allocData, uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
+    uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
 {
     int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
@@ -68,7 +65,6 @@ __global__ void allocateVoxelBlocksList_device(
         voxelAllocationList,
         excessAllocationList,
         hashTable,
-        allocData,
 
         entriesAllocType,
         entriesVisibleType,
@@ -148,15 +144,13 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITM
 
 template<class TVoxel>
 void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateSceneFromDepth(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, 
-	const ITMTrackingState *trackingState, const ITMRenderState *renderState, bool onlyUpdateVisibleList)
+	const ITMTrackingState *trackingState, ITMRenderState *renderState)
 {
 	Vector2i depthImgSize = view->depth->noDims;
 	float voxelSize = scene->sceneParams->voxelSize;
 
 	Matrix4f M_d, invM_d;
 	Vector4f projParams_d, invProjParams_d;
-
-	ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)renderState;
 
 	M_d = trackingState->pose_d->GetM(); M_d.inv(invM_d);
 
@@ -174,8 +168,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	int noTotalEntries = scene->index.noTotalEntries;
 
-	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
-	uchar *entriesVisibleType = renderState_vh->GetEntriesVisibleType();
+	int *visibleEntryIDs = renderState->GetVisibleEntryIDs();
+	uchar *entriesVisibleType = renderState->GetEntriesVisibleType();
 
 	dim3 cudaBlockSizeHV(16, 16);
 	dim3 gridSizeHV((int)ceil((float)depthImgSize.x / (float)cudaBlockSizeHV.x), (int)ceil((float)depthImgSize.y / (float)cudaBlockSizeHV.y));
@@ -184,7 +178,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
 
 	dim3 cudaBlockSizeVS(256, 1);
-	dim3 gridSizeVS((int)ceil((float)renderState_vh->noVisibleEntries / (float)cudaBlockSizeVS.x));
+	dim3 gridSizeVS((int)ceil((float)renderState->noVisibleEntries / (float)cudaBlockSizeVS.x));
 
 	float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
@@ -194,25 +188,26 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
 
-	if (gridSizeVS.x > 0) setToType3 << <gridSizeVS, cudaBlockSizeVS >> > (entriesVisibleType, visibleEntryIDs, renderState_vh->noVisibleEntries);
+    // Mark previously visible entries as such.
+	if (gridSizeVS.x > 0) setToType3 << <gridSizeVS, cudaBlockSizeVS >> > (entriesVisibleType, visibleEntryIDs, renderState->noVisibleEntries);
 
+    // Determine blocks currently visible in depth map and prepare allocation list
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(entriesAllocType_device, entriesVisibleType, 
 		blockCoords_device, depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max);
 
-	if (!onlyUpdateVisibleList)
-	{
-        allocateVoxelBlocksList_device<TVoxel> << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, excessAllocationList, hashTable,
-			noTotalEntries, (AllocationTempData*)allocationTempData_device, entriesAllocType_device, entriesVisibleType,
-			blockCoords_device);
-	}
+    // Do allocation
+    allocateVoxelBlocksList_device<TVoxel> << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, excessAllocationList, hashTable,
+		noTotalEntries, entriesAllocType_device, entriesVisibleType,
+		blockCoords_device);
 
+    // Visibility test for remaining blocks and count visible entries
 	buildVisibleList_device<< <gridSizeAL, cudaBlockSizeAL >> >(hashTable, noTotalEntries, visibleEntryIDs,
 			(AllocationTempData*)allocationTempData_device, entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 	
 
 	ITMSafeCall(cudaMemcpy(tempData, allocationTempData_device, sizeof(AllocationTempData), cudaMemcpyDeviceToHost));
-	renderState_vh->noVisibleEntries = tempData->noVisibleEntries;
+	renderState->noVisibleEntries = tempData->noVisibleEntries;
 }
 
 template<class TVoxel>
@@ -225,8 +220,6 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 
 	Matrix4f M_d, M_rgb;
 	Vector4f projParams_d, projParams_rgb;
-
-	ITMRenderState_VH *renderState_vh = (ITMRenderState_VH*)renderState;
 
 	M_d = trackingState->pose_d->GetM();
 	if (TVoxel::hasColorInformation) M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
@@ -241,10 +234,10 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
-	int *visibleEntryIDs = renderState_vh->GetVisibleEntryIDs();
+	int *visibleEntryIDs = (int*)renderState->GetVisibleEntryIDs();
 
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-	dim3 gridSize(renderState_vh->noVisibleEntries);
+	dim3 gridSize(renderState->noVisibleEntries);
 
 #define integrateIntoScene_d(stopIntegratingAtMaxW, approximateIntegration) \
     integrateIntoScene_device<TVoxel, stopIntegratingAtMaxW, approximateIntegration> << <gridSize, cudaBlockSize >> >(\

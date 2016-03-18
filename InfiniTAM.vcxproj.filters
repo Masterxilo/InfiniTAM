@@ -58,30 +58,24 @@
     <Filter Include="ITMLib\Objects\Hierarchy">
       <UniqueIdentifier>{b426d800-5169-4a96-b480-d36f77674ae2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ITMLib\Engine\SceneReconstructionEngine">
+      <UniqueIdentifier>{20cc5b03-9f8c-4a40-9f20-d35e58034000}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib\Engine\VisualisationEngine">
+      <UniqueIdentifier>{d2c70a1c-554a-4345-9c9e-bf873d088767}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ITMLib\ITMLib.h">
       <Filter>ITMLib</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMSceneReconstructionEngine.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMMainEngine.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine_CUDA.h">
-      <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.h">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMDepthTracker.h">
@@ -91,12 +85,6 @@
       <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h">
-      <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMVisualisationEngine.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.h">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMRepresentationAccess.h">
@@ -148,9 +136,6 @@
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMRenderState.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMRenderState_VH.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMScene.h">
@@ -228,15 +213,27 @@
     <ClInclude Include="ITMLib\Objects\ITMImageHierarchy.h">
       <Filter>ITMLib\Objects\Hierarchy</Filter>
     </ClInclude>
+    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.h">
+      <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
+      <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMSceneReconstructionEngine.h">
+      <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.h">
+      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMVisualisationEngine.h">
+      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
+      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine_CUDA.cu">
-      <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.cu">
-      <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.cu">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMViewBuilder_CUDA.cu">
@@ -266,9 +263,6 @@
     <CudaCompile Include="ITMLib\Engine\ITMTrackingController.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu">
       <Filter>ITMLib\Objects</Filter>
     </CudaCompile>
@@ -282,7 +276,18 @@
       <Filter>Utils</Filter>
     </CudaCompile>
     <CudaCompile Include="InfiniTAM.cu" />
-    <CudaCompile Include="Utils\FileUtilsPNG.cu" />
+    <CudaCompile Include="Utils\FileUtilsPNG.cu">
+      <Filter>Utils</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.cu">
+      <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.cu">
+      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
+      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="png\lodepng.cpp">

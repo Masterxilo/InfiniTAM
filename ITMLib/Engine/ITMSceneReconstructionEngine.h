@@ -40,13 +40,20 @@ namespace ITMLib
 			    visible blocks, allocate them and update the hash
 			    table so that the new image data can be integrated.
 			*/
-			virtual void AllocateSceneFromDepth(ITMScene<TVoxel,TIndex> *scene, const ITMView *view, const ITMTrackingState *trackingState,
-				const ITMRenderState *renderState, bool onlyUpdateVisibleList = false) = 0;
+			virtual void AllocateSceneFromDepth(
+                ITMScene<TVoxel,TIndex> *scene,
+                const ITMView *view,
+                const ITMTrackingState *trackingState,
+				ITMRenderState *renderState //<! [in, out] initializes visibility
+                ) = 0;
 
 			/** Update the voxel blocks by integrating depth and
 			    possibly colour information from the given view.
 			*/
-			virtual void IntegrateIntoScene(ITMScene<TVoxel,TIndex> *scene, const ITMView *view, const ITMTrackingState *trackingState,
+			virtual void IntegrateIntoScene(
+                ITMScene<TVoxel,TIndex> *scene,
+                const ITMView *view,
+                const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState) = 0;
 
 			ITMSceneReconstructionEngine(void) { }

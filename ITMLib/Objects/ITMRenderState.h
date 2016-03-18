@@ -17,8 +17,39 @@ namespace ITMLib
 			and Visualisation engines.
 			*/
 		class ITMRenderState
-		{
+        {
+        private:
+            MemoryDeviceType memoryType;
+
+            /** A list of "visible entries", that are currently
+            being processed by the tracker.
+
+            at most SDF_LOCAL_BLOCK_NUM many, valid up to noVisibleEntries-1
+            */
+            ORUtils::MemoryBlock<int> visibleEntryIDs;
+
+            /** A list of "visible entries", that are
+            currently being processed by integration
+            and tracker.
+
+            SDF_GLOBAL_BLOCK_NUM many
+            */
+            ORUtils::MemoryBlock<uchar> entriesVisibleType;
 		public:
+
+            /** Number of entries in the live list. */
+            int noVisibleEntries;
+
+            /** Get the list of "visible entries", that are currently
+            processed by the tracker.
+
+            noTotalEntries == SDF_GLOBAL_BLOCK_NUM many
+            */
+            const int *GetVisibleEntryIDs(void) const { return visibleEntryIDs.GetData(memoryType); }
+            int *GetVisibleEntryIDs(void) { return visibleEntryIDs.GetData(memoryType); }
+            uchar *GetEntriesVisibleType(void) { return entriesVisibleType.GetData(memoryType); }
+
+
 			/** @brief
 			Gives the raycasting operations an idea of the
 			depth range to cover
@@ -45,7 +76,15 @@ namespace ITMLib
 
 			ORUtils::Image<Vector4u> *raycastImage;
 
-			ITMRenderState(const Vector2i &imgSize, float vf_min, float vf_max, MemoryDeviceType memoryType)
+            ITMRenderState(
+                int noTotalEntries,
+                const Vector2i &imgSize,
+                float vf_min, float vf_max,
+                MemoryDeviceType memoryType) : 
+                memoryType(memoryType),
+                visibleEntryIDs(SDF_LOCAL_BLOCK_NUM, memoryType),
+                entriesVisibleType(noTotalEntries, memoryType), 
+                noVisibleEntries(0)
 			{
 				renderingRangeImage = new ORUtils::Image<Vector2f>(imgSize, memoryType);
 				raycastResult = new ORUtils::Image<Vector4f>(imgSize, memoryType);

@@ -255,28 +255,8 @@ void UIEngine::glutIdleFunction()
 		uiEngine->ProcessFrame(); uiEngine->processedFrameNo++;
 		uiEngine->needsRefresh = true;
 		break;
-		//case SAVE_TO_DISK:
-		//	if (!uiEngine->actionDone)
-		//	{
-		//		char outFile[255];
-
-		//		ITMUChar4Image *saveImage = uiEngine->saveImage;
-
-		//		glReadBuffer(GL_BACK);
-		//		glReadPixels(0, 0, saveImage->noDims.x, saveImage->noDims.x, GL_RGBA, GL_UNSIGNED_BYTE, (unsigned char*)saveImage->GetData(false));
-		//		sprintf(outFile, "%s/out_%05d.ppm", uiEngine->outFolder, uiEngine->processedFrameNo);
-
-		//		SaveImageToFile(saveImage, outFile, true);
-
-		//		uiEngine->actionDone = true;
-		//	}
-		//	break;
 	case EXIT:
-#ifdef FREEGLUT
 		glutLeaveMainLoop();
-#else
-		exit(0);
-#endif
 		break;
 	case PROCESS_PAUSED:
 	default:

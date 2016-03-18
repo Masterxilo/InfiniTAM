@@ -2,8 +2,6 @@
 
 #include "ITMDenseMapper.h"
 
-#include "../Objects/ITMRenderState_VH.h"
-
 #include "../ITMLib.h"
 
 using namespace ITMLib::Engine;
@@ -35,12 +33,6 @@ void ITMDenseMapper<TVoxel,TIndex>::ProcessFrame(const ITMView *view, const ITMT
 
 	// camera data integration
 	sceneRecoEngine->IntegrateIntoScene(scene, view, trackingState, renderState);
-}
-
-template<class TVoxel, class TIndex>
-void ITMDenseMapper<TVoxel,TIndex>::UpdateVisibleList(const ITMView *view, const ITMTrackingState *trackingState, ITMScene<TVoxel,TIndex> *scene, ITMRenderState *renderState)
-{
-	sceneRecoEngine->AllocateSceneFromDepth(scene, view, trackingState, renderState, true);
 }
 
 template class ITMLib::Engine::ITMDenseMapper<ITMVoxel, ITMVoxelIndex>;

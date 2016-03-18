@@ -90,6 +90,12 @@ namespace ORUtils {
 		_CPU_AND_GPU_CODE_ inline void setColumn(int c, const Vector4_<T> &t) { memcpy(this->m + 4 * c, t.v, sizeof(T) * 4); }
 
 		// get values
+        _CPU_AND_GPU_CODE_ inline Vector3<T> getTranslate() const {
+            Vector3<T> T;
+            for (int y = 0; y < 3; y++)
+                T.v[y] = m[y + 4 * 3];
+            return T;
+        }
         _CPU_AND_GPU_CODE_ inline Vector4<T> getRow(int r) const { Vector4<T> v; for (int x = 0; x < 4; x++) v.v[x] = at(x, r); return v; }
 		_CPU_AND_GPU_CODE_ inline Vector4<T> getColumn(int c) const { Vector4<T> v; memcpy(v.v, this->m + 4 * c, sizeof(T) * 4); return v; }
 		_CPU_AND_GPU_CODE_ inline Matrix4 t() { // transpose
@@ -158,7 +164,7 @@ namespace ORUtils {
 			return r;
 		}
 
-		// The inverse matrix for float/double type
+		/// Set out to be the inverse matrix of this.
 		_CPU_AND_GPU_CODE_ inline bool inv(Matrix4 &out) const {
 			T tmp[12], src[16], det;
 			T *dst = out.m;

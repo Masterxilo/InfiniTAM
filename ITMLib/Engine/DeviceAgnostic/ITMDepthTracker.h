@@ -2,8 +2,6 @@
 // The current discussion ignores the optimizations/special iterations with 
 // rotation estimation only ("At the coarser levels we optimise only for the rotation matrix R.")
 // Also 'translation only' is not used for the depth ICP tracker.
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
- 
 #pragma once
 
 #include "../../Utils/ITMLibDefines.h"
@@ -13,8 +11,8 @@
 /**
 Computes
 \f{eqnarray*}{
-b &=& n_{k-1}^\top(p_{k-1} - p_k)  \\
-A^T &=& G(u)^T . n_{k-1}\\
+b &:=& n_{k-1}^\top(p_{k-1} - p_k)  \\
+A^T &:=& G(u)^T . n_{k-1}\\
 \f}
 
 where \f$G(u) = [ [p_k]_\times \;|\; Id ]\f$ a 3 x 6 matrix and \f$A^T\f$ is a 6 x 1 column vector.
@@ -32,8 +30,8 @@ the direction in which \f$p_k\f$ is observed (projective data association).
 */
 template<TrackerIterationType iterationType>
 _CPU_AND_GPU_CODE_ inline bool computePerPointGH_Depth_Ab(
-    THREADPTR(float) *AT, 
-    THREADPTR(float) &b,
+    THREADPTR(float) *AT, //!< [out]
+    THREADPTR(float) &b,//!< [out]
 
     const CONSTPTR(int) & x, const CONSTPTR(int) & y,
     const CONSTPTR(float) &depth, //!< \f$D_k(\mathbf u)\f$

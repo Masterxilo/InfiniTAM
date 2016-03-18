@@ -148,7 +148,6 @@
     <ClInclude Include="ITMLib\Engine\ITMViewBuilder.h" />
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h" />
     <ClInclude Include="ITMLib\Objects\ITMRenderState.h" />
-    <ClInclude Include="ITMLib\Objects\ITMRenderState_VH.h" />
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
     <ClInclude Include="ITMLib\Objects\ITMTemplatedHierarchyLevel.h" />
     <ClInclude Include="ITMLib\Objects\ITMSceneHierarchyLevel.h" />

@@ -2,7 +2,6 @@
 
 #include "ITMTrackingController.h"
 
-#include "../Objects/ITMRenderState_VH.h"
 
 #include "../ITMLib.h"
 

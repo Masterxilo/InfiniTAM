@@ -7,7 +7,7 @@
 #include "../Objects/ITMScene.h"
 #include "../Objects/ITMView.h"
 #include "../Objects/ITMTrackingState.h"
-#include "../Objects/ITMRenderState_VH.h"
+#include "../Objects/ITMRenderState.h"
 
 using namespace ITMLib::Objects;
 
@@ -36,23 +36,36 @@ namespace ITMLib
 			appropriate visualisation state object, created
 			previously using allocateInternalState().
 			*/
-			virtual void FindVisibleBlocks(const ITMPose *pose, const ITMIntrinsics *intrinsics,
-				ITMRenderState *renderState) const = 0;
+			virtual void FindVisibleBlocks(
+                const ITMPose *pose, 
+                const ITMIntrinsics *intrinsics,
+                ITMRenderState *renderState //!< [out] initializes visibleEntryIDs(), noVisibleEntries, entriesVisibleType
+                ) const = 0;
 
 			/** Given scene, pose and intrinsics, create an estimate
 			of the minimum and maximum depths at each pixel of
 			an image.
 			*/
-			virtual void CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics, 
-				ITMRenderState *renderState) const = 0;
+			virtual void CreateExpectedDepths(
+                const ITMPose *pose, 
+                const ITMIntrinsics *intrinsics, 
+				ITMRenderState *renderState //!< [out] initializes renderingRangeImage
+                ) const = 0;
 
 			/** This will render an image using raycasting. */
-			virtual void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics,
-				const ITMRenderState *renderState, ITMUChar4Image *outputImage, RenderImageType type = RENDER_SHADED_GREYSCALE) const = 0;
+			virtual void RenderImage(
+                const ITMPose *pose, 
+                const ITMIntrinsics *intrinsics,
+				const ITMRenderState *renderState, 
+                ITMUChar4Image *outputImage, 
+                RenderImageType type = RENDER_SHADED_GREYSCALE) const = 0;
 
 			/** Finds the scene surface using raycasting. */
-			virtual void FindSurface(const ITMPose *pose, const ITMIntrinsics *intrinsics,
-				const ITMRenderState *renderState) const = 0;
+			virtual void FindSurface(
+                const ITMPose *pose,
+                const ITMIntrinsics *intrinsics,
+				ITMRenderState *renderState //!< [out] initializes raycastResult
+                ) const = 0;
 
 			/** Create a point cloud as required by the
 			ITMLib::Engine::ITMColorTracker classes.
@@ -80,9 +93,6 @@ namespace ITMLib
 			virtual ITMRenderState* CreateRenderState(const Vector2i & imgSize) const = 0;
 		};
 
-		template<class TIndex> struct IndexToRenderState { typedef ITMRenderState type; };
-		template<> struct IndexToRenderState<ITMVoxelBlockHash> { typedef ITMRenderState_VH type; };
-
 		/** \brief
 			Interface to engines helping with the visualisation of
 			the results from the rest of the library.
@@ -105,8 +115,6 @@ namespace ITMLib
 				this->scene = scene;
 			}
 		public:
-			/** Override */
-			virtual typename IndexToRenderState<TIndex>::type *CreateRenderState(const Vector2i & imgSize) const = 0;
 		};
 	}
 }

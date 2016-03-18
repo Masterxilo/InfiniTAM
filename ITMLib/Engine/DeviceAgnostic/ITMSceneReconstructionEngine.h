@@ -244,7 +244,6 @@ void allocateVoxelBlock(
     typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
     ITMVoxelBlockHash::ExcessAllocationList* excessAllocationList,
     ITMHashEntry *hashTable,
-    AllocationTempData *allocData,
 
     uchar *entriesAllocType,
     uchar *entriesVisibleType,

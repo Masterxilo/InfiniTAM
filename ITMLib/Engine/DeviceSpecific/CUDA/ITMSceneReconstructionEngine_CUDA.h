@@ -24,10 +24,16 @@ namespace ITMLib
 		public:
 			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
 
-			void AllocateSceneFromDepth(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
-				const ITMRenderState *renderState, bool onlyUpdateVisibleList = false);
+			void AllocateSceneFromDepth(
+                ITMScene<TVoxel, ITMVoxelBlockHash> *scene, 
+                const ITMView *view, 
+                const ITMTrackingState *trackingState,
+				ITMRenderState *renderState);
 
-			void IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, const ITMTrackingState *trackingState,
+			void IntegrateIntoScene(
+                ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+                const ITMView *view,
+                const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);
 
 			ITMSceneReconstructionEngine_CUDA(void);

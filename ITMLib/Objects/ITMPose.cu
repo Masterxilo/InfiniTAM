@@ -211,10 +211,11 @@ void ITMPose::SetParamsFromModelView()
 
 	// Compute this->params.t = rottrans
 	const Vector3f T = GetT();
-	float shtot = 0.5f;
 	const float theta = length(resultRot);
 
-	if (theta > 0.00001f) shtot = sinf(theta * 0.5f) / theta;
+    const float shtot = (theta > 0.00001f) ?
+        sinf(theta * 0.5f) / theta :
+        0.5f; // lim_{t -> theta} sin(t/2)/t, lim_{t -> 0} sin(t/2)/t = 0.5
 
 	const ITMPose halfrotor(
 		0.0f, 0.0f, 0.0f, 
@@ -223,18 +224,14 @@ void ITMPose::SetParamsFromModelView()
 
 	Vector3f rottrans = halfrotor.GetR() * T;
 
-	if (theta > 0.001f)
-	{
-		float denom = dot(resultRot, resultRot);
-		float param = dot(T, resultRot) * (1 - 2 * shtot) / denom;
+    const float param = dot(T, resultRot) * 
+        (
+        (theta > 0.001f) ?
+        (1 - 2 * shtot) / (theta * theta) :
+        1 / 24.f // Series[(1 - 2*Sin[t/2]/t)/(t^2), {t, 0, 1}] = 1/24
+        );
 		
-		rottrans -= resultRot * param;
-	}
-	else
-	{
-		float param = dot(T, resultRot) / 24;
-		rottrans -= resultRot * param;
-	}
+	rottrans -= resultRot * param;
 
 	rottrans /= 2 * shtot;
 
@@ -264,10 +261,7 @@ Matrix3f ITMPose::GetR(void) const
 
 Vector3f ITMPose::GetT(void) const
 {
-	Vector3f T;
-	T.v[0] = M.m[0 + 4*3]; T.v[1] = M.m[1 + 4*3]; T.v[2] = M.m[2 + 4*3];
-
-	return T;
+	return M.getTranslate();
 }
 
 void ITMPose::GetParams(Vector3f &translation, Vector3f &rotation)
