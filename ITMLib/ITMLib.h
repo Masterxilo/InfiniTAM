@@ -11,7 +11,6 @@
 #include "Engine/ITMLowLevelEngine.h"
 
 #include "Engine/ITMDepthTracker.h"
-#include "Engine/DeviceSpecific/CUDA/ITMDepthTracker_CUDA.h"
 
 #include "Engine/ITMSceneReconstructionEngine.h"
 #include "Engine/DeviceSpecific/CUDA/ITMSceneReconstructionEngine_CUDA.h"
@@ -20,7 +19,6 @@
 #include "Engine/DeviceSpecific/CUDA/ITMVisualisationEngine_CUDA.h"
 
 #include "Engine/ITMViewBuilder.h"
-#include "Engine/DeviceSpecific/CUDA/ITMViewBuilder_CUDA.h"
 
 #include "Engine/ITMMainEngine.h"
 

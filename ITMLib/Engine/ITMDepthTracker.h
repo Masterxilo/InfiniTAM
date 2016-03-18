@@ -43,6 +43,7 @@ namespace ITMLib
                 const ITMLowLevelEngine *lowLevelEngine);
             virtual ~ITMDepthTracker(void);
 
+            /** !private! */
             struct AccuCell {
                 int noValidPoints;
                 float f;
@@ -51,6 +52,8 @@ namespace ITMLib
                 // AT_A_tri, upper right triangular part of AT_A
                 float AT_A_tri[1 + 2 + 3 + 4 + 5 + 6];
             };
+        private:
+
             AccuCell make0Accu() {
                 AccuCell accu;
                 accu.noValidPoints = 0;
@@ -68,7 +71,6 @@ namespace ITMLib
                 for (int i = 0; i < noParaSQ(); i++) a.AT_A_tri[i] += b.AT_A_tri[i];
             }
 
-		private:
 
 			const ITMLowLevelEngine *lowLevelEngine;
             /// Passed on last call to TrackCamera
@@ -86,7 +88,6 @@ namespace ITMLib
             Matrix4f ComputeTinc(const float *delta) const;
 			bool HasConverged(float *step) const;
 
-        protected:
             struct TrackingLevel {
                 /// FilterSubsampleWithHoles result of one level higher
                 ITMFloatImage* depth;
@@ -159,7 +160,10 @@ namespace ITMLib
                 return accu.noValidPoints;
             }
 
-            virtual AccuCell ComputeGandH(Matrix4f T_g_k_estimate) = 0;
+            /// CUDA managed host/device memory (call cudaDeviceSynchronize before using on host)
+            AccuCell *accu;
+
+            AccuCell ComputeGandH(Matrix4f T_g_k_estimate);
 
 		};
 	}

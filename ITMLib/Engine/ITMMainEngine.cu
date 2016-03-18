@@ -11,7 +11,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	scene = new ITMScene(&(settings->sceneParams));
 
 	lowLevelEngine = new ITMLowLevelEngine();
-	viewBuilder = new ITMViewBuilder_CUDA(calib);
+	viewBuilder = new ITMViewBuilder(calib);
 	visualisationEngine = new ITMVisualisationEngine_CUDA(scene);
 
     Vector2i trackedImageSize = imgSize_d;
@@ -22,7 +22,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
     sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA();
     ResetScene();
 
-    tracker = new ITMDepthTracker_CUDA(
+    tracker = new ITMDepthTracker(
         trackedImageSize,
         settings->depthTrackerICPThreshold,
         settings->depthTrackerTerminationThreshold,

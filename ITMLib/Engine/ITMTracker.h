@@ -24,8 +24,6 @@ namespace ITMLib
 			    currently stored as an attribute in trackingState.
 			*/
 			virtual void TrackCamera(ITMTrackingState *trackingState, const ITMView *view) = 0;
-
-
             virtual ITMTrackingState *BuildTrackingState() const = 0;
 
 			virtual ~ITMTracker(void) {}

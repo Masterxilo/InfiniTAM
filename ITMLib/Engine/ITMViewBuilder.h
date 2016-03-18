@@ -8,6 +8,8 @@
 #include "../Objects/ITMView.h"
 #include "../Objects/ITMRGBDCalib.h"
 
+#include "../Utils/ITMLibDefines.h"
+
 using namespace ITMLib::Objects;
 
 namespace ITMLib
@@ -25,10 +27,10 @@ namespace ITMLib
 			ITMFloatImage *floatImage;
 
         public:
-			virtual void ConvertDisparityToDepth(ITMFloatImage *depth_out, const ITMShortImage *disp_in, const ITMIntrinsics *depthIntrinsics,
-				Vector2f disparityCalibParams) = 0;
+			void ConvertDisparityToDepth(ITMFloatImage *depth_out, const ITMShortImage *disp_in, const ITMIntrinsics *depthIntrinsics,
+				Vector2f disparityCalibParams);
 
-			virtual void UpdateView(ITMView **view, ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage) = 0;
+			void UpdateView(ITMView **view, ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage);
 
 
 			ITMViewBuilder(const ITMRGBDCalib *calib)
