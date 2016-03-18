@@ -49,9 +49,6 @@
     <Filter Include="Engine\Source Files\ImageSource">
       <UniqueIdentifier>{d0ab998b-a21d-47d5-b123-402f924bf7b1}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ITMLib\Objects\Hierarchy">
-      <UniqueIdentifier>{b426d800-5169-4a96-b480-d36f77674ae2}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ITMLib\Engine\SceneReconstructionEngine">
       <UniqueIdentifier>{20cc5b03-9f8c-4a40-9f20-d35e58034000}</UniqueIdentifier>
     </Filter>
@@ -180,15 +177,6 @@
     <ClInclude Include="ITMLib\Objects\ITMView.h">
       <Filter>ITMLib\Objects\Views</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMTemplatedHierarchyLevel.h">
-      <Filter>ITMLib\Objects\Hierarchy</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMSceneHierarchyLevel.h">
-      <Filter>ITMLib\Objects\Hierarchy</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMImageHierarchy.h">
-      <Filter>ITMLib\Objects\Hierarchy</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.h">
       <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
     </ClInclude>
@@ -217,9 +205,6 @@
       <Filter>ITMLib\Engine\Tracker</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMTracker.h">
-      <Filter>ITMLib\Engine\Tracker</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMTrackingController.h">
       <Filter>ITMLib\Engine\Tracker</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMDepthTracker_CUDA.h">
@@ -274,9 +259,6 @@
       <Filter>Tests</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu">
-      <Filter>ITMLib\Engine\Tracker</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMTrackingController.cu">
       <Filter>ITMLib\Engine\Tracker</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMDepthTracker_CUDA.cu">

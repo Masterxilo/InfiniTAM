@@ -13,39 +13,35 @@ __global__ void integrateIntoScene_device(ITMVoxel *localVBA, const ITMHashEntry
     Vector4f projParams_rgb, float voxelSize, float mu, int maxW)
 {
     // one thread block for each voxel block
-    Vector3i globalPos;
-    int entryId = visibleEntryIDs[blockIdx.x];
+    const ITMHashEntry &currentHashEntry = hashTable[visibleEntryIDs[blockIdx.x]];
+    if (!currentHashEntry.isAllocated()) return;
 
-    const ITMHashEntry &currentHashEntry = hashTable[entryId];
+    const Vector3i globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 
-    if (currentHashEntry.ptr < 0) return;
-
-    globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
-
-    ITMVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
+    ITMVoxel * const localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
 
     // one thread for each voxel
-    int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
+    const int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
     integrateVoxel(x, y, z,
         globalPos, localVoxelBlock, voxelSize,
         M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
 
 __global__ void buildHashAllocAndVisibleType_device(uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords, const float *depth,
-    Matrix4f invM_d, Vector4f projParams_d, float mu, Vector2i _imgSize, float _voxelSize, ITMHashEntry *hashTable, float viewFrustum_min,
+    Matrix4f invM_d, Vector4f projParams_d, float mu, Vector2i imgSize, float voxelSize, ITMHashEntry *hashTable, float viewFrustum_min,
     float viewFrustum_max)
 {
-    int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
 
-    if (x > _imgSize.x - 1 || y > _imgSize.y - 1) return;
+    if (x > imgSize.x - 1 || y > imgSize.y - 1) return;
 
     buildHashAllocAndVisibleTypePP(entriesAllocType, entriesVisibleType, x, y, blockCoords, depth, invM_d,
-        projParams_d, mu, _imgSize, _voxelSize, hashTable, viewFrustum_min, viewFrustum_max);
+        projParams_d, mu, imgSize, voxelSize, hashTable, viewFrustum_min, viewFrustum_max);
 }
 
 __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int noVisibleEntries)
 {
-    int entryId = threadIdx.x + blockIdx.x * blockDim.x;
+    const int entryId = threadIdx.x + blockIdx.x * blockDim.x;
     if (entryId > noVisibleEntries - 1) return;
     entriesVisibleType[visibleEntryIDs[entryId]] = VT_VISIBLE_PREVIOUS;
 }
@@ -56,7 +52,7 @@ __global__ void allocateVoxelBlocksList_device(
     ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
     uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
 {
-    int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
+    const int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
 
     allocateVoxelBlock(targetIdx,
@@ -73,14 +69,14 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, int noTotalEntr
     int *visibleEntryIDs, AllocationTempData *allocData, uchar *entriesVisibleType,
     Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize)
 {
-    int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
+    const int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
 
     __shared__ bool shouldPrefix;
     shouldPrefix = false;
     __syncthreads();
 
-    bool visible = visibilityTestIfNeeded(
+    const bool visible = visibilityTestIfNeeded(
         targetIdx, entriesVisibleType, hashTable,
         M_d, projParams_d, depthImgSize, voxelSize
         );
@@ -91,7 +87,7 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, int noTotalEntr
 
     if (shouldPrefix)
     {
-        int offset = computePrefixSum_device<int>(visible, &allocData->noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
+        const int offset = computePrefixSum_device<int>(visible, &allocData->noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
         if (offset != -1) visibleEntryIDs[offset] = targetIdx;
     }
 }
@@ -103,7 +99,7 @@ ITMSceneReconstructionEngine_CUDA::ITMSceneReconstructionEngine_CUDA(void)
 	ITMSafeCall(cudaMalloc((void**)&allocationTempData_device, sizeof(AllocationTempData)));
 	ITMSafeCall(cudaMallocHost((void**)&allocationTempData_host, sizeof(AllocationTempData)));
 
-	int noTotalEntries = ITMVoxelBlockHash::noTotalEntries;
+	const int noTotalEntries = ITMVoxelBlockHash::noTotalEntries;
 	ITMSafeCall(cudaMalloc((void**)&entriesAllocType_device, noTotalEntries));
 	ITMSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
 }
@@ -118,8 +114,8 @@ ITMSceneReconstructionEngine_CUDA::~ITMSceneReconstructionEngine_CUDA(void)
 
 void ITMSceneReconstructionEngine_CUDA::ResetScene(ITMScene *scene)
 {
-	int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
-	int blockSize = scene->index.getVoxelBlockSize();
+	const int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
+	const int blockSize = scene->index.getVoxelBlockSize();
 
     // Reset all voxels in all voxel blocks
     ITMVoxel *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
@@ -137,46 +133,47 @@ void ITMSceneReconstructionEngine_CUDA::ResetScene(ITMScene *scene)
     scene->index.excessAllocationList->Reset();
 }
 
-void ITMSceneReconstructionEngine_CUDA::AllocateSceneFromDepth(ITMScene *scene, const ITMView *view, 
-	const ITMTrackingState *trackingState, ITMRenderState *renderState)
+void ITMSceneReconstructionEngine_CUDA::AllocateSceneFromDepth(
+    ITMScene *scene,
+    const ITMView *view, 
+	const ITMTrackingState *trackingState, 
+    ITMRenderState *renderState)
 {
-	Vector2i depthImgSize = view->depth->noDims;
-	float voxelSize = scene->sceneParams->voxelSize;
+	const Vector2i depthImgSize = view->depth->noDims;
+    const float voxelSize = scene->sceneParams->voxelSize;
+    
+    const Matrix4f M_d = trackingState->pose_d->GetM();
+    Matrix4f invM_d; M_d.inv(invM_d);
 
-	Matrix4f M_d, invM_d;
-	Vector4f projParams_d, invProjParams_d;
-
-	M_d = trackingState->pose_d->GetM(); M_d.inv(invM_d);
-
-	projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
-	invProjParams_d = projParams_d;
+    const Vector4f projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
+    Vector4f invProjParams_d = projParams_d;
 	invProjParams_d.x = 1.0f / invProjParams_d.x;
 	invProjParams_d.y = 1.0f / invProjParams_d.y;
 
-	float mu = scene->sceneParams->mu;
+	const float mu = scene->sceneParams->mu;
 
-	float *depth = view->depth->GetData(MEMORYDEVICE_CUDA);
+    float * const depth = view->depth->GetData(MEMORYDEVICE_CUDA);
     auto voxelAllocationList = scene->localVBA.voxelAllocationList;
     auto excessAllocationList = scene->index.excessAllocationList;
-	ITMHashEntry *hashTable = scene->index.GetEntries();
+    ITMHashEntry * const hashTable = scene->index.GetEntries();
 
-	int noTotalEntries = scene->index.noTotalEntries;
+    const int noTotalEntries = scene->index.noTotalEntries;
 
-	int *visibleEntryIDs = renderState->GetVisibleEntryIDs();
-	uchar *entriesVisibleType = renderState->GetEntriesVisibleType();
+    int * const visibleEntryIDs = renderState->GetVisibleEntryIDs();
+    uchar * const entriesVisibleType = renderState->GetEntriesVisibleType();
 
-	dim3 cudaBlockSizeHV(16, 16);
-	dim3 gridSizeHV((int)ceil((float)depthImgSize.x / (float)cudaBlockSizeHV.x), (int)ceil((float)depthImgSize.y / (float)cudaBlockSizeHV.y));
+    const dim3 cudaBlockSizeHV(16, 16);
+    const dim3 gridSizeHV((int)ceil((float)depthImgSize.x / (float)cudaBlockSizeHV.x), (int)ceil((float)depthImgSize.y / (float)cudaBlockSizeHV.y));
 
-	dim3 cudaBlockSizeAL(256, 1);
-	dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
+	const dim3 cudaBlockSizeAL(256, 1);
+	const dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
 
-	dim3 cudaBlockSizeVS(256, 1);
-	dim3 gridSizeVS((int)ceil((float)renderState->noVisibleEntries / (float)cudaBlockSizeVS.x));
+	const dim3 cudaBlockSizeVS(256, 1);
+	const dim3 gridSizeVS((int)ceil((float)renderState->noVisibleEntries / (float)cudaBlockSizeVS.x));
 
-	float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
+    const float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
-	AllocationTempData *tempData = (AllocationTempData*)allocationTempData_host;
+    AllocationTempData * const tempData = (AllocationTempData*)allocationTempData_host;
 	tempData->noVisibleEntries = 0;
 	ITMSafeCall(cudaMemcpyAsync(allocationTempData_device, tempData, sizeof(AllocationTempData), cudaMemcpyHostToDevice));
 

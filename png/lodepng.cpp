@@ -1,3 +1,4 @@
+#pragma warning(disable : 4244 4334 4267)
 /*
 LodePNG version 20160124
 

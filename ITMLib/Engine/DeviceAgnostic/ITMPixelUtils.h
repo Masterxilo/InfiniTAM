@@ -41,7 +41,7 @@ _CPU_AND_GPU_CODE_ inline void updateVoxelDepthInformation(
     // write back
     /// D(X) <-  (4)
     voxel.sdf = ITMVoxel::SDF_floatToValue(newF);
-    voxel.w_depth = newW;
+    voxel.w_depth = (uchar)newW;
 }
 #undef weightedCombine
 
@@ -182,9 +182,10 @@ inline _CPU_AND_GPU_CODE_ float toFloat(float c) {
     return c;
 }
 
+/// Whether interpolation should return an illegal color when holes make interpolation impossible
 #define WITH_HOLES true
 /// Sample 4 channel image with bilinear interpolation (T::toFloat must return Vector4f)
-/// withHoles: returns makeIllegalColor<OUT>() when any of the four surrounding pixels is illegal (has negative w).
+/// IF withHoles == WITH_HOLES: returns makeIllegalColor<OUT>() when any of the four surrounding pixels is illegal (has negative w).
 template<typename T_OUT, //!< Vector4f or float
     bool withHoles = false, typename T_IN> _CPU_AND_GPU_CODE_ inline Vector4f interpolateBilinear(
     const CONSTPTR(T_IN) *source,

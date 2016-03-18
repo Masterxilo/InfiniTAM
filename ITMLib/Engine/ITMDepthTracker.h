@@ -4,14 +4,12 @@
 
 #include "../Utils/ITMLibDefines.h"
 
-#include "../Objects/ITMImageHierarchy.h"
-#include "../Objects/ITMTemplatedHierarchyLevel.h"
-#include "../Objects/ITMSceneHierarchyLevel.h"
-
 #include "../Engine/ITMTracker.h"
 #include "../Engine/ITMLowLevelEngine.h"
 
 using namespace ITMLib::Objects;
+
+#include <vector>
 
 namespace ITMLib
 {
@@ -28,15 +26,21 @@ namespace ITMLib
         {
         public:
 
-            void TrackCamera(ITMTrackingState *trackingState, //!< in/out, the computed best fit camera pose for the new view
+            void TrackCamera(ITMTrackingState *trackingState, //!< [in/out] the computed best fit camera pose for the new view
                 const ITMView *view //<! latest camera data, for which the camera pose shall be adjusted
                 );
 
+
+            ITMTrackingState *BuildTrackingState() const
+            {
+                return new ITMTrackingState(trackingLevels[0].depth->noDims);
+            }
+
             ITMDepthTracker(
-                Vector2i imgSize,
-                TrackerIterationType *trackingRegime, //!< array of size noHierarchyLevels. Tells which values should be computed in which hierarchy (pyramid) levels)
-                int noHierarchyLevels, int noICPRunTillLevel, float distThresh,
-                float terminationThreshold, const ITMLowLevelEngine *lowLevelEngine, MemoryDeviceType memoryType);
+                Vector2i depthImgSize,
+                float distThresh,
+                float terminationThreshold,
+                const ITMLowLevelEngine *lowLevelEngine);
             virtual ~ITMDepthTracker(void);
 
             struct AccuCell {
@@ -67,15 +71,10 @@ namespace ITMLib
 		private:
 
 			const ITMLowLevelEngine *lowLevelEngine;
-			ITMImageHierarchy<ITMSceneHierarchyLevel> *sceneHierarchy;
-			ITMImageHierarchy<ITMTemplatedHierarchyLevel<ITMFloatImage> > *viewHierarchy;
-
+            /// Passed on last call to TrackCamera
             const ITMView *view;
 
-			int *noIterationsPerLevel;
-			int noICPLevel;
-
-			float terminationThreshold;
+			const float terminationThreshold;
 
             /// Solves hessian.step = nabla
             /// \param delta output array of 6 floats 
@@ -87,18 +86,35 @@ namespace ITMLib
             Matrix4f ComputeTinc(const float *delta) const;
 			bool HasConverged(float *step) const;
 
-            /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
-            void SetEvaluationData(ITMTrackingState *trackingState, const ITMView *view);
-            /// Init coarser hierarchy levels (1-noICPLevel)
-            void PrepareForEvaluation();
-
-            /// Select current hierarchy level
-            void SetEvaluationParams(int levelId);
-
         protected:
+            struct TrackingLevel {
+                /// FilterSubsampleWithHoles result of one level higher
+                ITMFloatImage* depth;
+                /// Half of the intrinsics of one level higher
+                Vector4f intrinsics;
+                float distanceThreshold;
+                int numberOfIterations;
+                TrackerIterationType iterationType;
+                TrackingLevel() {}
+                TrackingLevel(int numberOfIterations, TrackerIterationType iterationType, float distanceThreshold, Vector2i depthImageSize) :
+                    numberOfIterations(numberOfIterations), iterationType(iterationType), distanceThreshold(distanceThreshold) {
+                    depth = new ITMFloatImage(depthImageSize, MEMORYDEVICE_CUDA);
+                }
+            };
+            // ViewHierarchy, 0 is highest resolution
+            std::vector<TrackingLevel> trackingLevels;
+            TrackingLevel* currentTrackingLevel;
+
+            Vector4f getViewIntrinsics() {
+                return view->calib->intrinsics_d.projectionParamsSimple.all;
+            }
+
+            TrackerIterationType iterationType() const {
+                return currentTrackingLevel->iterationType;
+            }
             bool shortIteration() const {
-                return (iterationType == TRACKER_ITERATION_ROTATION) ||
-                    (iterationType == TRACKER_ITERATION_TRANSLATION);
+                return (iterationType() == TRACKER_ITERATION_ROTATION) ||
+                    (iterationType() == TRACKER_ITERATION_TRANSLATION);
             }
 
             int noPara() const  {
@@ -109,14 +125,9 @@ namespace ITMLib
                 return shortIteration() ? 3 + 2 + 1 : 6 + 5 + 4 + 3 + 2 + 1;
             }
 
-			float *distThresh;
-
-			int levelId;
-			TrackerIterationType iterationType;
-
-			Matrix4f scenePose;
-			ITMSceneHierarchyLevel *sceneHierarchyLevel;
-			ITMTemplatedHierarchyLevel<ITMFloatImage> *viewHierarchyLevel;
+            /// Of trackingState passed to TrackCamera
+            ORUtils::Image<Vector4f> *pointsMap, *normalsMap;
+            Matrix4f scenePose;
 
             /// evaluate error function at the current T_g_k_estimate, 
             /// compute sum_ATb and sum_AT_A, the system we need to solve to compute the

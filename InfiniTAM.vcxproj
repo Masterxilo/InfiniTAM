@@ -55,7 +55,7 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
@@ -72,11 +72,13 @@
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <CodeGeneration>compute_30,compute_30</CodeGeneration>
       <AdditionalOptions>-Xcompiler "/wd 4819" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalCompilerOptions>
+      </AdditionalCompilerOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
@@ -110,7 +112,6 @@
     <CudaCompile Include="Engine\UIEngine.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu" />
-    <CudaCompile Include="ITMLib\Engine\ITMTrackingController.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu" />
     <CudaCompile Include="ITMLib\Utils\ITMLibSettings.cu" />
     <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu" />
@@ -141,13 +142,10 @@
     <ClInclude Include="ITMLib\Engine\ITMMainEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMTracker.h" />
-    <ClInclude Include="ITMLib\Engine\ITMTrackingController.h" />
     <ClInclude Include="ITMLib\Engine\ITMViewBuilder.h" />
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h" />
     <ClInclude Include="ITMLib\Objects\ITMRenderState.h" />
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
-    <ClInclude Include="ITMLib\Objects\ITMTemplatedHierarchyLevel.h" />
-    <ClInclude Include="ITMLib\Objects\ITMSceneHierarchyLevel.h" />
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h" />
     <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h" />
     <ClInclude Include="ITMLib\Utils\ITMLibDefines.h" />
@@ -162,7 +160,6 @@
     <ClInclude Include="ITMLib\Objects\ITMScene.h" />
     <ClInclude Include="ITMLib\Objects\ITMSceneParams.h" />
     <ClInclude Include="ITMLib\Objects\ITMView.h" />
-    <ClInclude Include="ITMLib\Objects\ITMImageHierarchy.h" />
     <ClInclude Include="ITMLib\Objects\ITMLocalVBA.h" />
     <ClInclude Include="ITMLib\ITMLib.h" />
     <ClInclude Include="ORUtils\Cholesky.h" />

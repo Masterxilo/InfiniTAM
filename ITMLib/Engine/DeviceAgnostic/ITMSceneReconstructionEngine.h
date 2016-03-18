@@ -64,7 +64,7 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(ITMVoxel) 
 {
     Vector4f pt_camera; Vector2f pt_image;
     Vector3f oldC, newC;
-    float newW, oldW;
+    int newW, oldW;
 
     if (!projectModel(projParams_rgb, M_rgb,
         imgSize, pt_model, pt_camera, pt_image)) return;
@@ -321,13 +321,11 @@ _CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
     const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & depthImgSize,
     const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & rgbImgSize
     ) {
-    Vector4f pt_model; int locId;
-
-    locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
+    const int locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
 
     // Voxel's world coordinates, for later projection into depth and color image
-    pt_model = Vector4f(
-        (globalPos.toFloat() + Vector3f(x, y, z)) * voxelSize, 1.f);
+    const Vector4f pt_model = Vector4f(
+        (globalPos.toFloat() + Vector3f((float)x, (float)y, (float)z)) * voxelSize, 1.f);
 
     computeUpdatedVoxelInfo(
         localVoxelBlock[locId],

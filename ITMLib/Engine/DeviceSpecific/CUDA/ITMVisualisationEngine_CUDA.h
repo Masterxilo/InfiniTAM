@@ -46,7 +46,9 @@ namespace ITMLib
                 ITMRenderState *renderState, //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
                 ITMUChar4Image *outputImage, ITMVisualisationEngine::RenderImageType type = ITMVisualisationEngine::RENDER_SHADED_GREYSCALE) const;
 			
-            void CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState,
+            void CreateICPMaps(
+                const ITMIntrinsics * intrinsics_d,
+                ITMTrackingState *trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
                 ITMRenderState *renderState //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
                 ) const;
 			

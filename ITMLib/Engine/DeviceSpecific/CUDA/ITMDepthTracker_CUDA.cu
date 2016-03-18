@@ -188,9 +188,12 @@ __global__ void depthTrackerOneLevel_g_rt_device(ITMDepthTracker_KernelParameter
 
 // host methods
 
-ITMDepthTracker_CUDA::ITMDepthTracker_CUDA(Vector2i imgSize, TrackerIterationType *trackingRegime, int noHierarchyLevels, int noICPRunTillLevel,
-	float distThresh, float terminationThreshold, const ITMLowLevelEngine *lowLevelEngine)
-	:ITMDepthTracker(imgSize, trackingRegime, noHierarchyLevels, noICPRunTillLevel, distThresh, terminationThreshold, lowLevelEngine, MEMORYDEVICE_CUDA)
+ITMDepthTracker_CUDA::ITMDepthTracker_CUDA(
+    Vector2i depthImgSize,
+    float distThresh,
+    float terminationThreshold,
+    const ITMLowLevelEngine *lowLevelEngine)
+    :ITMDepthTracker(depthImgSize, distThresh, terminationThreshold, lowLevelEngine)
 {
 	ITMSafeCall(cudaMallocManaged((void**)&accu, sizeof(AccuCell)));
 }
@@ -201,14 +204,15 @@ ITMDepthTracker_CUDA::~ITMDepthTracker_CUDA(void)
 }
 
 ITMDepthTracker::AccuCell ITMDepthTracker_CUDA::ComputeGandH(Matrix4f T_g_k_estimate) {
-	Vector4f *pointsMap = sceneHierarchyLevel->pointsMap->GetData(MEMORYDEVICE_CUDA);
-	Vector4f *normalsMap = sceneHierarchyLevel->normalsMap->GetData(MEMORYDEVICE_CUDA);
-	Vector4f sceneIntrinsics = sceneHierarchyLevel->intrinsics;
-	Vector2i sceneImageSize = sceneHierarchyLevel->pointsMap->noDims;
+    Vector4f *pointsMap = this->pointsMap->GetData(MEMORYDEVICE_CUDA);
+	Vector4f *normalsMap = this->normalsMap->GetData(MEMORYDEVICE_CUDA);
+	Vector4f sceneIntrinsics = getViewIntrinsics();
+    Vector2i sceneImageSize = this->pointsMap->noDims;
+    assert(sceneImageSize == this->normalsMap->noDims);
 
-	float *depth = viewHierarchyLevel->depth->GetData(MEMORYDEVICE_CUDA);
-	Vector4f viewIntrinsics = viewHierarchyLevel->intrinsics;
-	Vector2i viewImageSize = viewHierarchyLevel->depth->noDims;
+    float *depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
+    Vector4f viewIntrinsics = currentTrackingLevel->intrinsics;
+    Vector2i viewImageSize = currentTrackingLevel->depth->noDims;
 
 	dim3 blockSize(16, 16);
 	dim3 gridSize(
@@ -228,12 +232,12 @@ ITMDepthTracker::AccuCell ITMDepthTracker_CUDA::ComputeGandH(Matrix4f T_g_k_esti
 	args.scenePose = scenePose;
 	args.viewIntrinsics = viewIntrinsics;
 	args.viewImageSize = viewImageSize;
-	args.distThresh = distThresh[levelId];
+    args.distThresh = currentTrackingLevel->distanceThreshold;
 
-#define iteration(iterationType) \
-			iterationType: depthTrackerOneLevel_g_rt_device<iterationType> << <gridSize, blockSize >> >(args);
+#define iteration(it) \
+			it: depthTrackerOneLevel_g_rt_device<it> << <gridSize, blockSize >> >(args);
 
-    switch (iterationType) {
+    switch (iterationType()) {
         case iteration(TRACKER_ITERATION_ROTATION);
         case iteration(TRACKER_ITERATION_TRANSLATION);
         case iteration(TRACKER_ITERATION_BOTH);

@@ -67,13 +67,13 @@ struct ITMHashEntry
 	*/
     int ptr;
 
-    _CPU_AND_GPU_CODE_ bool isAllocatedAndActive() { return ptr >= 0; }
+    _CPU_AND_GPU_CODE_ bool isAllocatedAndActive() const { return ptr >= 0; }
 
     /// Was once allocated, but is maybe not in active memory.
     /// But this space is permanently reserved.
-    _CPU_AND_GPU_CODE_ bool isAllocated() { return ptr >= -1; }
+    _CPU_AND_GPU_CODE_ bool isAllocated() const { return ptr >= -1; }
 
-    _CPU_AND_GPU_CODE_ bool isUnallocated() { return ptr < -1; }
+    _CPU_AND_GPU_CODE_ bool isUnallocated() const { return ptr < -1; }
 
     // an unallocated entry, used for resetting
     static ITMHashEntry createIllegalEntry() {

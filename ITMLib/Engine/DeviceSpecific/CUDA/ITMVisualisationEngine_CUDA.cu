@@ -277,18 +277,21 @@ static void RenderImage_common(const ITMScene *scene, const ITMPose *pose, const
 	}
 }
 
-void CreateICPMaps_common(const ITMScene *scene, const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState)
+void CreateICPMaps_common(const ITMScene *scene, Vector4f intrinsics_d, ITMTrackingState *trackingState, ITMRenderState *renderState)
 {
 	Vector2i imgSize = renderState->raycastResult->noDims;
 	Matrix4f invM = trackingState->pose_d->GetInvM();
 
-	GenericRaycast(scene, imgSize, invM, view->calib->intrinsics_d.projectionParamsSimple.all, renderState);
-	trackingState->pose_pointCloud->SetFrom(trackingState->pose_d);
+    GenericRaycast(scene, imgSize, invM, intrinsics_d, renderState);
+	
+    // Remember the pose from which this point cloud was rendered
+    trackingState->pointCloud->pose_pointCloud->SetFrom(trackingState->pose_d);
 
 	Vector4f *pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
-	Vector4f *normalsMap = trackingState->pointCloud->colours->GetData(MEMORYDEVICE_CUDA);
+    Vector4f *normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
 	Vector4u *outRendering = renderState->raycastImage->GetData(MEMORYDEVICE_CUDA);
 	Vector4f *pointsRay = renderState->raycastResult->GetData(MEMORYDEVICE_CUDA);
+
 	Vector3f lightSource = -Vector3f(invM.getColumn(2));
 
 	dim3 cudaBlockSize(16, 12);
@@ -304,10 +307,12 @@ void ITMVisualisationEngine_CUDA::RenderImage(const ITMPose *pose, const ITMIntr
 	RenderImage_common(this->scene, pose, intrinsics, renderState, outputImage, type);
 }
 
-void ITMVisualisationEngine_CUDA::CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, 
+void ITMVisualisationEngine_CUDA::CreateICPMaps(
+    const ITMIntrinsics * intrinsics_d,
+    ITMTrackingState *trackingState,
 	ITMRenderState *renderState) const
 {
-    CreateExpectedDepths(trackingState->pose_d, &(view->calib->intrinsics_d), renderState);
-	CreateICPMaps_common(this->scene, view, trackingState, renderState);
+    CreateExpectedDepths(trackingState->pose_d, intrinsics_d, renderState);
+    CreateICPMaps_common(this->scene, intrinsics_d->projectionParamsSimple.all, trackingState, renderState);
 }
 

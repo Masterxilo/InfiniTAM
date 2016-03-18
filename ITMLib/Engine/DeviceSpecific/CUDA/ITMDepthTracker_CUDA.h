@@ -19,8 +19,11 @@ namespace ITMLib
             AccuCell ComputeGandH(Matrix4f T_g_k_estimate);
 
 		public:
-			ITMDepthTracker_CUDA(Vector2i imgSize, TrackerIterationType *trackingRegime, int noHierarchyLevels, int noICPRunTillLevel, float distThresh,
-				float terminationThreshold, const ITMLowLevelEngine *lowLevelEngine);
+            ITMDepthTracker_CUDA(
+                Vector2i depthImgSize,
+                float distThresh,
+                float terminationThreshold,
+                const ITMLowLevelEngine *lowLevelEngine);
 			~ITMDepthTracker_CUDA(void);
 		};
 	}

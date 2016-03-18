@@ -397,34 +397,18 @@ float voxelSize)
     }
 }
 
-_CPU_AND_GPU_CODE_ inline void processPixelICP(DEVICEPTR(Vector4u) &outRendering, DEVICEPTR(Vector4f) &pointsMap, DEVICEPTR(Vector4f) &normalsMap,
-    const THREADPTR(Vector3f) & point, bool foundPoint, const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
-    float voxelSize, const THREADPTR(Vector3f) &lightSource)
-{
-    Vector3f outNormal;
-    float angle;
-
-    computeNormalAndAngle(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
-
-    processPixelICPPost(
-        angle, outNormal,
-        outRendering,
-        pointsMap,
-        normalsMap,
-        point,
-        foundPoint,
-        voxelSize);
-
-}
-
-
+/**
+Produces a shaded image (outRendering) and a point cloud for e.g. tracking.
+Uses image space normals.
+*/
 /// \param useSmoothing whether to compute normals by forward differences two pixels away (true) or just one pixel away (false)
 template<bool useSmoothing>
 _CPU_AND_GPU_CODE_ inline void processPixelICP(
     DEVICEPTR(Vector4u) *outRendering,
     DEVICEPTR(Vector4f) *pointsMap, //!< receives output points in world coordinates
     DEVICEPTR(Vector4f) *normalsMap,
-    const CONSTPTR(Vector4f) *pointsRay, //!< input points in voxel-fractional-world-coordinates
+
+    const CONSTPTR(Vector4f) *pointsRay, //!< [in] points in voxel-fractional-world-coordinates
     const THREADPTR(Vector2i) &imgSize,
     const THREADPTR(int) &x, const THREADPTR(int) &y,
     float voxelSize,

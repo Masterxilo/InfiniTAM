@@ -19,20 +19,6 @@ ITMLibSettings::ITMLibSettings(void)
 	skipPoints = true;
 
 	//deviceType = DEVICE_CPU;
-
-	// builds the tracking regime. level 0 is full resolution
-	{
-		noHierarchyLevels = 5;
-		trackingRegime = new TrackerIterationType[noHierarchyLevels];
-
-		trackingRegime[0] = TRACKER_ITERATION_BOTH;
-		trackingRegime[1] = TRACKER_ITERATION_BOTH;
-		trackingRegime[2] = TRACKER_ITERATION_ROTATION;
-		trackingRegime[3] = TRACKER_ITERATION_ROTATION;
-		trackingRegime[4] = TRACKER_ITERATION_ROTATION;
-	}
-
-    noICPRunTillLevel = 0;
 }
 
 ITMLibSettings::~ITMLibSettings()

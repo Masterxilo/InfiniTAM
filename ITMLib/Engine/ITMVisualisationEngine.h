@@ -73,8 +73,11 @@ namespace ITMLib
 			/** Create an image of reference points and normals as
 			required by the ITMLib::Engine::ITMDepthTracker classes.
 			*/
-			virtual void CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, 
-				ITMRenderState *renderState) const = 0;
+            virtual void CreateICPMaps(
+                const ITMIntrinsics * intrinsics_d,
+                ITMTrackingState *trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
+                ITMRenderState *renderState //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
+                ) const = 0;
 
 			/** Creates a render state, containing rendering info
 			for the scene.

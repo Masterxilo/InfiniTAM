@@ -61,10 +61,11 @@ _CPU_AND_GPU_CODE_ inline bool computePerPointGH_Depth_Ab(
         hat_u)) return false;
     // p_km1 := V_{k-1}(\hat u)
     Vector4f p_km1 = interpolateBilinear<Vector4f, WITH_HOLES>(pointsMap, hat_u, sceneImageSize);
-    if (p_km1.w < 0.0f) return false;
+    if (!isLegalColor(p_km1)) return false;
 
     // n_km1 := N_{k-1}(\hat u)
     Vector4f n_km1 = interpolateBilinear<Vector4f, WITH_HOLES>(normalsMap, hat_u, sceneImageSize);
+    if (!isLegalColor(n_km1)) return false;
 
     // d := p_km1 - p_k
     Vector3f d = p_km1.toVector3() - p_k.toVector3();

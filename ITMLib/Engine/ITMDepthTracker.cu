@@ -8,81 +8,28 @@
 
 using namespace ITMLib::Engine;
 
-ITMDepthTracker::ITMDepthTracker(Vector2i imgSize, TrackerIterationType *trackingRegime, int noHierarchyLevels, int noICPRunTillLevel, float distThresh,
-	float terminationThreshold, const ITMLowLevelEngine *lowLevelEngine, MemoryDeviceType memoryType)
+ITMDepthTracker::ITMDepthTracker(
+    Vector2i depthImgSize, 
+    float distThresh,
+	float terminationThreshold, 
+    const ITMLowLevelEngine *lowLevelEngine) :
+    terminationThreshold(terminationThreshold)
 {
-	viewHierarchy = new ITMImageHierarchy<ITMTemplatedHierarchyLevel<ITMFloatImage> >(
-        imgSize, trackingRegime, noHierarchyLevels, memoryType, true);
-	sceneHierarchy = new ITMImageHierarchy<ITMSceneHierarchyLevel>(imgSize, trackingRegime, noHierarchyLevels, memoryType, true);
-
 	this->lowLevelEngine = lowLevelEngine;
 
-	this->noICPLevel = noICPRunTillLevel;
-
-	this->terminationThreshold = terminationThreshold;
-
-    // Init per level noIterationsPerLevel
-	this->noIterationsPerLevel = new int[noHierarchyLevels];
-	
-	this->noIterationsPerLevel[0] = 2; //TODO -> make parameter
-	for (int levelId = 1; levelId < noHierarchyLevels; levelId++)
-	{
-		noIterationsPerLevel[levelId] = noIterationsPerLevel[levelId - 1] + 2;
-	}
-
-    // Init per level distThresh
-    this->distThresh = new float[noHierarchyLevels];
-	float distThreshStep = distThresh / noHierarchyLevels;
-	this->distThresh[noHierarchyLevels - 1] = distThresh;
-	for (int levelId = noHierarchyLevels - 2; levelId >= 0; levelId--)
-		this->distThresh[levelId] = this->distThresh[levelId + 1] - distThreshStep;
+    // Tracking strategy:
+    const int noHierarchyLevels = 5;
+    const float distThreshStep = distThresh / noHierarchyLevels;
+    trackingLevels.push_back(TrackingLevel(2, TRACKER_ITERATION_BOTH, distThresh - distThreshStep * 4, depthImgSize));
+    trackingLevels.push_back(TrackingLevel(4, TRACKER_ITERATION_BOTH, distThresh - distThreshStep * 3, depthImgSize / 2));
+    trackingLevels.push_back(TrackingLevel(6, TRACKER_ITERATION_ROTATION, distThresh - distThreshStep * 2, depthImgSize / 4));
+    trackingLevels.push_back(TrackingLevel(8, TRACKER_ITERATION_ROTATION, distThresh - distThreshStep, depthImgSize / 8));
+    trackingLevels.push_back(TrackingLevel(10, TRACKER_ITERATION_ROTATION, distThresh, depthImgSize / 16));
+    assert(trackingLevels.size() == noHierarchyLevels);
 }
 
 ITMDepthTracker::~ITMDepthTracker(void) 
 { 
-	delete this->viewHierarchy;
-	delete this->sceneHierarchy;
-
-	delete[] this->noIterationsPerLevel;
-	delete[] this->distThresh;
-}
-
-void ITMDepthTracker::SetEvaluationData(ITMTrackingState *trackingState, const ITMView *view)
-{
-	this->view = view;
-
-	sceneHierarchy->levels[0]->intrinsics = view->calib->intrinsics_d.projectionParamsSimple.all;
-	viewHierarchy->levels[0]->intrinsics = view->calib->intrinsics_d.projectionParamsSimple.all;
-
-	// the image hierarchy allows pointers to external data at level 0
-	viewHierarchy->levels[0]->depth = view->depth;
-	sceneHierarchy->levels[0]->pointsMap = trackingState->pointCloud->locations;
-	sceneHierarchy->levels[0]->normalsMap = trackingState->pointCloud->colours;
-
-	scenePose = trackingState->pose_pointCloud->GetM();
-}
-
-void ITMDepthTracker::PrepareForEvaluation()
-{
-	for (int i = 1; i < viewHierarchy->noLevels; i++)
-	{
-		ITMTemplatedHierarchyLevel<ITMFloatImage> *currentLevelView = viewHierarchy->levels[i], *previousLevelView = viewHierarchy->levels[i - 1];
-		lowLevelEngine->FilterSubsampleWithHoles(currentLevelView->depth, previousLevelView->depth);
-		currentLevelView->intrinsics = previousLevelView->intrinsics * 0.5f;
-
-		ITMSceneHierarchyLevel *currentLevelScene = sceneHierarchy->levels[i], *previousLevelScene = sceneHierarchy->levels[i - 1];
-		//lowLevelEngine->FilterSubsampleWithHoles(currentLevelScene->pointsMap, previousLevelScene->pointsMap);
-		//lowLevelEngine->FilterSubsampleWithHoles(currentLevelScene->normalsMap, previousLevelScene->normalsMap);
-		currentLevelScene->intrinsics = previousLevelScene->intrinsics * 0.5f;
-	}
-}
-
-void ITMDepthTracker::SetEvaluationParams(int levelId)
-{
-	this->levelId = levelId;
-	this->iterationType = viewHierarchy->levels[levelId]->iterationType;
-	this->sceneHierarchyLevel = sceneHierarchy->levels[0];
-	this->viewHierarchyLevel = viewHierarchy->levels[levelId];
 }
 
 void ITMDepthTracker::ComputeDelta(float *step, float *nabla, float *hessian) const
@@ -123,7 +70,7 @@ Matrix4f ITMDepthTracker::ComputeTinc(const float *delta) const
 	float step[6];
 
     // Depending on the iteration type, fill in 0 for values that where not computed.
-	switch (iterationType)
+	switch (currentTrackingLevel->iterationType)
 	{
 	case TRACKER_ITERATION_ROTATION:
 		step[0] = (float)(delta[0]); step[1] = (float)(delta[1]); step[2] = (float)(delta[2]);
@@ -153,14 +100,31 @@ Matrix4f ITMDepthTracker::ComputeTinc(const float *delta) const
 /// \file c.f. newcombe_etal_ismar2011.pdf, Sensor Pose Estimation section
 void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView *view)
 {
-    this->SetEvaluationData(trackingState, view);
-	this->PrepareForEvaluation();
+    /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
+    this->view = view;
+
+    pointsMap = trackingState->pointCloud->locations;
+    normalsMap = trackingState->pointCloud->normals;
+    scenePose = trackingState->pointCloud->pose_pointCloud->GetM();
+
+    /// Init image hierarchy levels
+    trackingLevels[0].depth = view->depth;
+    trackingLevels[0].intrinsics = getViewIntrinsics();
+    for (int i = 1; i < trackingLevels.size(); i++)
+    {
+        TrackingLevel* currentLevel = &trackingLevels[i];
+        TrackingLevel* previousLevel = &trackingLevels[i - 1];
+
+        lowLevelEngine->FilterSubsampleWithHoles(currentLevel->depth, previousLevel->depth);
+
+        currentLevel->intrinsics = previousLevel->intrinsics * 0.5f;
+    }
 
     // Coarse to fine
-	for (int levelId = viewHierarchy->noLevels - 1; levelId >= noICPLevel; levelId--)
+    for (int levelId = trackingLevels.size()-1; levelId >= 0; levelId--)
 	{
-		if (iterationType == TRACKER_ITERATION_NONE) continue;
-		this->SetEvaluationParams(levelId);
+        currentTrackingLevel = &trackingLevels[levelId];
+        if (iterationType() == TRACKER_ITERATION_NONE) continue;
 
 #define T_k_g_estimate trackingState->pose_d
         // T_g_k_estimate caches T_k_g_estimate->GetInvM()
@@ -188,10 +152,8 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
 		float lambda = 1.0;
 
         // Iterate as required
-		for (int iterNo = 0; iterNo < noIterationsPerLevel[levelId]; iterNo++)
+        for (int iterNo = 0; iterNo < currentTrackingLevel->numberOfIterations; iterNo++)
         {
-            if (iterationType == TRACKER_ITERATION_NONE) continue;
-
             // [ this takes most time. 
             // Computes f(x) as well as A^TA and A^Tb for next computation of delta_x as
             // (A^TA + lambda * diag(A^TA)) delta_x = A^T b

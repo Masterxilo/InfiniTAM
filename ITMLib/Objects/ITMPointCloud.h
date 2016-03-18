@@ -11,39 +11,6 @@ namespace ITMLib
 {
 	namespace Objects
 	{
-        /// Output from visualisationengine for next tracker iteration
-		class ITMPointCloud
-		{
-		public:
-			uint noTotalPoints;
-
-			ORUtils::Image<Vector4f> *locations, *colours;
-
-			explicit ITMPointCloud(Vector2i imgSize, MemoryDeviceType memoryType)
-			{
-				this->noTotalPoints = 0;
-
-				locations = new ORUtils::Image<Vector4f>(imgSize, memoryType);
-				colours = new ORUtils::Image<Vector4f>(imgSize, memoryType);
-			}
-
-			void UpdateHostFromDevice()
-			{
-				this->locations->UpdateHostFromDevice();
-				this->colours->UpdateHostFromDevice();
-			}
-
-			void UpdateDeviceFromHost()
-			{
-				this->locations->UpdateDeviceFromHost();
-				this->colours->UpdateDeviceFromHost();
-			}
-
-			~ITMPointCloud()
-			{
-				delete locations;
-				delete colours;
-			}
-		};
+        
 	}
 }

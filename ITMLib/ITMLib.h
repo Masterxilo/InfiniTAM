@@ -19,8 +19,6 @@
 #include "Engine/ITMVisualisationEngine.h"
 #include "Engine/DeviceSpecific/CUDA/ITMVisualisationEngine_CUDA.h"
 
-#include "Engine/ITMTrackingController.h"
-
 #include "Engine/ITMViewBuilder.h"
 #include "Engine/DeviceSpecific/CUDA/ITMViewBuilder_CUDA.h"
 

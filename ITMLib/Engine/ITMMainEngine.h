@@ -58,7 +58,6 @@ namespace ITMLib
 
             ITMViewBuilder *viewBuilder;
             ITMSceneReconstructionEngine *sceneRecoEngine;
-			ITMTrackingController *trackingController;
 
 			ITMTracker *tracker;
 
@@ -72,6 +71,7 @@ namespace ITMLib
 			ITMRenderState *renderState_freeview;
 
 		public:
+
 			enum GetImageType
 			{
 				InfiniTAM_IMAGE_ORIGINAL_RGB,
@@ -102,17 +102,14 @@ namespace ITMLib
 			/// Get a result image as output
 			Vector2i GetImageSize(void) const;
 
-			void GetImage(ITMUChar4Image *out, GetImageType getImageType, ITMPose *pose = NULL, ITMIntrinsics *intrinsics = NULL);
+			void GetImage(ITMUChar4Image *out, GetImageType getImageType, 
+                const ITMPose * const pose = NULL, //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
+                const ITMIntrinsics * const intrinsics = NULL //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
+                );
 
-			/// switch for turning intergration on/off
-			void turnOnIntegration();
-			void turnOffIntegration();
-
-			/// switch for turning main processing on/off
-			void turnOnMainProcessing();
-			void turnOffMainProcessing();
-
-			explicit ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib *calib, 
+			explicit ITMMainEngine(
+                const ITMLibSettings *settings,
+                const ITMRGBDCalib *calib, 
                 Vector2i imgSize_rgb, 
                 Vector2i imgSize_d
                 );

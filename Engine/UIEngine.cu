@@ -5,19 +5,8 @@
 #include <sstream>
 #include <string>
 #include <string.h>
-#ifdef __APPLE__
-#include <GLUT/glut.h>
-#else
 #include <GL/glut.h>
-#endif
-
-#ifdef FREEGLUT
 #include <GL/freeglut.h>
-#else
-#if (!defined USING_CMAKE) && (defined _MSC_VER)
-#pragma comment(lib, "glut64")
-#endif
-#endif
 
 #include "../Utils/FileUtils.h"
 
@@ -26,24 +15,16 @@ UIEngine* UIEngine::instance;
 
 static void safe_glutBitmapString(void *font, const char *str)
 {
-	size_t len = strlen(str);
-	for (size_t x = 0; x < len; ++x) {
-		glutBitmapCharacter(font, str[x]);
+    while (*str) {
+		glutBitmapCharacter(font, *str++);
 	}
 }
 
-void saveMesh() {
-    printf("saving mesh to disk ...");
-    char n[1000];
-    sprintf_s(n, "%s%s", UIEngine::Instance()->outFolder, "\\manual_save_mesh.stl");
-    //UIEngine::Instance()->SaveSceneToMesh(n);
-    printf(" done\n");
-}
 // Called from void ImageFileReader::loadIntoCache(void) when all files have been read
 void endOfFiles() {
-    saveMesh();
     UIEngine::glutKeyUpFunction('f',0,0);
 }
+
 const char* KEY_HELP_STR =
 "n - next frame \t "
 "b - all frames \t "
@@ -56,22 +37,7 @@ const char* KEY_HELP_STR =
 "o - save current images to disk\t "
 "r - reset data \t ";
 extern const char *calibFile;
-void record() {
 
-    UIEngine *uiEngine = UIEngine::Instance();
-    // Paul: clear output folder
-    char n[1000];
-    sprintf_s(n, "del /s /F /q %s\\*", uiEngine->outFolder);
-    system(n);
-    sprintf_s(n, "mkdir %s\\frames", uiEngine->outFolder);
-    system(n);
-    sprintf_s(n, "copy /y %s %s\\calib.txt", calibFile, uiEngine->outFolder);
-    system(n);
-
-    printf("started recoding disk ...\n");
-    uiEngine->currentFrameNo = 0;
-    uiEngine->isRecording = true;
-}
 void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
 {
     UIEngine *uiEngine = UIEngine::Instance();
@@ -87,28 +53,8 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
         uiEngine->mainLoopAction = UIEngine::PROCESS_VIDEO;
         break;
     case 'r':
-        printf("clearing data ... NOT TESTED\n");
+        printf("clearing data ...\n");
         uiEngine->mainEngine->ResetScene();
-        break;
-    case 's':
-        if (uiEngine->isRecording)
-        {
-            printf("stopped recoding disk ...\n");
-            uiEngine->isRecording = false;
-
-
-            printf("saving mesh to disk ...");
-            char n[1000];
-            sprintf_s(n, "%s%s", uiEngine->outFolder, "\\end_record_mesh.stl");
-
-            printf(" done\n");
-
-        }
-        else
-        {
-            record();
-
-        }
         break;
     case 'e':
     case 27: // esc key
@@ -118,20 +64,17 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
     case 'f':
         if (uiEngine->freeviewActive)
         {
-            uiEngine->outImageType[0] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
-            uiEngine->outImageType[1] = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH;
-
+            uiEngine->windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
             uiEngine->freeviewActive = false;
         }
         else
         {
-            uiEngine->outImageType[0] = ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED;
-            uiEngine->outImageType[1] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
+            uiEngine->windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED;
 
             uiEngine->freeviewPose.SetFrom(uiEngine->mainEngine->GetTrackingState()->pose_d);
             if (uiEngine->mainEngine->GetView() != NULL) {
                 uiEngine->freeviewIntrinsics = uiEngine->mainEngine->GetView()->calib->intrinsics_d;
-                uiEngine->outImage[0]->ChangeDims(uiEngine->mainEngine->GetView()->depth->noDims);
+                uiEngine->windows[0].outImage->ChangeDims(uiEngine->mainEngine->GetView()->depth->noDims);
             }
             uiEngine->freeviewActive = true;
         }
@@ -143,49 +86,24 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
             uiEngine->currentColourMode = 0;
         uiEngine->needsRefresh = true;
         break;
-    case 't':
-        uiEngine->intergrationActive = !uiEngine->intergrationActive;
-        if (uiEngine->intergrationActive) uiEngine->mainEngine->turnOnIntegration();
-        else uiEngine->mainEngine->turnOffIntegration();
-        break;
-    case 'w':
-        saveMesh();
-        break;
-
-    case 'o':
-        for (int w = 0; w < NUM_WIN; w++)	{// save each sub window
-            if (uiEngine->outImageType[w] == ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN) continue;
-            std::stringstream s;
-            s << uiEngine->outFolder << "\\" << w << ".png";
-            std::string fn = s.str();
-            png::SaveImageToFile(uiEngine->outImage[w], fn.c_str());
-        }
-        break;
     default:
         break;
     }
 
     if (uiEngine->freeviewActive) {
-        uiEngine->outImageType[0] = uiEngine->colourModes[uiEngine->currentColourMode].type;
+        uiEngine->windows[0].outImageType = uiEngine->colourModes[uiEngine->currentColourMode].type;
     }
 }
 
 void UIEngine::glutDisplayFunction()
 {
 	UIEngine *uiEngine = UIEngine::Instance();
+    uiEngine->needsRefresh = false;
 
-	// get updated images from processing thread
-	uiEngine->mainEngine->GetImage(uiEngine->outImage[0], uiEngine->outImageType[0], &uiEngine->freeviewPose, &uiEngine->freeviewIntrinsics);
-
-	for (int w = 1; w < NUM_WIN; w++) uiEngine->mainEngine->GetImage(uiEngine->outImage[w], uiEngine->outImageType[w]);
-
-	// do the actual drawing
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glEnable(GL_TEXTURE_2D);
 
-	ITMUChar4Image** showImgs = uiEngine->outImage;
-	Vector4f *winReg = uiEngine->winReg;
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	{
@@ -196,17 +114,32 @@ void UIEngine::glutDisplayFunction()
 		glPushMatrix();
 		{
 			glEnable(GL_TEXTURE_2D);
-			for (int w = 0; w < NUM_WIN; w++)	{// Draw each sub window
-				if (uiEngine->outImageType[w] == ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN) continue;
-				glBindTexture(GL_TEXTURE_2D, uiEngine->textureId[w]);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, showImgs[w]->noDims.x, showImgs[w]->noDims.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, showImgs[w]->GetData(MEMORYDEVICE_CPU));
+
+            for (auto& window : uiEngine->windows) {
+                if (window.outImageType == ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN) continue;
+
+                // Draw each sub window
+                // get updated images from processing thread
+                uiEngine->mainEngine->GetImage(
+                    window.outImage,
+                    window.outImageType,
+                    &uiEngine->freeviewPose, &uiEngine->freeviewIntrinsics);
+
+                Vector4f winReg = window.winReg;
+
+                glBindTexture(GL_TEXTURE_2D, window.textureId);
+				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 
+                    window.outImage->noDims.x,
+                    window.outImage->noDims.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, 
+                    window.outImage->GetData(MEMORYDEVICE_CPU));
+
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 				glBegin(GL_QUADS); {
-					glTexCoord2f(0, 1); glVertex2f(winReg[w][0], winReg[w][1]); // glVertex2f(0, 0);
-					glTexCoord2f(1, 1); glVertex2f(winReg[w][2], winReg[w][1]); // glVertex2f(1, 0);
-					glTexCoord2f(1, 0); glVertex2f(winReg[w][2], winReg[w][3]); // glVertex2f(1, 1);
-					glTexCoord2f(0, 0); glVertex2f(winReg[w][0], winReg[w][3]); // glVertex2f(0, 1);
+                    glTexCoord2f(0, 1); glVertex2f(winReg.v[0], winReg.v[1]); // glVertex2f(0, 0);
+                    glTexCoord2f(1, 1); glVertex2f(winReg.v[2], winReg.v[1]); // glVertex2f(1, 0);
+                    glTexCoord2f(1, 0); glVertex2f(winReg.v[2], winReg.v[3]); // glVertex2f(1, 1);
+                    glTexCoord2f(0, 0); glVertex2f(winReg.v[0], winReg.v[3]); // glVertex2f(0, 1);
 				}
 				glEnd();
 			}
@@ -217,9 +150,13 @@ void UIEngine::glutDisplayFunction()
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 
-	glColor3f(1.0f, 0.0f, 0.0f); glRasterPos2f(0.85f, -0.962f);
-
-	char str[2000]; sprintf(str, "%04.2lf", uiEngine->processedTime);
+	glColor3f(1.0f, 0.0f, 0.0f); 
+    
+    glRasterPos2f(0.85f, -0.962f);
+	char str[2000]; sprintf(str, "%04.2lf", 
+        //sdkGetTimerValue(&timer_instant);
+        sdkGetAverageTimerValue(&uiEngine->timer_average)
+        );
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const char*)str);
 
 	glRasterPos2f(-0.95f, -0.95f);
@@ -230,7 +167,6 @@ void UIEngine::glutDisplayFunction()
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, (const char*)str);
 
 	glutSwapBuffers();
-	uiEngine->needsRefresh = false;
 }
 
 void UIEngine::glutIdleFunction()
@@ -261,7 +197,6 @@ void UIEngine::glutIdleFunction()
 	}
 }
 
-
 void UIEngine::glutMouseButtonFunction(int button, int state, int x, int y)
 {
 	UIEngine *uiEngine = UIEngine::Instance();
@@ -270,19 +205,20 @@ void UIEngine::glutMouseButtonFunction(int button, int state, int x, int y)
 	{
 		switch (button)
 		{
-		case GLUT_LEFT_BUTTON: uiEngine->mouseState = 1; break;
-		case GLUT_MIDDLE_BUTTON: uiEngine->mouseState = 3; break;
-		case GLUT_RIGHT_BUTTON: uiEngine->mouseState = 2; break;
+        case GLUT_LEFT_BUTTON: uiEngine->mouseState = MLEFT; break;
+        case GLUT_MIDDLE_BUTTON: uiEngine->mouseState = MMIDDLE; break;
+        case GLUT_RIGHT_BUTTON: uiEngine->mouseState = MRIGHT; break;
 		default: break;
 		}
 		uiEngine->mouseLastClick.x = x;
 		uiEngine->mouseLastClick.y = y;
 	}
-	else if (state == GLUT_UP) uiEngine->mouseState = 0;
+    else if (state == GLUT_UP) uiEngine->mouseState = MNONE;
 }
 
 static inline Matrix3f createRotation(const Vector3f & _axis, float angle)
 {
+    // TODO leverage ITMPose which does this conversion given r = axis * angle
 	Vector3f axis = normalize(_axis);
 	float si = sinf(angle);
 	float co = cosf(angle);
@@ -326,25 +262,26 @@ void UIEngine::glutMouseMoveFunction(int x, int y)
 
 	switch (uiEngine->mouseState)
 	{
-	case 1:
+	case MLEFT:
 	{
-		// left button: rotation
+		// rotation
 		Vector3f axis((float)-movement.y, (float)-movement.x, 0.0f);
 		float angle = scale_rotation * sqrt((float)(movement.x * movement.x + movement.y*movement.y));
 		Matrix3f rot = createRotation(axis, angle);
 		uiEngine->freeviewPose.SetRT(rot * uiEngine->freeviewPose.GetR(), rot * uiEngine->freeviewPose.GetT());
 		uiEngine->freeviewPose.Coerce();
+
 		uiEngine->needsRefresh = true;
 		break;
 	}
-	case 2:
+	case MRIGHT:
 	{
 		// right button: translation in x and y direction
 		uiEngine->freeviewPose.SetT(uiEngine->freeviewPose.GetT() + scale_translation * Vector3f((float)movement.x, (float)movement.y, 0.0f));
 		uiEngine->needsRefresh = true;
 		break;
 	}
-	case 3:
+	case MMIDDLE:
 	{
 		// middle button: translation along z axis
 		uiEngine->freeviewPose.SetT(uiEngine->freeviewPose.GetT() + scale_translation * Vector3f(0.0f, 0.0f, (float)movement.y));
@@ -377,28 +314,27 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 
 	this->imageSource = imageSource;
 	this->mainEngine = mainEngine;
-	{
-		size_t len = strlen(outFolder);
-		this->outFolder = new char[len + 1];
-		strcpy(this->outFolder, outFolder);
-	}
 
 	int textAreaHeight = 30; 
 	winSize.x = (int)(1.5f * (float)(imageSource->getDepthImageSize().x));
 	winSize.y = imageSource->getDepthImageSize().y + textAreaHeight;
 	float h1 = textAreaHeight / (float)winSize.y, h2 = (1.f + h1) / 2;
-	winReg[0] = Vector4f(0.0f, h1, 0.665f, 1.0f);   // Main render
-	winReg[1] = Vector4f(0.665f, h2, 1.0f, 1.0f);   // Side sub window 0
-	winReg[2] = Vector4f(0.665f, h1, 1.0f, h2);     // Side sub window 2
+    windows[0].winReg = Vector4f(0.0f, h1, 0.665f, 1.0f);   // Main render
+    windows[1].winReg = Vector4f(0.665f, h2, 1.0f, 1.0f);   // Side sub window 0
+    windows[2].winReg = Vector4f(0.665f, h1, 1.0f, h2);     // Side sub window 2
 
-	this->isRecording = false;
+    windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
+    windows[1].outImageType = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH;
+    windows[2].outImageType = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_RGB;
+
 	this->currentFrameNo = 0;
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
 	glutInitWindowSize(winSize.x, winSize.y);
 	glutCreateWindow("InfiniTAM");
-	glGenTextures(NUM_WIN, textureId);
+    for (auto& window : windows) 
+        glGenTextures(1, &window.textureId);
 
 	glutDisplayFunc(UIEngine::glutDisplayFunction);
 	glutKeyboardUpFunc(UIEngine::glutKeyUpFunction);
@@ -406,36 +342,22 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 	glutMotionFunc(UIEngine::glutMouseMoveFunction);
 	glutIdleFunc(UIEngine::glutIdleFunction);
 
-#ifdef FREEGLUT
 	glutMouseWheelFunc(UIEngine::glutMouseWheelFunction);
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, 1);
-#endif
 
-	bool allocateGPU = false;
-#ifdef __CUDACC__
-    allocateGPU = true;
-#endif
 
-	for (int w = 0; w < NUM_WIN; w++)
-		outImage[w] = new ITMUChar4Image(imageSource->getDepthImageSize(), true, allocateGPU);
+	bool allocateGPU = true;
+    for (auto& window : windows) 
+        window.outImage = new ITMUChar4Image(imageSource->getDepthImageSize(), true, allocateGPU);
 
 	inputRGBImage = new ITMUChar4Image(imageSource->getRGBImageSize(), true, allocateGPU);
 	inputRawDepthImage = new ITMShortImage(imageSource->getDepthImageSize(), true, allocateGPU);
 
-	saveImage = new ITMUChar4Image(imageSource->getDepthImageSize(), true, false);
-
-	outImageType[0] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
-	outImageType[1] = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH;
-	outImageType[2] = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_RGB;
-	if (inputRGBImage->noDims == Vector2i(0,0)) outImageType[2] = ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN;
-	//outImageType[3] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
-	//outImageType[4] = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
 
 	mainLoopAction = PROCESS_PAUSED;
-	mouseState = 0;
+	mouseState = MNONE;
 	needsRefresh = false;
 	processedFrameNo = 0;
-	processedTime = 0.0f;
 
 	ITMSafeCall(cudaThreadSynchronize());
 
@@ -447,11 +369,6 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 	printf("initialised.\n");
 }
 
-//void UIEngine::SaveSceneToMesh(const char *filename) const
-//{
-	//mainEngine->SaveSceneToMesh(filename);
-//}
-
 void UIEngine::ProcessFrame()
 {
 	if (!imageSource->hasMoreImages()) return;
@@ -460,50 +377,12 @@ void UIEngine::ProcessFrame()
 	sdkResetTimer(&timer_instant);
 	sdkStartTimer(&timer_instant); sdkStartTimer(&timer_average);
 
-	//actual processing on the mailEngine
+	//actual processing on the mainEngine
     mainEngine->ProcessFrame(inputRGBImage, inputRawDepthImage);
 
 	ITMSafeCall(cudaThreadSynchronize());
 	sdkStopTimer(&timer_instant); sdkStopTimer(&timer_average);
-
-
-	if (isRecording)
-	{
-		char str[250];
-
-        // Save sensor picture data
-        sprintf(str, "%s/Frames/%04d.pgm", outFolder, currentFrameNo);
-        SaveImageToFile(inputRawDepthImage, str);
-
-        if (inputRGBImage->noDims != Vector2i(0, 0)) {
-            sprintf(str, "%s/Frames/%04d.ppm", outFolder, currentFrameNo);
-            SaveImageToFile(inputRGBImage, str);
-        }
-
-        // Record camera position
-        // binary, full matrix
-		sprintf(str, "%s/depth_cam_pose_M_Matrix4f.bin", outFolder);
-		FILE* f = fopen(str, "ab");
-		ITMPose* p = mainEngine->GetTrackingState()->pose_d;
-		fwrite(&p->GetM(), sizeof(p->GetM()), 1, f);
-		fclose(f);
-
-        // textual, translation (camera position) only, in world coordinates,
-        // i.e. R^{-1}*(0 - t)
-		sprintf(str, "%s/depth_cam_pose_T_v.obj", outFolder);
-		f = fopen(str, "a");
-        float factor = 1.f / SDF_BLOCK_SIZE; // <- determined "experimentally" that this is the way to go // GetTriangleScaleFactor(mainEngine->GetScene());
-        Vector3f v = factor * (p->GetInvM()*Vector3f(0,0,0));
-        fprintf(f, "v %f %f %f\n", 
-			v.z*factor, 
-			v.y*factor,
-			v.x*factor);
-		fclose(f);
-
-	}
-
-	//processedTime = sdkGetTimerValue(&timer_instant);
-	processedTime = sdkGetAverageTimerValue(&timer_average);
+    
 
 	currentFrameNo++;
 }
@@ -514,13 +393,8 @@ void UIEngine::Shutdown()
 	sdkDeleteTimer(&timer_instant);
 	sdkDeleteTimer(&timer_average);
 
-	for (int w = 0; w < NUM_WIN; w++)
-		delete outImage[w];
-
 	delete inputRGBImage;
 	delete inputRawDepthImage;
 
-	delete[] outFolder;
-	delete saveImage;
 	delete instance;
 }

@@ -44,13 +44,17 @@ namespace InfiniTAM
 			StopWatchInterface *timer_instant;
 			StopWatchInterface *timer_average;
 
-		private: // For UI layout
+		private: 
+            // For UI layout
+            Vector2i winSize;
 			static const int NUM_WIN = 3;
-			Vector4f winReg[NUM_WIN]; // (x1, y1, x2, y2)
-			Vector2i winSize;
-			uint textureId[NUM_WIN];
-			ITMUChar4Image *outImage[NUM_WIN];
-			ITMMainEngine::GetImageType outImageType[NUM_WIN];
+            struct Window {
+                Vector4f winReg; // (x1, y1, x2, y2)
+                uint textureId;
+                ITMUChar4Image *outImage;
+                ITMMainEngine::GetImageType outImageType;
+            };
+            Window windows[NUM_WIN];
 
 			ITMUChar4Image *inputRGBImage; ITMShortImage *inputRawDepthImage;
 
@@ -59,12 +63,13 @@ namespace InfiniTAM
 			ITMPose freeviewPose;
 			ITMIntrinsics freeviewIntrinsics;
 
-			int mouseState;
+            enum MOUSESTATE { MLEFT, MMIDDLE, MRIGHT, MNONE };
+            MOUSESTATE mouseState;
 			Vector2i mouseLastClick;
 
 
 		public:
-			int currentFrameNo; bool isRecording;
+			int currentFrameNo; 
 			static UIEngine* Instance(void) {
 				if (instance == NULL) instance = new UIEngine();
 				return instance;
@@ -82,11 +87,8 @@ namespace InfiniTAM
 			const Vector2i & getWindowSize(void) const
 			{ return winSize; }
 
-			float processedTime;
 			int processedFrameNo;
-			char *outFolder;
 			bool needsRefresh;
-			ITMUChar4Image *saveImage;
 
 			void Initialise(int & argc, char** argv, ImageSourceEngine *imageSource, ITMMainEngine *mainEngine,
 				const char *outFolder);
