@@ -4,6 +4,7 @@
 
 #include "../ITMLib.h"
 #include "../Utils/ITMLibSettings.h"
+#include "ITMLowLevelEngine.h"
 
 /** \mainpage
     This is the API reference documentation for InfiniTAM. For a general
@@ -53,10 +54,10 @@ namespace ITMLib
 			bool fusionActive, mainProcessingActive;
 
 			ITMLowLevelEngine *lowLevelEngine;
-			IITMVisualisationEngine *visualisationEngine;
+			ITMVisualisationEngine *visualisationEngine;
 
-			ITMViewBuilder *viewBuilder;		
-			ITMDenseMapper<ITMVoxel,ITMVoxelIndex> *denseMapper;
+            ITMViewBuilder *viewBuilder;
+            ITMSceneReconstructionEngine *sceneRecoEngine;
 			ITMTrackingController *trackingController;
 
 			ITMTracker *tracker;
@@ -64,7 +65,7 @@ namespace ITMLib
 			ITMView *view;
 			ITMTrackingState *trackingState;
 
-			ITMScene<ITMVoxel, ITMVoxelIndex> *scene;
+			ITMScene* scene;
             /// Describes the tracked camera position and possibly a frame rendered from that position
 			ITMRenderState *renderState_live;
             /// Describes a free camera position and frame rendered from that position
@@ -89,10 +90,10 @@ namespace ITMLib
 			ITMTrackingState* GetTrackingState(void) { return trackingState; }
 
 			/// Gives access to the internal world representation
-			ITMScene<ITMVoxel, ITMVoxelIndex>* GetScene(void) { return scene; }
+			ITMScene* GetScene(void) { return scene; }
 
             /// Gives access to the internal world representation
-            void ResetScene(void) { denseMapper->ResetScene(scene); }
+            void ResetScene(void) { sceneRecoEngine->ResetScene(scene); }
 
 			/// Process a frame with rgb and depth images and optionally a corresponding imu measurement.
             /// Key method.

@@ -8,19 +8,19 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 {
 	this->settings = settings;
 
-	this->scene = new ITMScene<ITMVoxel, ITMVoxelIndex>(&(settings->sceneParams), MEMORYDEVICE_CUDA);
+	scene = new ITMScene(&(settings->sceneParams), MEMORYDEVICE_CUDA);
 
-	lowLevelEngine = new ITMLowLevelEngine_CUDA();
+	lowLevelEngine = new ITMLowLevelEngine();
 	viewBuilder = new ITMViewBuilder_CUDA(calib);
-	visualisationEngine = new ITMVisualisationEngine_CUDA<ITMVoxel, ITMVoxelIndex>(scene);
+	visualisationEngine = new ITMVisualisationEngine_CUDA(scene);
 
 	Vector2i trackedImageSize = ITMTrackingController::GetTrackedImageSize(settings, imgSize_rgb, imgSize_d);
 
 	renderState_live = visualisationEngine->CreateRenderState(trackedImageSize);
-	renderState_freeview = NULL; //will be created by the visualisation engine
+	renderState_freeview = NULL; //will be created by the visualisation engine on demand
 
-	denseMapper = new ITMDenseMapper<ITMVoxel, ITMVoxelIndex>(settings);
-	denseMapper->ResetScene(scene);
+    sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA();
+    ResetScene();
 
     tracker = new ITMDepthTracker_CUDA(
         trackedImageSize,
@@ -50,7 +50,7 @@ ITMMainEngine::~ITMMainEngine()
 
 	delete scene;
 
-	delete denseMapper;
+    delete sceneRecoEngine;
 	delete trackingController;
 
 	delete tracker;
@@ -67,7 +67,7 @@ ITMMainEngine::~ITMMainEngine()
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
 {
 	// prepare image and turn it into a depth image
-	viewBuilder->UpdateView(&view, rgbImage, rawDepthImage, settings->useBilateralFilter,settings->modelSensorNoise);
+	viewBuilder->UpdateView(&view, rgbImage, rawDepthImage);
 
 	if (!mainProcessingActive) return;
 
@@ -75,7 +75,7 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 	trackingController->Track(trackingState, view);
 
 	// fusion
-	if (fusionActive) denseMapper->ProcessFrame(view, trackingState, scene, renderState_live);
+	if (fusionActive) sceneRecoEngine->ProcessFrame(view, trackingState, scene, renderState_live);
 
 	// raycast to renderState_live for tracking in next iteration
 	trackingController->Prepare(trackingState, view, renderState_live);
@@ -101,7 +101,7 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 		out->ChangeDims(view->depth->noDims);
         
         view->depth->UpdateHostFromDevice();
-        ITMVisualisationEngine<ITMVoxel, ITMVoxelIndex>::DepthToUchar4(out, view->depth);
+        ITMVisualisationEngine::DepthToUchar4(out, view->depth);
 
 		break;
 	case ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST:
@@ -116,13 +116,15 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, ITM
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL:
 	{
-		IITMVisualisationEngine::RenderImageType type = IITMVisualisationEngine::RENDER_SHADED_GREYSCALE;
-		if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME) type = IITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME;
-		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL) type = IITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
+		ITMVisualisationEngine::RenderImageType type = ITMVisualisationEngine::RENDER_SHADED_GREYSCALE;
+		if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME) 
+            type = ITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME;
+		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL) 
+            type = ITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
+
 		if (renderState_freeview == NULL) renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
 
 		visualisationEngine->FindVisibleBlocks(pose, intrinsics, renderState_freeview);
-		visualisationEngine->CreateExpectedDepths(pose, intrinsics, renderState_freeview);
 		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, renderState_freeview->raycastImage, type);
 
         out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);

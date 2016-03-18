@@ -8,12 +8,7 @@ namespace ITMLib
 {
 	namespace Engine
     {
-        template<class TVoxel, class TIndex>
-        class ITMSceneReconstructionEngine_CUDA : public ITMSceneReconstructionEngine < TVoxel, TIndex >
-        {};
-
-		template<class TVoxel>
-		class ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash> : public ITMSceneReconstructionEngine < TVoxel, ITMVoxelBlockHash >
+		class ITMSceneReconstructionEngine_CUDA : public ITMSceneReconstructionEngine
 		{
 		private:
 			void *allocationTempData_device;
@@ -22,16 +17,16 @@ namespace ITMLib
 			Vector4s *blockCoords_device;
 
 		public:
-			void ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
+			void ResetScene(ITMScene *scene);
 
 			void AllocateSceneFromDepth(
-                ITMScene<TVoxel, ITMVoxelBlockHash> *scene, 
+                ITMScene *scene, 
                 const ITMView *view, 
                 const ITMTrackingState *trackingState,
 				ITMRenderState *renderState);
 
 			void IntegrateIntoScene(
-                ITMScene<TVoxel, ITMVoxelBlockHash> *scene,
+                ITMScene *scene,
                 const ITMView *view,
                 const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState);

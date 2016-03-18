@@ -16,13 +16,13 @@ namespace ITMLib
 {
 	namespace Engine
 	{
-		/** \brief
+		/** \brief ITMTracker driver
 		*/
 		class ITMTrackingController
 		{
 		private:
 			const ITMLibSettings *settings;
-			const IITMVisualisationEngine *visualisationEngine;
+            const ITMVisualisationEngine *visualisationEngine;
 			const ITMLowLevelEngine *lowLevelEngine;
 
 			ITMTracker *tracker;
@@ -33,7 +33,7 @@ namespace ITMLib
 			void Track(ITMTrackingState *trackingState, const ITMView *view);
 			void Prepare(ITMTrackingState *trackingState, const ITMView *view, ITMRenderState *renderState);
 
-			ITMTrackingController(ITMTracker *tracker, const IITMVisualisationEngine *visualisationEngine, const ITMLowLevelEngine *lowLevelEngine,
+            ITMTrackingController(ITMTracker *tracker, const ITMVisualisationEngine *visualisationEngine, const ITMLowLevelEngine *lowLevelEngine,
 				const ITMLibSettings *settings)
 			{
 				this->tracker = tracker;

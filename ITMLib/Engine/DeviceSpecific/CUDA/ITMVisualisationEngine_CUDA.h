@@ -10,20 +10,29 @@ namespace ITMLib
 {
 	namespace Engine
 	{
-
-        template<class TVoxel, class TIndex>
-        class ITMVisualisationEngine_CUDA : public ITMVisualisationEngine < TVoxel, TIndex >
-        {};
-
-		template<class TVoxel>
-		class ITMVisualisationEngine_CUDA<TVoxel, ITMVoxelBlockHash> : public ITMVisualisationEngine < TVoxel, ITMVoxelBlockHash >
+		class ITMVisualisationEngine_CUDA: public ITMVisualisationEngine
 		{
 		private:
-			RenderingBlock *renderingBlockList_device;
-			uint *noTotalBlocks_device;
 			int *noVisibleEntries_device;
+
+            RenderingBlock *renderingBlockList_device;
+            uint *noTotalBlocks_device;
+            /** Given scene, pose and intrinsics, create an estimate
+            of the minimum and maximum depths at each pixel of
+            an image.
+
+            Called by rendering methods (CreateICPMaps, RenderImage).
+
+            Creates the list of RenderingBlocks
+            */
+            void CreateExpectedDepths(
+                const ITMPose *pose,
+                const ITMIntrinsics *intrinsics,
+                ITMRenderState *renderState //!< [out] initializes renderingRangeImage
+                ) const;
+
 		public:
-			explicit ITMVisualisationEngine_CUDA(ITMScene<TVoxel, ITMVoxelBlockHash> *scene);
+			explicit ITMVisualisationEngine_CUDA(ITMScene *scene);
 			~ITMVisualisationEngine_CUDA(void);
 
             void FindVisibleBlocks(
@@ -33,18 +42,13 @@ namespace ITMLib
                 ) const;
 
             /// render for tracking
-            void CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const;
-			void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics, const ITMRenderState *renderState, 
-				ITMUChar4Image *outputImage, IITMVisualisationEngine::RenderImageType type = IITMVisualisationEngine::RENDER_SHADED_GREYSCALE) const;
+			void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics,
+                ITMRenderState *renderState, //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
+                ITMUChar4Image *outputImage, ITMVisualisationEngine::RenderImageType type = ITMVisualisationEngine::RENDER_SHADED_GREYSCALE) const;
 			
-
-            void FindSurface(
-                const ITMPose *pose,
-                const ITMIntrinsics *intrinsics,
-                ITMRenderState *renderState //!< [out] initializes raycastResult
-                ) const; 
-
-            void CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, ITMRenderState *renderState) const;
+            void CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState,
+                ITMRenderState *renderState //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
+                ) const;
 			
 			ITMRenderState* CreateRenderState(const Vector2i & imgSize) const;
 		};

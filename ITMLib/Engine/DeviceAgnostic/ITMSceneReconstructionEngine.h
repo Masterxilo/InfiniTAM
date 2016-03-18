@@ -13,9 +13,8 @@
 /// \returns \f$\eta\f$, -1 on failure
 // Note that the stored T-SDF values are normalized to lie
 // in [-1,1] within the truncation band.
-template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
-    DEVICEPTR(TVoxel) &voxel, //!< X
+    DEVICEPTR(ITMVoxel) &voxel, //!< X
     const THREADPTR(Vector4f) & pt_model, //!< voxel location X
     const CONSTPTR(Matrix4f) & M_d, //!< depth camera pose
     const CONSTPTR(Vector4f) & projParams_d, //!< intrinsic camera parameters \f$K_d\f$
@@ -45,7 +44,7 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 
     // compute updated SDF value and reliability (number of observations)
     /// D(X), w(X)
-    oldF = TVoxel::SDF_valueToFloat(voxel.sdf);
+    oldF = ITMVoxel::SDF_valueToFloat(voxel.sdf);
     oldW = voxel.w_depth;
 
     // newF, normalized for -1 to 1
@@ -59,10 +58,8 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
     return eta;
 }
 
-/// Used only if TVoxel::hasColorInformation
 /// \returns early on failure
-template<class TVoxel>
-_CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &voxel, const THREADPTR(Vector4f) & pt_model, const CONSTPTR(Matrix4f) & M_rgb,
+_CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(ITMVoxel) &voxel, const THREADPTR(Vector4f) & pt_model, const CONSTPTR(Matrix4f) & M_rgb,
     const CONSTPTR(Vector4f) & projParams_rgb, float mu, uchar maxW, float eta, const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & imgSize)
 {
     Vector4f pt_camera; Vector2f pt_image;
@@ -76,7 +73,7 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &v
     oldC = TO_FLOAT3(voxel.clr);
 
     /// Like formula (4) for depth
-    newC = TO_VECTOR3(interpolateBilinear(rgb, pt_image, imgSize));
+    newC = TO_VECTOR3(interpolateBilinear<Vector4f>(rgb, pt_image, imgSize));
     newW = 1;
 
     updateVoxelColorInformation(
@@ -84,38 +81,20 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(TVoxel) &v
         oldC, oldW, newC, newW, maxW);
 }
 
-template<bool hasColor, class TVoxel> struct ComputeUpdatedVoxelInfo;
 
-template<class TVoxel>
-struct ComputeUpdatedVoxelInfo<false, TVoxel> {
-    _CPU_AND_GPU_CODE_ static void compute(DEVICEPTR(TVoxel) & voxel, const THREADPTR(Vector4f) & pt_model,
-        const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) & projParams_d,
-        const CONSTPTR(Matrix4f) & M_rgb, const CONSTPTR(Vector4f) & projParams_rgb,
-        float mu, int maxW,
-        const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize_d,
-        const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & imgSize_rgb)
-    {
-        computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
-    }
-};
+_CPU_AND_GPU_CODE_ static void computeUpdatedVoxelInfo(DEVICEPTR(ITMVoxel) & voxel, const THREADPTR(Vector4f) & pt_model,
+    const THREADPTR(Matrix4f) & M_d, const THREADPTR(Vector4f) & projParams_d,
+    const THREADPTR(Matrix4f) & M_rgb, const THREADPTR(Vector4f) & projParams_rgb,
+    float mu, int maxW,
+    const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize_d,
+    const CONSTPTR(Vector4u) *rgb, const THREADPTR(Vector2i) & imgSize_rgb)
+{
+    float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
 
-template<class TVoxel>
-struct ComputeUpdatedVoxelInfo<true, TVoxel> {
-    _CPU_AND_GPU_CODE_ static void compute(DEVICEPTR(TVoxel) & voxel, const THREADPTR(Vector4f) & pt_model,
-        const THREADPTR(Matrix4f) & M_d, const THREADPTR(Vector4f) & projParams_d,
-        const THREADPTR(Matrix4f) & M_rgb, const THREADPTR(Vector4f) & projParams_rgb,
-        float mu, int maxW,
-        const CONSTPTR(float) *depth, const CONSTPTR(Vector2i) & imgSize_d,
-        const CONSTPTR(Vector4u) *rgb, const THREADPTR(Vector2i) & imgSize_rgb)
-    {
-        float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model, M_d, projParams_d, mu, maxW, depth, imgSize_d);
-
-        // Only the voxels withing +- 25% mu of the surface get color
-        if ((eta > mu) || (fabs(eta / mu) > 0.25f)) return;
-        computeUpdatedVoxelColorInfo(voxel, pt_model, M_rgb, projParams_rgb, mu, maxW, eta, rgb, imgSize_rgb);
-    }
-};
-
+    // Only the voxels withing +- 25% mu of the surface get color
+    if ((eta > mu) || (fabs(eta / mu) > 0.25f)) return;
+    computeUpdatedVoxelColorInfo(voxel, pt_model, M_rgb, projParams_rgb, mu, maxW, eta, rgb, imgSize_rgb);
+}
 
 // alloc types
 #define AT_NEEDS_ALLOC_FITS 1 //needs allocation, fits in the ordered list
@@ -233,7 +212,6 @@ struct AllocationTempData {
 
 /// \returns false when the list is full
 
-template<typename TVoxel>
 inline
 #ifdef __CUDACC__
 __device__
@@ -241,7 +219,7 @@ __device__
 void allocateVoxelBlock(
     int targetIdx,
 
-    typename ITMLocalVBA<TVoxel>::VoxelAllocationList* voxelAllocationList,
+    typename ITMLocalVBA::VoxelAllocationList* voxelAllocationList,
     ITMVoxelBlockHash::ExcessAllocationList* excessAllocationList,
     ITMHashEntry *hashTable,
 
@@ -332,10 +310,9 @@ _CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
     return hashVisibleType > 0;
 }
 
-template<typename TVoxel>
 _CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
     Vector3i globalPos, 
-    TVoxel *localVoxelBlock, 
+    ITMVoxel *localVoxelBlock, 
     float voxelSize,
 
     const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) & projParams_d,
@@ -352,7 +329,7 @@ _CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
     pt_model = Vector4f(
         (globalPos.toFloat() + Vector3f(x, y, z)) * voxelSize, 1.f);
 
-    ComputeUpdatedVoxelInfo<TVoxel::hasColorInformation, TVoxel>::compute(
+    computeUpdatedVoxelInfo(
         localVoxelBlock[locId],
         pt_model,
         M_d,

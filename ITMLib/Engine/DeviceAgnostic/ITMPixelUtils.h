@@ -8,9 +8,9 @@
 #include "../../Utils/ITMLibDefines.h"
 
 #define weightedCombine(oldX, oldW, newX, newW) \
-    newX = oldW * oldX + newW * newX; \
+    newX = (float)oldW * oldX + (float)newW * newX; \
     newW = oldW + newW;\
-    newX /= newW;\
+    newX /= (float)newW;\
     newW = MIN(newW, maxW);
 
 /// Linearized pixel index
@@ -18,9 +18,8 @@ _CPU_AND_GPU_CODE_ inline int pixelLocId(int x, int y, const THREADPTR(Vector2i)
     return x + y * imgSize.x;
 }
 
-template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline void updateVoxelColorInformation(
-    DEVICEPTR(TVoxel) & voxel,
+    DEVICEPTR(ITMVoxel) & voxel,
     Vector3f oldC, int oldW, Vector3f newC, int newW,
     int maxW)
 {
@@ -32,9 +31,8 @@ _CPU_AND_GPU_CODE_ inline void updateVoxelColorInformation(
     voxel.w_color = (uchar)newW;
 }
 
-template<class TVoxel>
 _CPU_AND_GPU_CODE_ inline void updateVoxelDepthInformation(
-    DEVICEPTR(TVoxel) & voxel,
+    DEVICEPTR(ITMVoxel) & voxel,
     float oldF, int oldW, float newF, int newW,
     int maxW)
 {
@@ -42,7 +40,7 @@ _CPU_AND_GPU_CODE_ inline void updateVoxelDepthInformation(
 
     // write back
     /// D(X) <-  (4)
-    voxel.sdf = TVoxel::SDF_floatToValue(newF);
+    voxel.sdf = ITMVoxel::SDF_floatToValue(newF);
     voxel.w_depth = newW;
 }
 #undef weightedCombine
@@ -151,24 +149,61 @@ inline T sampleNearest(
             imgSize)];
 }
 
-/// Sample 4 channel image with bilinear interpolation.
-template<typename T> _CPU_AND_GPU_CODE_ inline Vector4f interpolateBilinear(const CONSTPTR(T) *source,
+template<typename T>
+struct IllegalColor {
+    static _CPU_AND_GPU_CODE_ T make();
+};
+inline _CPU_AND_GPU_CODE_ float IllegalColor<float>::make() {
+    return -1;
+}
+inline _CPU_AND_GPU_CODE_ Vector4f IllegalColor<Vector4f>::make() {
+    return Vector4f(0, 0, 0, -1);
+}
+inline _CPU_AND_GPU_CODE_ bool isLegalColor(float c) {
+    return c >= 0;
+}
+inline _CPU_AND_GPU_CODE_ bool isLegalColor(Vector4f c) {
+    return c.w >= 0;
+}
+inline _CPU_AND_GPU_CODE_ bool isLegalColor(Vector4u c) {
+    // NOTE this should never be called -- withHoles should be false for a Vector4u
+    // implementing this just calms the compiler
+    assert(false);
+    return false;
+}
+inline _CPU_AND_GPU_CODE_ Vector4f toFloat(Vector4u c) {
+    return c.toFloat();
+}
+
+inline _CPU_AND_GPU_CODE_ Vector4f toFloat(Vector4f c) {
+    return c;
+}
+inline _CPU_AND_GPU_CODE_ float toFloat(float c) {
+    return c;
+}
+
+#define WITH_HOLES true
+/// Sample 4 channel image with bilinear interpolation (T::toFloat must return Vector4f)
+/// withHoles: returns makeIllegalColor<OUT>() when any of the four surrounding pixels is illegal (has negative w).
+template<typename T_OUT, //!< Vector4f or float
+    bool withHoles = false, typename T_IN> _CPU_AND_GPU_CODE_ inline Vector4f interpolateBilinear(
+    const CONSTPTR(T_IN) *source,
 	const THREADPTR(Vector2f) & position, const CONSTPTR(Vector2i) & imgSize)
 {
-    T a, b, c, d; Vector4f result;
+    T_OUT result;
     Vector2i p; Vector2f delta;
 
     p.x = (int)floor(position.x); p.y = (int)floor(position.y);
-    delta.x = position.x - (float)p.x; delta.y = position.y - (float)p.y;
+    delta.x = position.x - p.x; delta.y = position.y - p.y;
 
-    b.x = 0; b.y = 0; b.z = 0; b.w = 0;
-    c.x = 0; c.y = 0; c.z = 0; c.w = 0;
-    d.x = 0; d.y = 0; d.z = 0; d.w = 0;
+#define sample(dx, dy) sampleNearest(source, p.x + dx, p.y + dy, imgSize);
+    T_IN a = sample(0, 0);
+    T_IN b = sample(1, 0);
+    T_IN c = sample(0, 1);
+    T_IN d = sample(1, 1);
+#undef sample
 
-    a = source[p.x + p.y * imgSize.x];
-    if (delta.x != 0) b = source[(p.x + 1) + p.y * imgSize.x];
-    if (delta.y != 0) c = source[p.x + (p.y + 1) * imgSize.x];
-    if (delta.x != 0 && delta.y != 0) d = source[(p.x + 1) + (p.y + 1) * imgSize.x];
+    if (withHoles && (!isLegalColor(a) || !isLegalColor(b) || !isLegalColor(c) || !isLegalColor(d))) return IllegalColor<T_OUT>::make();
 
     /**
     ------> dx
@@ -178,66 +213,10 @@ template<typename T> _CPU_AND_GPU_CODE_ inline Vector4f interpolateBilinear(cons
     \/
     */
 	result =
-        a.toFloat() * (1.0f - delta.x) * (1.0f - delta.y) + 
-        b.toFloat() * delta.x * (1.0f - delta.y) +
-		c.toFloat() * (1.0f - delta.x) * delta.y + 
-        d.toFloat() * delta.x * delta.y;
-
-	return result;
-}
-
-/// Same as interpolateBilinear, but return (0,0,0,-1) when any of the four surrounding pixels is illegal (has negative w).
-template<typename T> _CPU_AND_GPU_CODE_ inline Vector4f interpolateBilinear_withHoles(const CONSTPTR(T) *source,
-	const THREADPTR(Vector2f) & position, const CONSTPTR(Vector2i) & imgSize)
-{
-	T a, b, c, d; Vector4f result;
-	Vector2s p; Vector2f delta;
-
-	p.x = (short)floor(position.x); p.y = (short)floor(position.y);
-	delta.x = position.x - (float)p.x; delta.y = position.y - (float)p.y;
-
-	a = source[p.x + p.y * imgSize.x];
-	b = source[(p.x + 1) + p.y * imgSize.x];
-	c = source[p.x + (p.y + 1) * imgSize.x];
-	d = source[(p.x + 1) + (p.y + 1) * imgSize.x];
-
-	if (a.w < 0 || b.w < 0 || c.w < 0 || d.w < 0)
-	{
-		result.x = 0; result.y = 0; result.z = 0; result.w = -1.0f;
-		return result;
-	}
-
-	result.x = ((float)a.x * (1.0f - delta.x) * (1.0f - delta.y) + (float)b.x * delta.x * (1.0f - delta.y) +
-		(float)c.x * (1.0f - delta.x) * delta.y + (float)d.x * delta.x * delta.y);
-	result.y = ((float)a.y * (1.0f - delta.x) * (1.0f - delta.y) + (float)b.y * delta.x * (1.0f - delta.y) +
-		(float)c.y * (1.0f - delta.x) * delta.y + (float)d.y * delta.x * delta.y);
-	result.z = ((float)a.z * (1.0f - delta.x) * (1.0f - delta.y) + (float)b.z * delta.x * (1.0f - delta.y) +
-		(float)c.z * (1.0f - delta.x) * delta.y + (float)d.z * delta.x * delta.y);
-	result.w = ((float)a.w * (1.0f - delta.x) * (1.0f - delta.y) + (float)b.w * delta.x * (1.0f - delta.y) +
-		(float)c.w * (1.0f - delta.x) * delta.y + (float)d.w * delta.x * delta.y);
-
-	return result;
-}
-
-/// For single channel images.
-template<typename T> _CPU_AND_GPU_CODE_ inline float interpolateBilinear_withHoles_single(const CONSTPTR(T) *source,
-	const THREADPTR(Vector2f) & position, const CONSTPTR(Vector2i) & imgSize)
-{
-	T a = 0, b = 0, c = 0, d = 0; float result;
-	Vector2i p; Vector2f delta;
-
-	p.x = (int)floor(position.x); p.y = (int)floor(position.y);
-	delta.x = position.x - (float)p.x; delta.y = position.y - (float)p.y;
-
-	a = source[p.x + p.y * imgSize.x];
-	if (delta.x != 0) b = source[(p.x + 1) + p.y * imgSize.x];
-	if (delta.y != 0) c = source[p.x + (p.y + 1) * imgSize.x];
-	if (delta.x != 0 && delta.y != 0) d = source[(p.x + 1) + (p.y + 1) * imgSize.x];
-
-	if (a < 0 || b < 0 || c < 0 || d < 0) return -1;
-
-	result = ((float)a * (1.0f - delta.x) * (1.0f - delta.y) + (float)b * delta.x * (1.0f - delta.y) +
-		(float)c * (1.0f - delta.x) * delta.y + (float)d * delta.x * delta.y);
+        toFloat(a) * (1.0f - delta.x) * (1.0f - delta.y) +
+        toFloat(b) * delta.x * (1.0f - delta.y) +
+        toFloat(c) * (1.0f - delta.x) * delta.y +
+        toFloat(d) * delta.x * delta.y;
 
 	return result;
 }

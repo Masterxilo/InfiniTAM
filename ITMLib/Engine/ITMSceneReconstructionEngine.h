@@ -25,7 +25,6 @@ namespace ITMLib
 		    an ITMLib::Objects::ITMScene and fuse new image information
 		    into them.
 		*/
-		template<class TVoxel, class TIndex>
 		class ITMSceneReconstructionEngine
 		{
 		public:
@@ -33,7 +32,7 @@ namespace ITMLib
 			    one.
 			*/
 			virtual void ResetScene(
-                ITMScene<TVoxel, TIndex> *scene //<! scene to be reset. 
+                ITMScene *scene //<! scene to be reset. 
                 ) = 0;
 
 			/** Given a view with a new depth image, compute the
@@ -41,7 +40,7 @@ namespace ITMLib
 			    table so that the new image data can be integrated.
 			*/
 			virtual void AllocateSceneFromDepth(
-                ITMScene<TVoxel,TIndex> *scene,
+                ITMScene *scene,
                 const ITMView *view,
                 const ITMTrackingState *trackingState,
 				ITMRenderState *renderState //<! [in, out] initializes visibility
@@ -51,10 +50,20 @@ namespace ITMLib
 			    possibly colour information from the given view.
 			*/
 			virtual void IntegrateIntoScene(
-                ITMScene<TVoxel,TIndex> *scene,
+                ITMScene *scene,
                 const ITMView *view,
                 const ITMTrackingState *trackingState,
 				const ITMRenderState *renderState) = 0;
+
+            /// Fusion stage of the system
+            void ProcessFrame(const ITMView *view, const ITMTrackingState *trackingState, ITMScene *scene, ITMRenderState *renderState)
+            {
+                // allocation & visible list update
+                AllocateSceneFromDepth(scene, view, trackingState, renderState);
+
+                // camera data integration
+                IntegrateIntoScene(scene, view, trackingState, renderState);
+            }
 
 			ITMSceneReconstructionEngine(void) { }
 			virtual ~ITMSceneReconstructionEngine(void) { }

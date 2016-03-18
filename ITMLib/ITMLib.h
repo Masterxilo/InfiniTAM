@@ -9,7 +9,6 @@
 #include "Objects/ITMView.h"
 
 #include "Engine/ITMLowLevelEngine.h"
-#include "Engine/DeviceSpecific/CUDA/ITMLowLevelEngine_CUDA.h"
 
 #include "Engine/ITMDepthTracker.h"
 #include "Engine/DeviceSpecific/CUDA/ITMDepthTracker_CUDA.h"
@@ -25,7 +24,6 @@
 #include "Engine/ITMViewBuilder.h"
 #include "Engine/DeviceSpecific/CUDA/ITMViewBuilder_CUDA.h"
 
-#include "Engine/ITMDenseMapper.h"
 #include "Engine/ITMMainEngine.h"
 
 using namespace ITMLib::Objects;

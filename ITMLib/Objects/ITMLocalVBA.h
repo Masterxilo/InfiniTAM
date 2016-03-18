@@ -16,17 +16,16 @@ namespace ITMLib
 		Stores the actual voxel content that is referred to by a
 		ITMLib::Objects::ITMHashTable.
 		*/
-		template<class TVoxel>
 		class ITMLocalVBA
 		{
 		private:
-			ORUtils::MemoryBlock<TVoxel> *voxelBlocks;
+			ORUtils::MemoryBlock<ITMVoxel> *voxelBlocks;
 
             const MemoryDeviceType memoryType;
 
 		public:
-			inline TVoxel *GetVoxelBlocks(void) { return voxelBlocks->GetData(memoryType); }
-			inline const TVoxel *GetVoxelBlocks(void) const { return voxelBlocks->GetData(memoryType); }
+            inline ITMVoxel *GetVoxelBlocks(void) { return voxelBlocks->GetData(memoryType); }
+            inline const ITMVoxel *GetVoxelBlocks(void) const { return voxelBlocks->GetData(memoryType); }
 
 			const int allocatedSize;
 
@@ -90,7 +89,7 @@ namespace ITMLib
                 memoryType(memoryType),
                 allocatedSize(noBlocks * blockSize)
 			{
-				voxelBlocks = new ORUtils::MemoryBlock<TVoxel>(allocatedSize, memoryType);
+                voxelBlocks = new ORUtils::MemoryBlock<ITMVoxel>(allocatedSize, memoryType);
                 voxelAllocationList = new VoxelAllocationList(noBlocks, memoryType);
 			}
 

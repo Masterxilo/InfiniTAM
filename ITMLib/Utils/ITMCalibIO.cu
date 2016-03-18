@@ -17,9 +17,6 @@ namespace ITMLib {
         bool readDisparityCalib(std::istream & src, ITMDisparityCalib & dest);
         bool readDisparityCalib(const char *fileName, ITMDisparityCalib & dest);
         bool readRGBDCalib(std::istream & src, ITMRGBDCalib & dest);
-        
-        bool readRGBDCalib(const char *rgbIntrinsicsFile, const char *depthIntrinsicsFile, const char *disparityCalibFile, const char *extrinsicsFile, ITMRGBDCalib & dest);
-
     }
 }
 
@@ -38,12 +35,6 @@ bool ITMLib::Objects::readIntrinsics(std::istream & src, ITMIntrinsics & dest)
 	return true;
 }
 
-bool ITMLib::Objects::readIntrinsics(const char *fileName, ITMIntrinsics & dest)
-{
-	std::ifstream f(fileName);
-	return ITMLib::Objects::readIntrinsics(f, dest);
-}
-
 bool ITMLib::Objects::readExtrinsics(std::istream & src, ITMExtrinsics & dest)
 {
 	Matrix4f calib;
@@ -57,49 +48,15 @@ bool ITMLib::Objects::readExtrinsics(std::istream & src, ITMExtrinsics & dest)
 	return true;
 }
 
-bool ITMLib::Objects::readExtrinsics(const char *fileName, ITMExtrinsics & dest)
-{
-	std::ifstream f(fileName);
-	return ITMLib::Objects::readExtrinsics(f, dest);
-}
-
 bool ITMLib::Objects::readDisparityCalib(std::istream & src, ITMDisparityCalib & dest)
 {
-	std::string word;
-	src >> word;
-	if (src.fail()) return false;
-
-	ITMDisparityCalib::TrafoType type = ITMDisparityCalib::TRAFO_KINECT;
 	float a,b;
+	src >> a >> b;
 
-	if (word.compare("kinect") == 0) {
-		type = ITMDisparityCalib::TRAFO_KINECT;
-		src >> a;
-	} else if (word.compare("affine") == 0) {
-		type = ITMDisparityCalib::TRAFO_AFFINE;
-		src >> a;
-	} else {
-		std::stringstream wordstream(word);
-		wordstream >> a;
-		if (wordstream.fail()) return false;
-	}
-
-	src >> b;
 	if (src.fail()) return false;
-    /// Default calibration
-	if ((a == 0.0f) && (b == 0.0f)) {
-		type = ITMDisparityCalib::TRAFO_AFFINE;
-		a = 1.0f/1000.0f; b = 0.0f;
-	}
 
-	dest.SetFrom(a, b, type);
+	dest.SetFrom(a, b);
 	return true;
-}
-
-bool ITMLib::Objects::readDisparityCalib(const char *fileName, ITMDisparityCalib & dest)
-{
-	std::ifstream f(fileName);
-	return ITMLib::Objects::readDisparityCalib(f, dest);
 }
 
 bool ITMLib::Objects::readRGBDCalib(std::istream & src, ITMRGBDCalib & dest)
@@ -119,15 +76,5 @@ bool ITMLib::Objects::readRGBDCalib(const char *fileName, ITMRGBDCalib & dest)
         exit(1);
     }
 	return ITMLib::Objects::readRGBDCalib(f, dest);
-}
-
-bool ITMLib::Objects::readRGBDCalib(const char *rgbIntrinsicsFile, const char *depthIntrinsicsFile, const char *disparityCalibFile, const char *extrinsicsFile, ITMRGBDCalib & dest)
-{
-	bool ret = true;
-	ret &= ITMLib::Objects::readIntrinsics(rgbIntrinsicsFile, dest.intrinsics_rgb);
-	ret &= ITMLib::Objects::readIntrinsics(depthIntrinsicsFile, dest.intrinsics_d);
-	ret &= ITMLib::Objects::readExtrinsics(extrinsicsFile, dest.trafo_rgb_to_depth);
-	ret &= ITMLib::Objects::readDisparityCalib(disparityCalibFile, dest.disparityCalib);
-	return ret;
 }
 

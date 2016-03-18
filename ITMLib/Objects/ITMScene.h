@@ -15,9 +15,6 @@ namespace ITMLib
 		Represents the 3D world model as a hash of small voxel
 		blocks
 		*/
-		template<class TVoxel, //!< any of the ITMVoxel_ classes
-        class TIndex //!< 
-        >
 		class ITMScene
 		{
 		public:
@@ -26,10 +23,10 @@ namespace ITMLib
 			const ITMSceneParams *sceneParams;
 
 			/** Hash table to reference the 8x8x8 blocks */
-			TIndex index;
+			ITMVoxelIndex index;
 
 			/** Current local content of the 8x8x8 voxel blocks -- stored host or device */
-			ITMLocalVBA<TVoxel> localVBA;
+			ITMLocalVBA localVBA;
 
 			ITMScene(const ITMSceneParams *sceneParams, MemoryDeviceType memoryType)
 				: index(memoryType), localVBA(memoryType, index.getNumAllocatedVoxelBlocks(), index.getVoxelBlockSize())

@@ -131,13 +131,12 @@ _CPU_AND_GPU_CODE_ inline void CreateRenderingBlocks(
 
 /// \param x,y [in] camera space pixel determining ray direction
 /// \returns whether any intersection was found
-template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline bool castRay(
     DEVICEPTR(Vector4f) &pt_out, //!< [out] the intersection point. w is 1 for a valid point, 0 for no intersection; in voxel-fractional-world-coordinates
     
     const int x, const int y,
-    const CONSTPTR(TVoxel) *voxelData,
-	const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
+    const CONSTPTR(ITMVoxel) *voxelData,
+	const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
     const Matrix4f invM, //!< camera-to-world transform
     const Vector4f invProjParams, //!< camera-to-world transform
     const float oneOverVoxelSize,
@@ -167,7 +166,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
     const Vector3f rayDirection = normalize(pt_block_e - pt_block_s);
     Vector3f pt_result = pt_block_s; // Current position in voxel-fractional-world-coordinates
     const float stepScale = mu * oneOverVoxelSize;
-	typename TIndex::IndexCache cache;
+    typename ITMVoxelIndex::IndexCache cache;
     float sdfValue = 1.0f;
     bool hash_found;
     float stepLength;
@@ -226,12 +225,11 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
 
 /// Compute normal in the distance field via the gradient.
 /// c.f. computeSingleNormalFromSDF
-template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out
     const THREADPTR(Vector3f) & point,
-    const CONSTPTR(TVoxel) *voxelBlockData,
-    const CONSTPTR(typename TIndex::IndexData) *indexData,
+    const CONSTPTR(ITMVoxel) *voxelBlockData,
+    const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,
     const THREADPTR(Vector3f) & lightSource,
     THREADPTR(Vector3f) & outNormal,
     THREADPTR(float) & angle //!< outNormal . lightSource
@@ -315,45 +313,71 @@ _CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
 	if (!(angle > 0.0)) foundPoint = false;
 }
 
-_CPU_AND_GPU_CODE_ inline void drawPixelGrey(DEVICEPTR(Vector4u) & dest, const THREADPTR(float) & angle)
+
+
+
+#define DRAWFUNCTIONPARAMS \
+DEVICEPTR(Vector4u) & dest,\
+const CONSTPTR(Vector3f) & point,\
+const CONSTPTR(ITMVoxel) *voxelBlockData, \
+const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,\
+const THREADPTR(Vector3f) & normal_obj,\
+const THREADPTR(float) & angle
+
+// PIXEL SHADERS
+// " Finally a coloured or shaded rendering of the surface is trivially computed, as desired for the visualisation."
+_CPU_AND_GPU_CODE_ inline void drawPixelGrey(DRAWFUNCTIONPARAMS)
 {
-	float outRes = (0.8f * angle + 0.2f) * 255.0f;
-	dest = Vector4u((uchar)outRes);
+    float outRes = (0.8f * angle + 0.2f) * 255.0f;
+    dest = Vector4u((uchar)outRes);
 }
 
-_CPU_AND_GPU_CODE_ inline void drawPixelNormal(DEVICEPTR(Vector4u) & dest, const THREADPTR(Vector3f) & normal_obj)
+_CPU_AND_GPU_CODE_ inline void drawPixelNormal(DRAWFUNCTIONPARAMS)
 {
-	dest.r = (uchar)((0.3f + (-normal_obj.r + 1.0f)*0.35f)*255.0f);
-	dest.g = (uchar)((0.3f + (-normal_obj.g + 1.0f)*0.35f)*255.0f);
-	dest.b = (uchar)((0.3f + (-normal_obj.b + 1.0f)*0.35f)*255.0f);
+    dest.r = (uchar)((0.3f + (-normal_obj.r + 1.0f)*0.35f)*255.0f);
+    dest.g = (uchar)((0.3f + (-normal_obj.g + 1.0f)*0.35f)*255.0f);
+    dest.b = (uchar)((0.3f + (-normal_obj.b + 1.0f)*0.35f)*255.0f);
 }
 
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline void drawPixelColour(DEVICEPTR(Vector4u) & dest, const CONSTPTR(Vector3f) & point, 
-	const CONSTPTR(TVoxel) *voxelBlockData, const CONSTPTR(typename TIndex::IndexData) *indexData)
+_CPU_AND_GPU_CODE_ inline void drawPixelColour(DRAWFUNCTIONPARAMS)
 {
-	Vector4f clr = VoxelColorReader<TVoxel::hasColorInformation, TVoxel, TIndex>::interpolate(voxelBlockData, indexData, point);
+    Vector4f clr = interpolateColor(voxelBlockData, indexData, point);
 
-	dest.x = (uchar)(clr.x * 255.0f);
-	dest.y = (uchar)(clr.y * 255.0f);
-	dest.z = (uchar)(clr.z * 255.0f);
-	dest.w = 255;
+    dest.x = (uchar)(clr.x * 255.0f);
+    dest.y = (uchar)(clr.y * 255.0f);
+    dest.z = (uchar)(clr.z * 255.0f);
+    dest.w = 255;
 }
+
+#define PROCESS_AND_DRAW_PIXEL(PROCESSFUNCTION, DRAWFUNCTION) \
+_CPU_AND_GPU_CODE_ inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
+    bool foundPoint, const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,\
+	Vector3f lightSource) {\
+	Vector3f outNormal;\
+	float angle;\
+    computeNormalAndAngle(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);\
+    if (foundPoint) DRAWFUNCTION(outRendering, point, voxelData, voxelIndex, outNormal, angle);\
+	else outRendering = Vector4u((uchar)0);\
+}
+
+PROCESS_AND_DRAW_PIXEL(processPixelColour, drawPixelColour)
+PROCESS_AND_DRAW_PIXEL(processPixelGrey, drawPixelGrey)
+PROCESS_AND_DRAW_PIXEL(processPixelNormal, drawPixelNormal)
 
 
 _CPU_AND_GPU_CODE_ inline void processPixelICPPost(
-    float angle, Vector3f outNormal,
-    DEVICEPTR(Vector4u) &outRendering,
-    DEVICEPTR(Vector4f) &pointsMap,
-    DEVICEPTR(Vector4f) &normalsMap,
-    const THREADPTR(Vector3f) & point,
-    bool foundPoint,
-    float voxelSize)
+const float angle, const Vector3f outNormal,
+DEVICEPTR(Vector4u) &outRendering,
+DEVICEPTR(Vector4f) &pointsMap,
+DEVICEPTR(Vector4f) &normalsMap,
+const THREADPTR(Vector3f) & point,
+bool foundPoint,
+float voxelSize)
 {
 
     if (foundPoint)
     {
-        drawPixelGrey(outRendering, angle);
+        drawPixelGrey(outRendering, point, 0, 0 /*assume these are unused*/, outNormal, angle);
 
         Vector4f outPoint4;
         outPoint4.x = point.x * voxelSize; outPoint4.y = point.y * voxelSize;
@@ -372,26 +396,27 @@ _CPU_AND_GPU_CODE_ inline void processPixelICPPost(
         pointsMap = out4; normalsMap = out4; outRendering = Vector4u((uchar)0);
     }
 }
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline void processPixelICP(DEVICEPTR(Vector4u) &outRendering, DEVICEPTR(Vector4f) &pointsMap, DEVICEPTR(Vector4f) &normalsMap,
-	const THREADPTR(Vector3f) & point, bool foundPoint, const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
-	float voxelSize, const THREADPTR(Vector3f) &lightSource)
-{
-	Vector3f outNormal;
-	float angle;
 
-	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
+_CPU_AND_GPU_CODE_ inline void processPixelICP(DEVICEPTR(Vector4u) &outRendering, DEVICEPTR(Vector4f) &pointsMap, DEVICEPTR(Vector4f) &normalsMap,
+    const THREADPTR(Vector3f) & point, bool foundPoint, const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
+    float voxelSize, const THREADPTR(Vector3f) &lightSource)
+{
+    Vector3f outNormal;
+    float angle;
+
+    computeNormalAndAngle(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
 
     processPixelICPPost(
         angle, outNormal,
-       outRendering,
-       pointsMap,
-       normalsMap,
+        outRendering,
+        pointsMap,
+        normalsMap,
         point,
         foundPoint,
         voxelSize);
 
 }
+
 
 /// \param useSmoothing whether to compute normals by forward differences two pixels away (true) or just one pixel away (false)
 template<bool useSmoothing>
@@ -399,21 +424,21 @@ _CPU_AND_GPU_CODE_ inline void processPixelICP(
     DEVICEPTR(Vector4u) *outRendering,
     DEVICEPTR(Vector4f) *pointsMap, //!< receives output points in world coordinates
     DEVICEPTR(Vector4f) *normalsMap,
-	const CONSTPTR(Vector4f) *pointsRay, //!< input points in voxel-fractional-world-coordinates
+    const CONSTPTR(Vector4f) *pointsRay, //!< input points in voxel-fractional-world-coordinates
     const THREADPTR(Vector2i) &imgSize,
     const THREADPTR(int) &x, const THREADPTR(int) &y,
     float voxelSize,
-	const THREADPTR(Vector3f) &lightSource)
+    const THREADPTR(Vector3f) &lightSource)
 {
-	Vector3f outNormal;
-	float angle;
+    Vector3f outNormal;
+    float angle;
 
     int locId = pixelLocId(x, y, imgSize);
-	Vector4f point = pointsRay[locId];
+    Vector4f point = pointsRay[locId];
 
-	bool foundPoint = point.w > 0.0f;
+    bool foundPoint = point.w > 0.0f;
 
-	computeNormalAndAngle<useSmoothing>(foundPoint, x, y, pointsRay, lightSource, voxelSize, imgSize, outNormal, angle);
+    computeNormalAndAngle<useSmoothing>(foundPoint, x, y, pointsRay, lightSource, voxelSize, imgSize, outNormal, angle);
 
     processPixelICPPost(
         angle, outNormal,
@@ -423,64 +448,4 @@ _CPU_AND_GPU_CODE_ inline void processPixelICP(
         point.toVector3(),
         foundPoint,
         voxelSize);
-}
-
-template<bool useSmoothing>
-_CPU_AND_GPU_CODE_ inline void processPixelForwardRender(DEVICEPTR(Vector4u) *outRendering, const CONSTPTR(Vector4f) *pointsRay, 
-	const THREADPTR(Vector2i) &imgSize, const THREADPTR(int) &x, const THREADPTR(int) &y, float voxelSize, const THREADPTR(Vector3f) &lightSource)
-{
-	Vector3f outNormal;
-	float angle;
-
-    int locId = pixelLocId(x, y, imgSize);
-	Vector4f point = pointsRay[locId];
-
-	bool foundPoint = point.w > 0.0f;
-	computeNormalAndAngle<useSmoothing>(foundPoint, x, y, pointsRay, lightSource, voxelSize, imgSize, outNormal, angle);
-
-	if (foundPoint) drawPixelGrey(outRendering[locId], angle);
-	else outRendering[locId] = Vector4u((uchar)0);
-}
-
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline void processPixelGrey(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point, 
-	bool foundPoint, const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex, 
-	Vector3f lightSource)
-{
-	Vector3f outNormal;
-	float angle;
-
-	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
-
-	if (foundPoint) drawPixelGrey(outRendering, angle);
-	else outRendering = Vector4u((uchar)0);
-}
-
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline void processPixelColour(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,
-	bool foundPoint, const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex, 
-	Vector3f lightSource)
-{
-	Vector3f outNormal;
-	float angle;
-
-	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
-
-	if (foundPoint) drawPixelColour<TVoxel, TIndex>(outRendering, point, voxelData, voxelIndex);
-	else outRendering = Vector4u((uchar)0);
-}
-
-
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline void processPixelNormal(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,
-	bool foundPoint, const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
-	Vector3f lightSource)
-{
-	Vector3f outNormal;
-	float angle;
-
-	computeNormalAndAngle<TVoxel, TIndex>(foundPoint, point, voxelData, voxelIndex, lightSource, outNormal, angle);
-
-	if (foundPoint) drawPixelNormal(outRendering, outNormal);
-	else outRendering = Vector4u((uchar)0);
 }

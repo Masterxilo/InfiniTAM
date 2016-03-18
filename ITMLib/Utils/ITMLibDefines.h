@@ -55,7 +55,7 @@ struct ITMHashEntry
         return SDF_BUCKET_NUM + offset - 1;
     }
     
-    /** Pointer to the voxel block array (TVoxel* voxelData).
+    /** Pointer to the voxel block array (* voxelData).
 	    - >= 0 identifies an actual allocated entry in the voxel block array
 	    - -1 identifies an entry that has been removed (swapped out)
 	    - <-1 identifies an unallocated block
@@ -106,11 +106,6 @@ struct ITMVoxelT
 
 	/** Number of fused observations that make up @p sdf. */
 	uchar w_depth;
-	/** Padding that may or may not improve performance on certain GPUs */
-	//uchar pad;
-
-
-    static const CONSTPTR(bool) hasColorInformation = true;
 
 	/** RGB colour information stored for this voxel. */
 	Vector3u clr;
@@ -126,11 +121,9 @@ struct ITMVoxelT
 	}
 };
 
-/** This chooses the information stored at each voxel. At the moment, valid
-    options are ITMVoxel_s, ITMVoxel_f, ITMVoxel_s_rgb and ITMVoxel_f_rgb 
-*/
-#define VOXELTYPE ITMVoxelT // ITMVoxel_s
-#define _str(s) #s // note that s will not be macro expanded prior to stringification
+// Note that macros are expanded from outside in, opposite to c function evaluation
+#define VOXELTYPE ITMVoxelT 
+#define _str(s) #s // note that s will not be macro expanded prior to stringification 
 #define _xstr(s) _str(s) // force evaluation of s prior to 'calling' str
 #define sVOXELTYPE _xstr(VOXELTYPE) 
 struct ITMVoxel : public VOXELTYPE {

@@ -45,17 +45,12 @@ namespace ITMLib
             /// allocated when needed
 			ITMFloat4Image *depthNormal;
 
-			/// uncertainty (std) in each pixel of depth value based on sensor noise model
-			/// allocated when needed
-			ITMFloatImage *depthUncertainty;
-
 			ITMView(const ITMRGBDCalib *calibration, Vector2i imgSize_rgb, Vector2i imgSize_d, bool useGPU)
 			{
 				this->calib = new ITMRGBDCalib(*calibration);
 				this->rgb = new ITMUChar4Image(imgSize_rgb, true, useGPU);
 				this->depth = new ITMFloatImage(imgSize_d, true, useGPU);
 				this->depthNormal = NULL;
-				this->depthUncertainty = NULL;
 			}
 
 			virtual ~ITMView(void)
@@ -66,7 +61,6 @@ namespace ITMLib
 				delete depth;
 
 				if (depthNormal != NULL) delete depthNormal;
-				if (depthUncertainty != NULL) delete depthUncertainty;
 			}
 		};
 	}

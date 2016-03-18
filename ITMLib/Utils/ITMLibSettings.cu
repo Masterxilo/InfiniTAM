@@ -20,9 +20,6 @@ ITMLibSettings::ITMLibSettings(void)
 
 	//deviceType = DEVICE_CPU;
 
-	/// enable or disable bilateral depth filtering;
-	useBilateralFilter = false;
-
 	// builds the tracking regime. level 0 is full resolution
 	{
 		noHierarchyLevels = 5;

@@ -222,13 +222,6 @@ void UIEngine::glutDisplayFunction()
 	char str[2000]; sprintf(str, "%04.2lf", uiEngine->processedTime);
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_18, (const char*)str);
 
-
-    glRasterPos2f(-0.95f, 0.95f);
-    sprintf(str,
-        "Voxel type: %s, hasColor?: %s"
-        , sVOXELTYPE, VOXELTYPE::hasColorInformation ? "yes" : "no");
-    safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, (const char*)str);
-
 	glRasterPos2f(-0.95f, -0.95f);
 	sprintf(str, 
 		KEY_HELP_STR
@@ -379,7 +372,7 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 	this->intergrationActive = true;
 	this->currentColourMode = 0;
 	this->colourModes.push_back(UIColourMode("shaded greyscale", ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED));
-	if (ITMVoxel::hasColorInformation) this->colourModes.push_back(UIColourMode("integrated colours", ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME));
+	this->colourModes.push_back(UIColourMode("integrated colours", ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME));
 	this->colourModes.push_back(UIColourMode("surface normals", ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL));
 
 	this->imageSource = imageSource;

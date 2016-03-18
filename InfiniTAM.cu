@@ -6,7 +6,6 @@
 #include "Engine/UIEngine.h"
 #include "Engine/ImageSourceEngine.h"
 
-#include "Engine/OpenNIEngine.h"
 
 using namespace InfiniTAM::Engine;
 
@@ -35,17 +34,6 @@ static void CreateDefaultImageSource(ImageSourceEngine* & imageSource, const cha
 		printf("using rgb images: %s\nusing depth images: %s\n", filename1, filename2);
         usingImages = true;
         imageSource = new ImageFileReader(calibFile, filename1, filename2);
-	}
-
-	if (imageSource == NULL)
-	{
-		printf("trying OpenNI device: %s\n", (filename1==NULL)?"<OpenNI default device>":filename1);
-		imageSource = new OpenNIEngine(calibFile, filename1);
-		if (imageSource->getDepthImageSize().x == 0)
-		{
-			delete imageSource;
-			imageSource = NULL;
-		}
 	}
 }
 

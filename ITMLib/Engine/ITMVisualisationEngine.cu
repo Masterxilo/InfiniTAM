@@ -24,7 +24,7 @@ inline float base(float val) {
 	else return 0.0;
 }
 
-void IITMVisualisationEngine::DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src)
+void ITMVisualisationEngine::DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src)
 {
     dst->Clear();
     Vector4u * const dest = dst->GetData(MEMORYDEVICE_CPU);
@@ -57,6 +57,3 @@ void IITMVisualisationEngine::DepthToUchar4(ITMUChar4Image *dst, const ITMFloatI
 		dest[idx].a = 255;
 	}
 }
-
-
-template class ITMLib::Engine::ITMVisualisationEngine<ITMVoxel, ITMVoxelIndex>;

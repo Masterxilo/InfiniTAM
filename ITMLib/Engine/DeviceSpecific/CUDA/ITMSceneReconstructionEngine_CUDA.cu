@@ -8,8 +8,7 @@
 using namespace ITMLib::Engine;
 
 // device functions
-template<class TVoxel>
-__global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, const int *visibleEntryIDs,
+__global__ void integrateIntoScene_device(ITMVoxel *localVBA, const ITMHashEntry *hashTable, const int *visibleEntryIDs,
     const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i depthImgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d,
     Vector4f projParams_rgb, float voxelSize, float mu, int maxW)
 {
@@ -23,7 +22,7 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *
 
     globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
 
-    TVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
+    ITMVoxel *localVoxelBlock = &(localVBA[currentHashEntry.ptr * SDF_BLOCK_SIZE3]);
 
     // one thread for each voxel
     int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
@@ -52,16 +51,15 @@ __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int 
 }
 
 
-template<typename TVoxel>
 __global__ void allocateVoxelBlocksList_device(
-    typename ITMLocalVBA<TVoxel>::VoxelAllocationList *voxelAllocationList,
+    typename ITMLocalVBA::VoxelAllocationList *voxelAllocationList,
     ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList, ITMHashEntry *hashTable, int noTotalEntries,
     uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
 {
     int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
 
-    allocateVoxelBlock<TVoxel>(targetIdx,
+    allocateVoxelBlock(targetIdx,
         voxelAllocationList,
         excessAllocationList,
         hashTable,
@@ -100,8 +98,7 @@ __global__ void buildVisibleList_device(ITMHashEntry *hashTable, int noTotalEntr
 
 // host methods
 
-template<class TVoxel>
-ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstructionEngine_CUDA(void) 
+ITMSceneReconstructionEngine_CUDA::ITMSceneReconstructionEngine_CUDA(void) 
 {
 	ITMSafeCall(cudaMalloc((void**)&allocationTempData_device, sizeof(AllocationTempData)));
 	ITMSafeCall(cudaMallocHost((void**)&allocationTempData_host, sizeof(AllocationTempData)));
@@ -111,8 +108,7 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ITMSceneReconstruct
 	ITMSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
 }
 
-template<class TVoxel>
-ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMSceneReconstructionEngine_CUDA(void) 
+ITMSceneReconstructionEngine_CUDA::~ITMSceneReconstructionEngine_CUDA(void) 
 {
 	ITMSafeCall(cudaFreeHost(allocationTempData_host));
 	ITMSafeCall(cudaFree(allocationTempData_device));
@@ -120,15 +116,14 @@ ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::~ITMSceneReconstruc
 	ITMSafeCall(cudaFree(blockCoords_device));
 }
 
-template<class TVoxel>
-void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene)
+void ITMSceneReconstructionEngine_CUDA::ResetScene(ITMScene *scene)
 {
 	int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
 	int blockSize = scene->index.getVoxelBlockSize();
 
     // Reset all voxels in all voxel blocks
-	TVoxel *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
-	memsetKernel<TVoxel>(voxelBlocks_ptr, TVoxel(), numBlocks * blockSize);
+    ITMVoxel *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
+    memsetKernel<ITMVoxel>(voxelBlocks_ptr, ITMVoxel(), numBlocks * blockSize);
 
     // Reset voxel allocation list
     scene->localVBA.voxelAllocationList->Reset();
@@ -142,8 +137,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel,ITMVoxelBlockHash>::ResetScene(ITM
     scene->index.excessAllocationList->Reset();
 }
 
-template<class TVoxel>
-void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateSceneFromDepth(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view, 
+void ITMSceneReconstructionEngine_CUDA::AllocateSceneFromDepth(ITMScene *scene, const ITMView *view, 
 	const ITMTrackingState *trackingState, ITMRenderState *renderState)
 {
 	Vector2i depthImgSize = view->depth->noDims;
@@ -197,7 +191,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 		scene->sceneParams->viewFrustum_min, scene->sceneParams->viewFrustum_max);
 
     // Do allocation
-    allocateVoxelBlocksList_device<TVoxel> << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, excessAllocationList, hashTable,
+    allocateVoxelBlocksList_device << <gridSizeAL, cudaBlockSizeAL >> >(voxelAllocationList, excessAllocationList, hashTable,
 		noTotalEntries, entriesAllocType_device, entriesVisibleType,
 		blockCoords_device);
 
@@ -210,8 +204,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::AllocateScene
 	renderState->noVisibleEntries = tempData->noVisibleEntries;
 }
 
-template<class TVoxel>
-void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateIntoScene(ITMScene<TVoxel, ITMVoxelBlockHash> *scene, const ITMView *view,
+void ITMSceneReconstructionEngine_CUDA::IntegrateIntoScene(ITMScene *scene, const ITMView *view,
 	const ITMTrackingState *trackingState, const ITMRenderState *renderState)
 {
 	Vector2i rgbImgSize = view->rgb->noDims;
@@ -222,7 +215,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	Vector4f projParams_d, projParams_rgb;
 
 	M_d = trackingState->pose_d->GetM();
-	if (TVoxel::hasColorInformation) M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
+    M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
 
 	projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
 	projParams_rgb = view->calib->intrinsics_rgb.projectionParamsSimple.all;
@@ -231,7 +224,7 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 
 	float *depth = view->depth->GetData(MEMORYDEVICE_CUDA);
 	Vector4u *rgb = view->rgb->GetData(MEMORYDEVICE_CUDA);
-	TVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
+    ITMVoxel *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
 	int *visibleEntryIDs = (int*)renderState->GetVisibleEntryIDs();
@@ -239,11 +232,8 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	dim3 gridSize(renderState->noVisibleEntries);
 
-    integrateIntoScene_device<TVoxel> << <gridSize, cudaBlockSize >> >(
+    integrateIntoScene_device<< <gridSize, cudaBlockSize >> >(
         localVBA, hashTable, visibleEntryIDs, 
         rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 }
-
-
-template class ITMLib::Engine::ITMSceneReconstructionEngine_CUDA<ITMVoxel, ITMVoxelIndex>;
 

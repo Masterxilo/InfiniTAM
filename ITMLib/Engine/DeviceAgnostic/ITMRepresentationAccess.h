@@ -47,7 +47,7 @@ _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(
         */
 }
 
-/// \returns linearIdx to be used in TVoxel* voxelData, voxelData[voxelAddress]
+/// \returns linearIdx to be used in * voxelData, voxelData[voxelAddress]
 _CPU_AND_GPU_CODE_ inline int findVoxel(
     const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex, //<! hash table buckets, indexed by values computed from hashIndex
     const THREADPTR(Vector3i) & point,
@@ -100,16 +100,14 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(const CONSTPTR(ITMLib::Objects::ITMVoxel
 
 
 /// === ITMBlockhash methods (readVoxel) ===
-template<class TVoxel>
-_CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
+_CPU_AND_GPU_CODE_ inline ITMVoxel readVoxel(const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
 	const THREADPTR(Vector3i) & point, THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
 {
     int voxelAddress = findVoxel(voxelIndex, point, isFound, cache);
-    return isFound ? voxelData[voxelAddress] : TVoxel();
+    return isFound ? voxelData[voxelAddress] : ITMVoxel();
 }
 
-template<class TVoxel>
-_CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
+_CPU_AND_GPU_CODE_ inline ITMVoxel readVoxel(const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
 	Vector3i point, THREADPTR(bool) &isFound)
 {
 	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
@@ -118,35 +116,32 @@ _CPU_AND_GPU_CODE_ inline TVoxel readVoxel(const CONSTPTR(TVoxel) *voxelData, co
 
 
 /// === Generic methods (readSDF) ===
-template<class TVoxel, class TIndex>
 _CPU_AND_GPU_CODE_ inline float readFromSDF_float_uninterpolated(
-    const CONSTPTR(TVoxel) *voxelData,
-	const CONSTPTR(TIndex) *voxelIndex, 
+    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point,  //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
     THREADPTR(bool) &isFound)
 {
-	TVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound);
-	return TVoxel::SDF_valueToFloat(res.sdf);
+    ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound);
+    return ITMVoxel::SDF_valueToFloat(res.sdf);
 }
 
-template<class TVoxel, class TIndex, class TCache>
 _CPU_AND_GPU_CODE_ inline float readFromSDF_float_uninterpolated(
-    const CONSTPTR(TVoxel) *voxelData,
-	const CONSTPTR(TIndex) *voxelIndex, 
+    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
-    THREADPTR(bool) &isFound, THREADPTR(TCache) & cache)
+    THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
 {
-	TVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound, cache);
-	return TVoxel::SDF_valueToFloat(res.sdf);
+    ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound, cache);
+    return ITMVoxel::SDF_valueToFloat(res.sdf);
 }
 
-template<class TVoxel, class TIndex, class TCache>
 _CPU_AND_GPU_CODE_ inline float readFromSDF_float_interpolated(
-    const CONSTPTR(TVoxel) *voxelData,
-	const CONSTPTR(TIndex) *voxelIndex,
+    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
     THREADPTR(bool) &isFound, 
-    THREADPTR(TCache) & cache)
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
 {
 	float res1, res2, v1, v2;
     COMPUTE_COEFF_POS_FROM_POINT();
@@ -170,17 +165,16 @@ _CPU_AND_GPU_CODE_ inline float readFromSDF_float_interpolated(
 	res2 = (1.0f - coeff.y) * res2 + coeff.y * ((1.0f - coeff.x) * v1 + coeff.x * v2);
 
 	isFound = true;
-	return TVoxel::SDF_valueToFloat((1.0f - coeff.z) * res1 + coeff.z * res2);
+    return ITMVoxel::SDF_valueToFloat((1.0f - coeff.z) * res1 + coeff.z * res2);
 }
 
 /// Assumes voxels store color in some type convertible to Vector3f (e.g. Vector3u) and that color values are in the range 0-255.
 /// \returns [0,1]^4 color (with w = 1)
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTPTR(TVoxel) *voxelData,
-	const CONSTPTR(typename TIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) & point, 
-	THREADPTR(typename TIndex::IndexCache) & cache)
+_CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) & point,
+    THREADPTR(typename ITMVoxelIndex::IndexCache) & cache)
 {
-    TVoxel resn;
+    ITMVoxel resn; 
     Vector3f ret = 0.0f; 
     bool isFound;
     
@@ -208,8 +202,9 @@ _CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTP
 
 /// Compute SDF normal 
 /// Used in processPixelGrey
-template<class TVoxel, class TIndex>
-_CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(TIndex) *voxelIndex, const THREADPTR(Vector3f) &point)
+_CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(
+    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) &point)
 {
 
 	Vector3f ret;
@@ -292,7 +287,7 @@ _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(const CONSTPTR(TVo
 	     tmp.z * ncoeff.y *  coeff.z +
 	     tmp.w *  coeff.y *  coeff.z;
 
-	ret.x = TVoxel::SDF_valueToFloat(
+    ret.x = ITMVoxel::SDF_valueToFloat(
         p1 * ncoeff.x + p2 * coeff.x // v2
         - 
         v1);
@@ -325,7 +320,7 @@ _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(const CONSTPTR(TVo
 	     tmp.z * ncoeff.x *  coeff.z +
 	     tmp.w *  coeff.x *  coeff.z;
 
-	ret.y = TVoxel::SDF_valueToFloat(p1 * ncoeff.y + p2 * coeff.y - v1);
+    ret.y = ITMVoxel::SDF_valueToFloat(p1 * ncoeff.y + p2 * coeff.y - v1);
 
 	// gradient z
 	p1 = front.x * ncoeff.x * ncoeff.y +
@@ -355,28 +350,16 @@ _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(const CONSTPTR(TVo
 	     tmp.z * ncoeff.x *  coeff.y +
 	     tmp.w *  coeff.x *  coeff.y;
 
-	ret.z = TVoxel::SDF_valueToFloat(p1 * ncoeff.z + p2 * coeff.z - v1);
+    ret.z = ITMVoxel::SDF_valueToFloat(p1 * ncoeff.z + p2 * coeff.z - v1);
 #undef lookup
 	return ret;
 }
 
-template<bool hasColor,class TVoxel,class TIndex> struct VoxelColorReader;
-
-template<class TVoxel, class TIndex>
-struct VoxelColorReader<false,TVoxel,TIndex> {
-	_CPU_AND_GPU_CODE_ static Vector4f interpolate(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
-		const THREADPTR(Vector3f) & point)
-	{ return Vector4f(0.0f,0.0f,0.0f,0.0f); }
-};
-
-template<class TVoxel, class TIndex>
-struct VoxelColorReader<true,TVoxel,TIndex> {
-	_CPU_AND_GPU_CODE_ static Vector4f interpolate(const CONSTPTR(TVoxel) *voxelData, const CONSTPTR(typename TIndex::IndexData) *voxelIndex,
-		const THREADPTR(Vector3f) & point)
-	{
-		typename TIndex::IndexCache cache;
-		return readFromSDF_color4u_interpolated<TVoxel,TIndex>(voxelData, voxelIndex, point, cache);
-	}
-};
+_CPU_AND_GPU_CODE_ static Vector4f interpolateColor(const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
+	const THREADPTR(Vector3f) & point)
+{
+    typename ITMVoxelIndex::IndexCache cache;
+	return readFromSDF_color4u_interpolated(voxelData, voxelIndex, point, cache);
+}
 
 #undef COMPUTE_COEFF_POS_FROM_POINT

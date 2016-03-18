@@ -11,10 +11,6 @@ namespace ITMLib
 		class ITMLibSettings
 		{
 		public:
-			bool useBilateralFilter;
-
-			bool modelSensorNoise;
-
 			/// The tracking regime used by the tracking controller
 			TrackerIterationType *trackingRegime;
 
