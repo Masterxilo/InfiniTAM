@@ -218,21 +218,6 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
 	return pt_found;
 }
 
-/// \returns -1 on failure, otherwise the linear index of the pixel the given world 
-/// coordinate 'pixel' projects to
-_CPU_AND_GPU_CODE_ inline int forwardProjectPixel(
-    Vector4f pixel, const CONSTPTR(Matrix4f) &M,
-    const CONSTPTR(Vector4f) &projParams,
-	const THREADPTR(Vector2i) &imgSize)
-{
-	pixel.w = 1;
-
-	Vector2f pt_image;
-    if (!projectModel(projParams, M, imgSize, pixel, pixel, pt_image)) return -1;
-
-	return (int)(pt_image.x + 0.5f) + (int)(pt_image.y + 0.5f) * imgSize.x;
-}
-
 /// Compute normal in the distance field via the gradient.
 /// c.f. computeSingleNormalFromSDF
 template<class TVoxel, class TIndex>

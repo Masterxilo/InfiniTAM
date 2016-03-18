@@ -122,9 +122,9 @@ struct ComputeUpdatedVoxelInfo<true, TVoxel> {
 #define AT_NEEDS_ALLOC_EXCESS 2 //needs allocation in the excess list
 
 // visible type
-#define VT_VISIBLE_AND_IN_MEMORY 1 //make child visible and in memory
-#define VT_VISIBLE_AND_STREAMED_OUT 2//entry has been streamed out but is visible
-#define VT_VISIBLE_PREVIOUS_AND_UNSTREAMED 3 // visible at previous frame and unstreamed
+//#define VT_NOT_VISIBLE 0 // default
+#define VT_VISIBLE 1 //make child visible and in memory
+#define VT_VISIBLE_PREVIOUS 3 // visible at previous frame
 
 /// For allocation and visibility determination. 
 ///
@@ -192,7 +192,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
             hashEntry = hashTable[hashIdx]; \
             if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.isAllocated()) \
             {\
-                entriesVisibleType[hashIdx] = VT_VISIBLE_AND_IN_MEMORY; \
+                entriesVisibleType[hashIdx] = VT_VISIBLE; \
                 isFound = true; \
                 BREAK;\
             }
@@ -273,7 +273,7 @@ void allocateVoxelBlock(
     }
 
     hashTable[targetIdx] = hashEntry;
-    entriesVisibleType[targetIdx] = VT_VISIBLE_AND_IN_MEMORY; //new entry is visible
+    entriesVisibleType[targetIdx] = VT_VISIBLE; //every new entry is visible
 }
 
 _CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible,
@@ -310,7 +310,8 @@ _CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible,
 
 /// \returns hashVisibleType > 0
 _CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
-    int targetIdx, uchar *entriesVisibleType, 
+    int targetIdx,
+    uchar *entriesVisibleType, 
     ITMHashEntry *hashTable,
     Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize
     ) {
@@ -320,7 +321,7 @@ _CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
     //  -- perform visibility check for voxel blocks that where visible in the last frame
     // but not yet detected in the current depth frame
     // (many of these will actually not be visible anymore)
-    if (hashVisibleType == VT_VISIBLE_PREVIOUS_AND_UNSTREAMED)
+    if (hashVisibleType == VT_VISIBLE_PREVIOUS)
     {
         bool isVisible;        
         checkBlockVisibility(isVisible, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
@@ -333,7 +334,7 @@ _CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
 
 template<typename TVoxel>
 _CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
-    bool stopIntegratingAtMaxW, Vector3i globalPos, 
+    Vector3i globalPos, 
     TVoxel *localVoxelBlock, 
     float voxelSize,
 
@@ -346,9 +347,6 @@ _CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
     Vector4f pt_model; int locId;
 
     locId = x + y * SDF_BLOCK_SIZE + z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
-
-    if (stopIntegratingAtMaxW) if (localVoxelBlock[locId].w_depth == maxW) return;
-    //if (approximateIntegration) if (localVoxelBlock[locId].w_depth != 0) continue;
 
     // Voxel's world coordinates, for later projection into depth and color image
     pt_model = Vector4f(

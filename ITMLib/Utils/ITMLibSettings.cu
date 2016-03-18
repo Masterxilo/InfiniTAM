@@ -7,7 +7,7 @@
 using namespace ITMLib::Objects;
 
 ITMLibSettings::ITMLibSettings(void)
-	: sceneParams(0.02f, 100, 0.005f, 0.2f, 3.0f, false)
+	: sceneParams(0.02f, 100, 0.005f, 0.2f, 3.0f)
 {
 	/// depth threashold for the ICP tracker
 	depthTrackerICPThreshold = 0.1f * 0.1f;
@@ -19,10 +19,6 @@ ITMLibSettings::ITMLibSettings(void)
 	skipPoints = true;
 
 	//deviceType = DEVICE_CPU;
-
-
-	/// enables or disables approximate raycast (aka forward projection)
-    useApproximateRaycast = true;// default false
 
 	/// enable or disable bilateral depth filtering;
 	useBilateralFilter = false;

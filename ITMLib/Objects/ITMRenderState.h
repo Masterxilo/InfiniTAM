@@ -70,10 +70,6 @@ namespace ITMLib
 			*/
 			ORUtils::Image<Vector4f> *raycastResult;
 
-			ORUtils::Image<Vector4f> *forwardProjection;
-			ORUtils::Image<int> *fwdProjMissingPoints;
-			int noFwdProjMissingPoints;
-
 			ORUtils::Image<Vector4u> *raycastImage;
 
             ITMRenderState(
@@ -88,8 +84,6 @@ namespace ITMLib
 			{
 				renderingRangeImage = new ORUtils::Image<Vector2f>(imgSize, memoryType);
 				raycastResult = new ORUtils::Image<Vector4f>(imgSize, memoryType);
-				forwardProjection = new ORUtils::Image<Vector4f>(imgSize, memoryType);
-				fwdProjMissingPoints = new ORUtils::Image<int>(imgSize, memoryType);
 				raycastImage = new ORUtils::Image<Vector4u>(imgSize, memoryType);
 
                 // Initialize renderingRangeImage to (vf_min, vf_max)
@@ -103,16 +97,12 @@ namespace ITMLib
                     renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CPU);
 
 				delete buffImage;
-
-				noFwdProjMissingPoints = 0;
 			}
 
 			virtual ~ITMRenderState()
 			{
 				delete renderingRangeImage;
 				delete raycastResult;
-				delete forwardProjection;
-				delete fwdProjMissingPoints;
 				delete raycastImage;
 			}
 		};

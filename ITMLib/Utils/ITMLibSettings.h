@@ -11,8 +11,6 @@ namespace ITMLib
 		class ITMLibSettings
 		{
 		public:
-			bool useApproximateRaycast;
-
 			bool useBilateralFilter;
 
 			bool modelSensorNoise;

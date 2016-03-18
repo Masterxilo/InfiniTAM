@@ -36,8 +36,6 @@ namespace ITMLib
 			/// Current pose of the depth camera.
 			ITMPose *pose_d;
 
-			bool requiresFullRendering;
-
 			bool TrackerFarFromPointCloud(void) const
 			{
 				// if no point cloud exists, yet
@@ -69,7 +67,6 @@ namespace ITMLib
 				this->pose_pointCloud = new ITMPose();
 				this->pose_pointCloud->SetFrom(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 
-				requiresFullRendering = true;
 			}
 
 			~ITMTrackingState(void)

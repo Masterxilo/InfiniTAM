@@ -111,6 +111,7 @@ int main(int argc, char** argv) {
     //record();
 
     UIEngine::Instance()->Run();
+    // When the main window is closed/esc pressed we arrive here
 	UIEngine::Instance()->Shutdown();
 
 	delete mainEngine;

@@ -44,17 +44,14 @@ namespace ITMLib
 			*/
 			int maxW;
 
-			/** Stop integration once maxW has been reached. */
-			bool stopIntegratingAtMaxW;
 
 			ITMSceneParams(float mu, int maxW, float voxelSize, 
-				float viewFrustum_min, float viewFrustum_max, bool stopIntegratingAtMaxW)
+				float viewFrustum_min, float viewFrustum_max)
 			{
 				this->mu = mu;
 				this->maxW = maxW;
 				this->voxelSize = voxelSize;
 				this->viewFrustum_min = viewFrustum_min; this->viewFrustum_max = viewFrustum_max;
-				this->stopIntegratingAtMaxW = stopIntegratingAtMaxW;
 			}
 
 			explicit ITMSceneParams(const ITMSceneParams *sceneParams) { this->SetFrom(sceneParams); }
@@ -66,7 +63,6 @@ namespace ITMLib
 				this->viewFrustum_max = sceneParams->viewFrustum_max;
 				this->mu = sceneParams->mu;
 				this->maxW = sceneParams->maxW;
-				this->stopIntegratingAtMaxW = sceneParams->stopIntegratingAtMaxW;
 			}
 		};
 	}

@@ -118,6 +118,7 @@
     <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu" />
     <CudaCompile Include="InfiniTAM.cu" />
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu" />
+    <CudaCompile Include="TestHashMap.cu" />
     <CudaCompile Include="Utils\FileUtils.cu" />
     <CudaCompile Include="Utils\FileUtilsPNG.cu" />
   </ItemGroup>
@@ -125,6 +126,7 @@
     <ClInclude Include="Engine\ImageSourceEngine.h" />
     <ClInclude Include="Engine\OpenNIEngine.h" />
     <ClInclude Include="Engine\UIEngine.h" />
+    <ClInclude Include="HashMap.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMDepthTracker.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMPixelUtils.h" />

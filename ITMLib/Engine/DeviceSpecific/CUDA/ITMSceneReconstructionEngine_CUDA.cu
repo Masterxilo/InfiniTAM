@@ -8,7 +8,7 @@
 using namespace ITMLib::Engine;
 
 // device functions
-template<class TVoxel, bool stopIntegratingAtMaxW, bool approximateIntegration>
+template<class TVoxel>
 __global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *hashTable, const int *visibleEntryIDs,
     const Vector4u *rgb, Vector2i rgbImgSize, const float *depth, Vector2i depthImgSize, Matrix4f M_d, Matrix4f M_rgb, Vector4f projParams_d,
     Vector4f projParams_rgb, float voxelSize, float mu, int maxW)
@@ -28,7 +28,7 @@ __global__ void integrateIntoScene_device(TVoxel *localVBA, const ITMHashEntry *
     // one thread for each voxel
     int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
     integrateVoxel(x, y, z,
-        stopIntegratingAtMaxW, globalPos, localVoxelBlock, voxelSize,
+        globalPos, localVoxelBlock, voxelSize,
         M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
 
@@ -48,7 +48,7 @@ __global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int 
 {
     int entryId = threadIdx.x + blockIdx.x * blockDim.x;
     if (entryId > noVisibleEntries - 1) return;
-    entriesVisibleType[visibleEntryIDs[entryId]] = VT_VISIBLE_PREVIOUS_AND_UNSTREAMED;
+    entriesVisibleType[visibleEntryIDs[entryId]] = VT_VISIBLE_PREVIOUS;
 }
 
 
@@ -239,21 +239,9 @@ void ITMSceneReconstructionEngine_CUDA<TVoxel, ITMVoxelBlockHash>::IntegrateInto
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
 	dim3 gridSize(renderState->noVisibleEntries);
 
-#define integrateIntoScene_d(stopIntegratingAtMaxW, approximateIntegration) \
-    integrateIntoScene_device<TVoxel, stopIntegratingAtMaxW, approximateIntegration> << <gridSize, cudaBlockSize >> >(\
-    localVBA, hashTable, visibleEntryIDs,\
-        rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW)
-
-	if (scene->sceneParams->stopIntegratingAtMaxW)
-		if (trackingState->requiresFullRendering)
-            integrateIntoScene_d(true, false);
-		else
-            integrateIntoScene_d(true, true);
-	else
-		if (trackingState->requiresFullRendering)
-            integrateIntoScene_d(false, false);
-		else
-            integrateIntoScene_d(false, true);
+    integrateIntoScene_device<TVoxel> << <gridSize, cudaBlockSize >> >(
+        localVBA, hashTable, visibleEntryIDs, 
+        rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 }
 
 

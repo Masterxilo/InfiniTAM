@@ -31,9 +31,6 @@
     <Filter Include="ITMLib\Engine\DeviceSpecific\CUDA">
       <UniqueIdentifier>{f0ab1e40-ee17-4e17-a928-11d247a89293}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ITMLib\Engine\DeviceAgnostic">
-      <UniqueIdentifier>{81fe007a-9227-4a3c-8cc3-91bd54e42b5e}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ITMLib\Engine\Trackers">
       <UniqueIdentifier>{b7c1abfb-1faa-4437-b421-e0847200dd2f}</UniqueIdentifier>
     </Filter>
@@ -64,6 +61,18 @@
     <Filter Include="ITMLib\Engine\VisualisationEngine">
       <UniqueIdentifier>{d2c70a1c-554a-4345-9c9e-bf873d088767}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Tests">
+      <UniqueIdentifier>{63e4d5e1-b6a7-451b-af08-1398c42ff5d1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="HashMap">
+      <UniqueIdentifier>{065cce4d-a013-444e-b88e-0aac74f66ec7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib\Engine\agnostic">
+      <UniqueIdentifier>{81fe007a-9227-4a3c-8cc3-91bd54e42b5e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib\Engine\Tracker">
+      <UniqueIdentifier>{ea0e4d5c-cbd5-4810-951c-607fb5128370}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ITMLib\ITMLib.h">
@@ -78,23 +87,14 @@
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine_CUDA.h">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMDepthTracker.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMLowLevelEngine.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
+      <Filter>ITMLib\Engine\agnostic</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMRepresentationAccess.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h">
-      <Filter>ITMLib\Engine\Trackers</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMTracker.h">
-      <Filter>ITMLib\Engine\Trackers</Filter>
+      <Filter>ITMLib\Engine\agnostic</Filter>
     </ClInclude>
     <ClInclude Include="ORUtils\Cholesky.h">
       <Filter>ORUtils</Filter>
@@ -124,7 +124,7 @@
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMViewBuilder.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
+      <Filter>ITMLib\Engine\agnostic</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMViewBuilder_CUDA.h">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
@@ -165,9 +165,6 @@
     <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h">
       <Filter>ITMLib\Objects\VoxelHashing</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMTrackingController.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Utils\ITMCalibIO.h">
       <Filter>ITMLib\Utils</Filter>
     </ClInclude>
@@ -187,7 +184,7 @@
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMPixelUtils.h">
-      <Filter>ITMLib\Engine\DeviceAgnostic</Filter>
+      <Filter>ITMLib\Engine\agnostic</Filter>
     </ClInclude>
     <ClInclude Include="Engine\ImageSourceEngine.h">
       <Filter>Engine\Header Files\ImageSource</Filter>
@@ -197,9 +194,6 @@
     </ClInclude>
     <ClInclude Include="Engine\UIEngine.h">
       <Filter>Engine\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMDepthTracker_CUDA.h">
-      <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMView.h">
       <Filter>ITMLib\Objects\Views</Filter>
@@ -231,15 +225,30 @@
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
       <Filter>ITMLib\Engine\VisualisationEngine</Filter>
     </ClInclude>
+    <ClInclude Include="HashMap.h">
+      <Filter>HashMap</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMDepthTracker.h">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMTracker.h">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMTrackingController.h">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMDepthTracker_CUDA.h">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine_CUDA.cu">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMViewBuilder_CUDA.cu">
-      <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMDepthTracker_CUDA.cu">
       <Filter>ITMLib\Engine\DeviceSpecific\CUDA</Filter>
     </CudaCompile>
     <CudaCompile Include="Engine\ImageSourceEngine.cu">
@@ -251,16 +260,10 @@
     <CudaCompile Include="Engine\UIEngine.cu">
       <Filter>Engine\Source Files</Filter>
     </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu">
-      <Filter>ITMLib\Engine\Trackers</Filter>
-    </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMDenseMapper.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMTrackingController.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu">
@@ -287,6 +290,18 @@
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
       <Filter>ITMLib\Engine\VisualisationEngine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="TestHashMap.cu">
+      <Filter>Tests</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMTrackingController.cu">
+      <Filter>ITMLib\Engine\Tracker</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMDepthTracker_CUDA.cu">
+      <Filter>ITMLib\Engine\Tracker</Filter>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>

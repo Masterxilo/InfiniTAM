@@ -79,14 +79,6 @@ namespace ITMLib
 			virtual void CreateICPMaps(const ITMView *view, ITMTrackingState *trackingState, 
 				ITMRenderState *renderState) const = 0;
 
-			/** Create an image of reference points and normals as
-			required by the ITMLib::Engine::ITMDepthTracker classes.
-
-			Incrementally previous raycast result.
-			*/
-			virtual void ForwardRender(const ITMView *view, ITMTrackingState *trackingState,
-				ITMRenderState *renderState) const = 0;
-
 			/** Creates a render state, containing rendering info
 			for the scene.
 			*/
