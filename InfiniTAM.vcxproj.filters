@@ -168,9 +168,6 @@
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMRepresentationAccess.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>

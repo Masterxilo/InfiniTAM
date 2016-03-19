@@ -129,7 +129,6 @@
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMPixelUtils.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMRepresentationAccess.h" />
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h" />
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h" />
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMMainEngine.h" />

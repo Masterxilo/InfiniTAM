@@ -366,35 +366,28 @@ PROCESS_AND_DRAW_PIXEL(processPixelNormal, drawPixelNormal)
 
 
 _CPU_AND_GPU_CODE_ inline void processPixelICPPost(
-const float angle, const Vector3f outNormal,
+const float angle,
+const Vector3f outNormal,
 DEVICEPTR(Vector4u) &outRendering,
-DEVICEPTR(Vector4f) &pointsMap,
+DEVICEPTR(Vector4f) &pointsMap, //<! [out] trackingState->pointCloud->locations (world space conversion of point)
 DEVICEPTR(Vector4f) &normalsMap,
-const THREADPTR(Vector3f) & point,
-bool foundPoint,
-float voxelSize)
+const THREADPTR(Vector3f) & point, //<! [in] renderState->raycastResult, in voxel-fractional-world-coordinates!
+const bool foundPoint,
+const float voxelSize)
 {
 
-    if (foundPoint)
+    if (!foundPoint)
     {
-        drawPixelGrey(outRendering, point, 0, 0 /*assume these are unused*/, outNormal, angle);
-
-        Vector4f outPoint4;
-        outPoint4.x = point.x * voxelSize; outPoint4.y = point.y * voxelSize;
-        outPoint4.z = point.z * voxelSize; outPoint4.w = 1.0f;
-        pointsMap = outPoint4;
-
-        Vector4f outNormal4;
-        outNormal4.x = outNormal.x; outNormal4.y = outNormal.y; outNormal4.z = outNormal.z; outNormal4.w = 0.0f;
-        normalsMap = outNormal4;
+        pointsMap = normalsMap = IllegalColor<Vector4f>::make();
+        outRendering = Vector4u((uchar)0);
+        return;
     }
-    else
-    {
-        Vector4f out4;
-        out4.x = 0.0f; out4.y = 0.0f; out4.z = 0.0f; out4.w = -1.0f;
 
-        pointsMap = out4; normalsMap = out4; outRendering = Vector4u((uchar)0);
-    }
+    drawPixelGrey(outRendering, point, 0, 0 /*assume these are unused*/, outNormal, angle);
+
+    pointsMap = Vector4f(point * voxelSize, 1);
+
+    normalsMap = Vector4f(outNormal, 0);
 }
 
 /**
@@ -404,14 +397,15 @@ Uses image space normals.
 /// \param useSmoothing whether to compute normals by forward differences two pixels away (true) or just one pixel away (false)
 template<bool useSmoothing>
 _CPU_AND_GPU_CODE_ inline void processPixelICP(
-    DEVICEPTR(Vector4u) *outRendering,
-    DEVICEPTR(Vector4f) *pointsMap, //!< receives output points in world coordinates
-    DEVICEPTR(Vector4f) *normalsMap,
+    DEVICEPTR(Vector4u) *const outRendering,
+    DEVICEPTR(Vector4f) *const pointsMap, //!< [out] receives output points in world coordinates
+    DEVICEPTR(Vector4f) *const normalsMap,
 
-    const CONSTPTR(Vector4f) *pointsRay, //!< [in] points in voxel-fractional-world-coordinates
+    const CONSTPTR(Vector4f) *pointsRay, //!< [in] points in voxel-fractional-world-coordinates (renderState->raycastResult)
     const THREADPTR(Vector2i) &imgSize,
-    const THREADPTR(int) &x, const THREADPTR(int) &y,
-    float voxelSize,
+    const THREADPTR(int) &x,
+    const THREADPTR(int) &y,
+    const float voxelSize,
     const THREADPTR(Vector3f) &lightSource)
 {
     Vector3f outNormal;
@@ -497,15 +491,19 @@ inline dim3 getGridSize(Vector2i taskSize, dim3 blockSize) { return getGridSize(
 
 //device implementations
 
-__global__ void buildVisibleList_device(const ITMHashEntry *hashTable, int noTotalEntries,
-    int *visibleEntryIDs, int *noVisibleEntries, uchar *entriesVisibleType, Matrix4f M, Vector4f projParams, Vector2i imgSize, float voxelSize)
+__global__ void buildVisibleList_device(
+    const ITMHashEntry * const hashTable,
+    const int noTotalEntries,
+    int * const visibleEntryIDs, //!< [out]
+    int * const noVisibleEntries, //!< [out]
+    const Matrix4f M, const Vector4f projParams, const Vector2i imgSize, const float voxelSize)
 {
     int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
 
     __shared__ bool shouldPrefix;
 
-    unsigned char hashVisibleType = 0; //entriesVisibleType[targetIdx];
+    unsigned char hashVisibleType = 0; 
     const ITMHashEntry &hashEntry = hashTable[targetIdx];
 
     shouldPrefix = false;
@@ -659,15 +657,20 @@ void ITMVisualisationEngine::FindVisibleBlocks(const ITMPose *pose, const ITMInt
 
 
     // Brute-force full visibility test
-    ITMSafeCall(cudaMemset(noVisibleEntries_device, 0, sizeof(int)));
+    int * const visibleEntryIDs = renderState->entryVisibilityInformation->visibleEntryIDs.GetData(MEMORYDEVICE_CUDA);
+    cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
+    int* const noVisibleEntries = renderState->entryVisibilityInformation->noVisibleEntries;
+
+    *noVisibleEntries = 0;
 
     dim3 cudaBlockSizeAL(256, 1);
     dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
-    buildVisibleList_device << <gridSizeAL, cudaBlockSizeAL >> >(hashTable, noTotalEntries,
-        renderState->GetVisibleEntryIDs(), noVisibleEntries_device, renderState->GetEntriesVisibleType(), M, projParams,
-        imgSize, voxelSize);
+    buildVisibleList_device << <gridSizeAL, cudaBlockSizeAL >> >(
+        hashTable, noTotalEntries,
+        visibleEntryIDs,
+        noVisibleEntries,
+        M, projParams, imgSize, voxelSize);
 
-    ITMSafeCall(cudaMemcpy(&renderState->noVisibleEntries, noVisibleEntries_device, sizeof(int), cudaMemcpyDeviceToHost));
 }
 
 void ITMVisualisationEngine::CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics,
@@ -680,8 +683,10 @@ void ITMVisualisationEngine::CreateExpectedDepths(const ITMPose *pose, const ITM
     //go through list of visible 8x8x8 blocks
     {
         const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
-        const int *visibleEntryIDs = renderState->GetVisibleEntryIDs();
-        int noVisibleEntries = renderState->noVisibleEntries;
+
+        const int * const visibleEntryIDs = renderState->entryVisibilityInformation->visibleEntryIDs.GetData(MEMORYDEVICE_CUDA);
+        cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
+        const int noVisibleEntries = *renderState->entryVisibilityInformation->noVisibleEntries;
 
         dim3 blockSize(256);
         dim3 gridSize((int)ceil((float)noVisibleEntries / (float)blockSize.x));
@@ -704,13 +709,19 @@ void ITMVisualisationEngine::CreateExpectedDepths(const ITMPose *pose, const ITM
     fillBlocks_device << <gridSize, blockSize >> >(noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
 }
 
-static void GenericRaycast(const ITMScene *scene, const Vector2i& imgSize, const Matrix4f& invM, Vector4f projParams, const ITMRenderState *renderState)
+static void GenericRaycast(
+    const ITMScene *const scene,
+    const Vector2i& imgSize,
+    const Matrix4f& invM,
+    const Vector4f projParams, 
+    ITMRenderState *const renderState //!< [in, out] uses renderingRangeImage, creates raycastResult
+    )
 {
     const float voxelSize = scene->sceneParams->voxelSize;
     const float oneOverVoxelSize = 1.0f / voxelSize;
 
-    projParams.x = 1.0f / projParams.x;
-    projParams.y = 1.0f / projParams.y;
+    // for speedup (?)
+    Vector4f invProjParams(1.0f / projParams.x, 1.0f / projParams.y, projParams.z, projParams.w);
 
     dim3 cudaBlockSize(16, 12);
     dim3 gridSize((int)ceil((float)imgSize.x / (float)cudaBlockSize.x), (int)ceil((float)imgSize.y / (float)cudaBlockSize.y));
@@ -720,15 +731,20 @@ static void GenericRaycast(const ITMScene *scene, const Vector2i& imgSize, const
         scene->index.getIndexData(),
         imgSize,
         invM,
-        projParams,
+        invProjParams,
         oneOverVoxelSize,
         renderState->renderingRangeImage->GetData(MEMORYDEVICE_CUDA),
         scene->sceneParams->mu
         );
 }
 
-static void RenderImage_common(const ITMScene *scene, const ITMPose *pose, const ITMIntrinsics *intrinsics, const ITMRenderState *renderState,
-    ITMUChar4Image *outputImage, ITMVisualisationEngine::RenderImageType type)
+static void RenderImage_common(
+    const ITMScene *const scene,
+    const ITMPose *const pose,
+    const ITMIntrinsics *const intrinsics,
+    ITMRenderState *const renderState,
+    ITMUChar4Image *const outputImage,
+    const ITMVisualisationEngine::RenderImageType type)
 {
     Vector2i imgSize = outputImage->noDims;
     Matrix4f invM = pose->GetInvM();
