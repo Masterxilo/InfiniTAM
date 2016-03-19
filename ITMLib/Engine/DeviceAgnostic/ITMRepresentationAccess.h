@@ -6,16 +6,13 @@
 #include "../../Utils/ITMLibDefines.h"
 #include "ITMPixelUtils.h"
 
-#define COMPUTE_COEFF_POS_FROM_POINT() \
-    /* Coeff are the sub-block coordinates, used for interpolation*/\
-    Vector3f coeff; Vector3i pos; TO_INT_FLOOR3(pos, coeff, point);
 
 // -- (i) retrieval of voxel (blocks) --
 // === ITMVoxelBlockHash methods (findVoxel) ===
 
 /// Voxel block hash index computation
 /// "we employ a hash function to associate 3D block coordinates with entries in a hash table"
-template<typename T> _CPU_AND_GPU_CODE_ inline int hashIndex(const THREADPTR(T) & blockPos) {
+_CPU_AND_GPU_CODE_ inline uint hashIndex(VoxelBlockPos blockPos) {
 	return (((uint)blockPos.x * 73856093u) ^ ((uint)blockPos.y * 19349669u) ^ ((uint)blockPos.z * 83492791u)) & (uint)SDF_HASH_MASK;
 }
 
@@ -23,8 +20,8 @@ template<typename T> _CPU_AND_GPU_CODE_ inline int hashIndex(const THREADPTR(T) 
 
 /// \returns linearIdx to be used to access individual voxels within a voxel block.
 _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(
-    const THREADPTR(Vector3i) & point, //!< in voxel coordinates
-    THREADPTR(Vector3i) &blockPos //!< [out] In voxel-block coordinates, floor(voxel coordinate / SDF_BLOCK_SIZE)
+    const THREADPTR(Vector3i) & point, //!< [in] in voxel coordinates
+    THREADPTR(VoxelBlockPos) &blockPos //!< [out] In voxel-block coordinates, floor(voxel coordinate / SDF_BLOCK_SIZE)
     ) {
     // "The 3D voxel block location is obtained by dividing the voxel coordinates with the block size along each axis."
 
@@ -35,7 +32,7 @@ _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(
 	blockPos.z = ((point.z < 0) ? point.z - SDF_BLOCK_SIZE + 1 : point.z) / SDF_BLOCK_SIZE;
 
     // This works too: [[
-	Vector3i locPos = point - blockPos * SDF_BLOCK_SIZE; // localized coordinate
+	Vector3i locPos = point - blockPos.toInt() * SDF_BLOCK_SIZE; // localized coordinate
 	return locPos.x + locPos.y * SDF_BLOCK_SIZE + locPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
     // ]]
 
@@ -47,21 +44,22 @@ _CPU_AND_GPU_CODE_ inline int pointToVoxelBlockPos(
         */
 }
 
-/// \returns linearIdx to be used in * voxelData, voxelData[voxelAddress]
-_CPU_AND_GPU_CODE_ inline int findVoxel(
-    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex, //<! hash table buckets, indexed by values computed from hashIndex
+/// \returns vbaPtr, c.f. ptr of ITMHashEntry
+_CPU_AND_GPU_CODE_ inline int findVoxelBlock(
+    const CONSTPTR(ITMHashEntry) * const voxelIndex, //<! hash table buckets, indexed by values computed from hashIndex
     const THREADPTR(Vector3i) & point,
-	THREADPTR(bool) &isFound, 
+	THREADPTR(bool) &isFound,  //!< [out]
+    VoxelBlockPos& blockPos,//!< [out]
+    short& linearIdx, //!< [out] tells which ITMVoxel of the referenced VoxelBlock should be accessed
     THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
 {
-	Vector3i blockPos;
-	short linearIdx = pointToVoxelBlockPos(point, blockPos);
+    linearIdx = pointToVoxelBlockPos(point, blockPos);
 
     // Can we find it in the cache?
 	if IS_EQUAL3(blockPos, cache.blockPos)
 	{
 		isFound = true;
-		return cache.blockPtr + linearIdx;
+		return cache.blockPtr;
 	}
 
     // No, search
@@ -76,8 +74,8 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 			isFound = true;
             // Cache it for later reuse
 			cache.blockPos = blockPos;
-            cache.blockPtr = hashEntry.ptr * SDF_BLOCK_SIZE3;
-			return cache.blockPtr + linearIdx;
+            cache.blockPtr = hashEntry.ptr;
+			return cache.blockPtr;
 		}
 
         // Excess list ends here?
@@ -91,57 +89,62 @@ _CPU_AND_GPU_CODE_ inline int findVoxel(
 	return -1;
 }
 
-_CPU_AND_GPU_CODE_ inline int findVoxel(const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex, Vector3i point, THREADPTR(bool) &isFound)
-{
-	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
-	return findVoxel(voxelIndex, point, isFound, cache);
-}
-
-
 
 /// === ITMBlockhash methods (readVoxel) ===
-_CPU_AND_GPU_CODE_ inline ITMVoxel readVoxel(const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
-	const THREADPTR(Vector3i) & point, THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
+_CPU_AND_GPU_CODE_ inline ITMVoxel readVoxel(
+    const CONSTPTR(ITMVoxelBlock) * const voxelData,
+    const CONSTPTR(ITMHashEntry) * const voxelIndex,
+	const THREADPTR(Vector3i) & point,
+    THREADPTR(bool) &isFound,
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelIndex::IndexCache())
 {
-    int voxelAddress = findVoxel(voxelIndex, point, isFound, cache);
-    return isFound ? voxelData[voxelAddress] : ITMVoxel();
-}
+    short linearIdx;
+    VoxelBlockPos blockPos;
+    int vbaPtr = findVoxelBlock(voxelIndex, point, isFound, blockPos, linearIdx, cache);
 
-_CPU_AND_GPU_CODE_ inline ITMVoxel readVoxel(const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
-	Vector3i point, THREADPTR(bool) &isFound)
-{
-	ITMLib::Objects::ITMVoxelBlockHash::IndexCache cache;
-	return readVoxel(voxelData, voxelIndex, point, isFound, cache);
+#ifdef _DEBUG
+    if (isFound) {
+        assert(vbaPtr >= 0 && vbaPtr < SDF_LOCAL_BLOCK_NUM);
+        if (voxelData[vbaPtr].pos != blockPos)
+            printf("%d (%d %d %d) expected (%d %d %d)\n",
+            vbaPtr,
+            voxelData[vbaPtr].pos.x,
+            voxelData[vbaPtr].pos.y,
+            voxelData[vbaPtr].pos.z,
+            blockPos.x,
+            blockPos.y,
+            blockPos.z
+            );
+        assert(voxelData[vbaPtr].pos == blockPos);
+    }
+#endif
+
+    return isFound ? voxelData[vbaPtr].blockVoxels[linearIdx] : ITMVoxel();
 }
 
 
 /// === Generic methods (readSDF) ===
 _CPU_AND_GPU_CODE_ inline float readFromSDF_float_uninterpolated(
-    const CONSTPTR(ITMVoxel) *voxelData,
-    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
-    Vector3f point,  //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
-    THREADPTR(bool) &isFound)
-{
-    ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound);
-    return ITMVoxel::SDF_valueToFloat(res.sdf);
-}
-
-_CPU_AND_GPU_CODE_ inline float readFromSDF_float_uninterpolated(
-    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(ITMVoxelBlock) * const voxelData,
     const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
-    THREADPTR(bool) &isFound, THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
+    THREADPTR(bool) &isFound,
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelIndex::IndexCache())
 {
     ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound, cache);
     return ITMVoxel::SDF_valueToFloat(res.sdf);
 }
 
+#define COMPUTE_COEFF_POS_FROM_POINT() \
+    /* Coeff are the sub-block coordinates, used for interpolation*/\
+    Vector3f coeff; Vector3i pos; TO_INT_FLOOR3(pos, coeff, point);
+
 _CPU_AND_GPU_CODE_ inline float readFromSDF_float_interpolated(
-    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(ITMVoxelBlock) * const voxelData,
     const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
     THREADPTR(bool) &isFound, 
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache)
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelIndex::IndexCache())
 {
 	float res1, res2, v1, v2;
     COMPUTE_COEFF_POS_FROM_POINT();
@@ -170,9 +173,11 @@ _CPU_AND_GPU_CODE_ inline float readFromSDF_float_interpolated(
 
 /// Assumes voxels store color in some type convertible to Vector3f (e.g. Vector3u) and that color values are in the range 0-255.
 /// \returns [0,1]^4 color (with w = 1)
-_CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTPTR(ITMVoxel) *voxelData,
-    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) & point,
-    THREADPTR(typename ITMVoxelIndex::IndexCache) & cache)
+_CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(
+    const CONSTPTR(ITMVoxelBlock) * const voxelData,
+    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex, 
+    const THREADPTR(Vector3f) & point,
+    THREADPTR(typename ITMVoxelIndex::IndexCache) & cache = ITMVoxelIndex::IndexCache())
 {
     ITMVoxel resn; 
     Vector3f ret = 0.0f; 
@@ -202,9 +207,11 @@ _CPU_AND_GPU_CODE_ inline Vector4f readFromSDF_color4u_interpolated(const CONSTP
 
 /// Compute SDF normal 
 /// Used in processPixelGrey
+// Note: this gets the localVBA list, not just a *single* voxel block.
 _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(
-    const CONSTPTR(ITMVoxel) *voxelData,
-    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex, const THREADPTR(Vector3f) &point)
+    const CONSTPTR(ITMVoxelBlock) * const voxelData,
+    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
+    const THREADPTR(Vector3f) &point)
 {
 
 	Vector3f ret;
@@ -353,13 +360,6 @@ _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(
     ret.z = ITMVoxel::SDF_valueToFloat(p1 * ncoeff.z + p2 * coeff.z - v1);
 #undef lookup
 	return ret;
-}
-
-_CPU_AND_GPU_CODE_ static Vector4f interpolateColor(const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
-	const THREADPTR(Vector3f) & point)
-{
-    typename ITMVoxelIndex::IndexCache cache;
-	return readFromSDF_color4u_interpolated(voxelData, voxelIndex, point, cache);
 }
 
 #undef COMPUTE_COEFF_POS_FROM_POINT

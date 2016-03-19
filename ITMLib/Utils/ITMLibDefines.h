@@ -35,6 +35,18 @@
 //////////////////////////////////////////////////////////////////////////
 
 /** 
+Coarsest integer grid laid over 3d space.
+
+Multiply by SDF_BLOCK_SIZE to get voxel coordinates,
+    and then by ITMSceneParams::voxelSize to get world coordinates.
+
+using short to reduce storage of hash map. // TODO could use another type for accessing convenience/alignment speed
+*/
+typedef Vector3s VoxelBlockPos;
+// Default voxel block pos, used for debugging
+#define INVALID_VOXEL_BLOCK_POS Vector3s(SHRT_MIN, SHRT_MIN, SHRT_MIN)
+
+/** 
     A single entry in the hash table (hash table bucket).
 */
 struct ITMHashEntry
@@ -43,7 +55,8 @@ struct ITMHashEntry
     In voxel-block coordinates. Multiply by SDF_BLOCK_SIZE to get voxel coordinates,
     and then by ITMSceneParams::voxelSize to get world coordinates.
     */
-	Vector3s pos;
+    VoxelBlockPos pos;
+
 	/** 1-based position of the 'next'
     entry in the excess list. 
     Used as SDF_BUCKET_NUM + hashEntry.offset - 1
@@ -55,7 +68,7 @@ struct ITMHashEntry
         return SDF_BUCKET_NUM + offset - 1;
     }
     
-    /** Pointer to the voxel block array (* voxelData).
+    /** Offset into the voxel block array (* voxelData).
 	    - >= 0 identifies an actual allocated entry in the voxel block array
 	    - -1 identifies an entry that has been removed (swapped out)
 	    - <-1 identifies an unallocated block
@@ -90,7 +103,7 @@ struct ITMHashEntry
 /** \brief
     Stores the information of a single voxel in the volume
 */
-struct ITMVoxelT
+struct ITMVoxel
 {    /** Value of the truncated signed distance transformation. */
 #ifdef USE_FLOAT_SDF_STORAGE
     _CPU_AND_GPU_CODE_ static float SDF_initialValue() { return 1.0f; }
@@ -112,7 +125,7 @@ struct ITMVoxelT
 	/** Number of observations that made up @p clr. */
 	uchar w_color;
 
-    _CPU_AND_GPU_CODE_ ITMVoxelT()
+    _CPU_AND_GPU_CODE_ ITMVoxel()
 	{
 		sdf = SDF_initialValue();
 		w_depth = 0;
@@ -121,14 +134,13 @@ struct ITMVoxelT
 	}
 };
 
-// Note that macros are expanded from outside in, opposite to c function evaluation
-#define VOXELTYPE ITMVoxelT 
-#define _str(s) #s // note that s will not be macro expanded prior to stringification 
-#define _xstr(s) _str(s) // force evaluation of s prior to 'calling' str
-#define sVOXELTYPE _xstr(VOXELTYPE) 
-struct ITMVoxel : public VOXELTYPE {
-    typedef struct { VOXELTYPE blockVoxels[SDF_BLOCK_SIZE3]; }  VoxelBlock;
+struct ITMVoxelBlock {
+    /// Mutable as this voxel block might represent any part of space
+    VoxelBlockPos pos;
+    ITMVoxel blockVoxels[SDF_BLOCK_SIZE3];
 };
+
+
 /** This chooses the way the voxels are addressed and indexed.
 */
 typedef ITMLib::Objects::ITMVoxelBlockHash ITMVoxelIndex;

@@ -19,15 +19,12 @@ namespace ITMLib
 		class ITMLocalVBA
 		{
 		private:
-			ORUtils::MemoryBlock<ITMVoxel> *voxelBlocks;
-
-            const MemoryDeviceType memoryType;
+            ORUtils::MemoryBlock<ITMVoxelBlock> *voxelBlocks;
 
 		public:
-            inline ITMVoxel *GetVoxelBlocks(void) { return voxelBlocks->GetData(memoryType); }
-            inline const ITMVoxel *GetVoxelBlocks(void) const { return voxelBlocks->GetData(memoryType); }
+            inline ITMVoxelBlock *GetVoxelBlocks(void) { return voxelBlocks->GetData(MEMORYDEVICE_CUDA); }
+            inline const ITMVoxelBlock *GetVoxelBlocks(void) const { return voxelBlocks->GetData(MEMORYDEVICE_CUDA); }
 
-			const int allocatedSize;
 
             /// Allocation list generating sequential ids
             // Implemented as a countdown semaphore in CUDA unified memory
@@ -39,12 +36,13 @@ namespace ITMLib
                 int lastFreeEntry;
                 const int capacity;
                 ORUtils::MemoryBlock<int> _allocationList;
+                /// Lists numbers that will eventually be assigned, becoming indices into the local voxel block array
                 int* allocationList;
 
             public:
-                VoxelAllocationList(int capacity, MemoryDeviceType memoryType) : 
-                    capacity(capacity), _allocationList(capacity, memoryType) {
-                    allocationList = _allocationList.GetData(memoryType);
+                VoxelAllocationList(int capacity) : 
+                    capacity(capacity), _allocationList(capacity, MEMORYDEVICE_CUDA) {
+                    allocationList = _allocationList.GetData(MEMORYDEVICE_CUDA);
                     Reset();
                 }
 
@@ -85,12 +83,10 @@ namespace ITMLib
             } *voxelAllocationList;
 
 
-            ITMLocalVBA(MemoryDeviceType memoryType, int noBlocks, int blockSize) :
-                memoryType(memoryType),
-                allocatedSize(noBlocks * blockSize)
+            ITMLocalVBA(int noBlocks) 
 			{
-                voxelBlocks = new ORUtils::MemoryBlock<ITMVoxel>(allocatedSize, memoryType);
-                voxelAllocationList = new VoxelAllocationList(noBlocks, memoryType);
+                voxelBlocks = new ORUtils::MemoryBlock<ITMVoxelBlock>(noBlocks, MEMORYDEVICE_CUDA);
+                voxelAllocationList = new VoxelAllocationList(noBlocks);
 			}
 
 			~ITMLocalVBA(void)

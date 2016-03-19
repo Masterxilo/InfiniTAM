@@ -30,8 +30,7 @@ namespace ITMLib
 
 			ITMScene(const ITMSceneParams *sceneParams)
                 : index(MEMORYDEVICE_CUDA),
-                localVBA(MEMORYDEVICE_CUDA,
-                index.getNumAllocatedVoxelBlocks(), index.getVoxelBlockSize())
+                localVBA(index.getNumAllocatedVoxelBlocks())
 			{
 				this->sceneParams = sceneParams;
 			}

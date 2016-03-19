@@ -133,7 +133,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
     DEVICEPTR(Vector4f) &pt_out, //!< [out] the intersection point. w is 1 for a valid point, 0 for no intersection; in voxel-fractional-world-coordinates
 
     const int x, const int y,
-    const CONSTPTR(ITMVoxel) *voxelData,
+    const CONSTPTR(ITMVoxelBlock) *voxelData,
     const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
     const Matrix4f invM, //!< camera-to-world transform
     const Vector4f invProjParams, //!< camera-to-world transform
@@ -228,7 +228,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
 _CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out
     const THREADPTR(Vector3f) & point,
-    const CONSTPTR(ITMVoxel) *voxelBlockData,
+    const CONSTPTR(ITMVoxelBlock) *voxelBlockData,
     const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,
     const THREADPTR(Vector3f) & lightSource,
     THREADPTR(Vector3f) & outNormal,
@@ -319,7 +319,7 @@ _CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
 #define DRAWFUNCTIONPARAMS \
 DEVICEPTR(Vector4u) & dest,\
 const CONSTPTR(Vector3f) & point,\
-const CONSTPTR(ITMVoxel) *voxelBlockData, \
+const CONSTPTR(ITMVoxelBlock) *voxelBlockData, \
 const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,\
 const THREADPTR(Vector3f) & normal_obj,\
 const THREADPTR(float) & angle
@@ -341,7 +341,8 @@ _CPU_AND_GPU_CODE_ inline void drawPixelNormal(DRAWFUNCTIONPARAMS)
 
 _CPU_AND_GPU_CODE_ inline void drawPixelColour(DRAWFUNCTIONPARAMS)
 {
-    Vector4f clr = interpolateColor(voxelBlockData, indexData, point);
+    
+    Vector4f clr = readFromSDF_color4u_interpolated(voxelBlockData, indexData, point);
 
     dest.x = (uchar)(clr.x * 255.0f);
     dest.y = (uchar)(clr.y * 255.0f);
@@ -351,7 +352,7 @@ _CPU_AND_GPU_CODE_ inline void drawPixelColour(DRAWFUNCTIONPARAMS)
 
 #define PROCESS_AND_DRAW_PIXEL(PROCESSFUNCTION, DRAWFUNCTION) \
 _CPU_AND_GPU_CODE_ inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
-    bool foundPoint, const CONSTPTR(ITMVoxel) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,\
+    bool foundPoint, const CONSTPTR(ITMVoxelBlock) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,\
 	Vector3f lightSource) {\
 	Vector3f outNormal;\
 	float angle;\
@@ -577,7 +578,7 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
     atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
 }
 
-__global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxel *voxelData, const typename ITMVoxelIndex::IndexData *voxelIndex,
+__global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock *voxelData, const typename ITMVoxelIndex::IndexData *voxelIndex,
     Vector2i imgSize, Matrix4f invM, Vector4f invProjParams, float oneOverVoxelSize, const Vector2f *minmaximg, float mu)
 {
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
@@ -606,7 +607,7 @@ renderColourFromNormal_device, processPixelNormal
 renderColour_device, processPixelColour
 */
 #define RENDER_PROCESS_PIXEL(RENDERFUN, PROCESSPIXELFUN) \
-__global__ void RENDERFUN ## _device(Vector4u *outRendering, const Vector4f *ptsRay, const ITMVoxel *voxelData,\
+__global__ void RENDERFUN ## _device(Vector4u *outRendering, const Vector4f *ptsRay, const ITMVoxelBlock *voxelData,\
     const typename ITMVoxelIndex::IndexData *voxelIndex, Vector2i imgSize, Vector3f lightSource) { \
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);\
     if (x >= imgSize.x || y >= imgSize.y) return;\

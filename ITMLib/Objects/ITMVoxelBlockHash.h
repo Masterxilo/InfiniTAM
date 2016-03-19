@@ -26,7 +26,9 @@ namespace ITMLib
 
             /// Caches a single voxel block.
 			struct IndexCache {
-				Vector3i blockPos;
+                // Cached key
+                VoxelBlockPos blockPos;
+                // Offset into the voxel block array, caches a .ptr of HashEntry
 				int blockPtr;
 				_CPU_AND_GPU_CODE_ IndexCache(void) : blockPos(0x7fffffff), blockPtr(-1) {}
 			};
