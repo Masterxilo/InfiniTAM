@@ -28,25 +28,25 @@ inline __device__ void warpReduce(volatile float* sdata, int tid) {
 	sdata[tid] += sdata[tid + 1];
 }
 
-inline __device__ void warpReduce3(volatile float* sdata, int tid) {
-	sdata[3*tid+0] += sdata[3*(tid + 32)+0];
-	sdata[3*tid+1] += sdata[3*(tid + 32)+1];
-	sdata[3*tid+2] += sdata[3*(tid + 32)+2];
-	sdata[3*tid+0] += sdata[3*(tid + 16)+0];
-	sdata[3*tid+1] += sdata[3*(tid + 16)+1];
-	sdata[3*tid+2] += sdata[3*(tid + 16)+2];
-	sdata[3*tid+0] += sdata[3*(tid + 8)+0];
-	sdata[3*tid+1] += sdata[3*(tid + 8)+1];
-	sdata[3*tid+2] += sdata[3*(tid + 8)+2];
-	sdata[3*tid+0] += sdata[3*(tid + 4)+0];
-	sdata[3*tid+1] += sdata[3*(tid + 4)+1];
-	sdata[3*tid+2] += sdata[3*(tid + 4)+2];
-	sdata[3*tid+0] += sdata[3*(tid + 2)+0];
-	sdata[3*tid+1] += sdata[3*(tid + 2)+1];
-	sdata[3*tid+2] += sdata[3*(tid + 2)+2];
-	sdata[3*tid+0] += sdata[3*(tid + 1)+0];
-	sdata[3*tid+1] += sdata[3*(tid + 1)+1];
-	sdata[3*tid+2] += sdata[3*(tid + 1)+2];
+
+template<typename T //!< int or float
+>
+inline __device__ void warpReduce256(
+float localValue,
+volatile float* dim_shared1,
+int locId_local,
+T* outTotal) {
+    dim_shared1[locId_local] = localValue;
+    __syncthreads();
+
+    if (locId_local < 128) dim_shared1[locId_local] += dim_shared1[locId_local + 128];
+    __syncthreads();
+    if (locId_local < 64) dim_shared1[locId_local] += dim_shared1[locId_local + 64];
+    __syncthreads();
+
+    if (locId_local < 32) warpReduce(dim_shared1, locId_local);
+
+    if (locId_local == 0) atomicAdd(outTotal, (T)dim_shared1[locId_local]);
 }
 
 template <typename T> 

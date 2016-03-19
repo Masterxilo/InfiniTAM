@@ -131,56 +131,7 @@ _CPU_AND_GPU_CODE_ inline bool computePerPointGH_Depth_Ab(
     return true;
 }
 
-/// Wrapper for computePerPointGH_Depth_Ab
-/// \param AT_b a 6 x 1 column vector (3 x 1)
-/// \param AT_A a 6 x 6 matrix (3 x 3) [because this will be a symmetric matrix, we store only the unique elements in the lower right triangular part of it] // woot, so smart
-/// \returns whether u is a valid point (\f$\Omega(u) \neq \mbox{null}\f$)
-/// \param x,y \f$u\f$
-template<TrackerIterationType iterationType>
-_CPU_AND_GPU_CODE_ inline bool computePerPointGH_Depth(
-    THREADPTR(float) *AT_b,
-    THREADPTR(float) *AT_A_tri,
-    THREADPTR(float) &localF,
-    const CONSTPTR(int) & x, const CONSTPTR(int) & y,
-    const CONSTPTR(float) &depth,
-    const CONSTPTR(Vector2i) & viewImageSize,
-    const CONSTPTR(Vector4f) & viewIntrinsics,
-    const CONSTPTR(Vector2i) & sceneImageSize,
-    const CONSTPTR(Vector4f) & sceneIntrinsics,
-    const CONSTPTR(Matrix4f) & T_g_k_estimate,
-    const CONSTPTR(Matrix4f) & scenePose,
-    const CONSTPTR(Vector4f) *pointsMap,
-    const CONSTPTR(Vector4f) *normalsMap,
-    const float distThresh)
-{
-    const int noPara = iterationType == TRACKER_ITERATION_BOTH ? 6 : 3;
-    // Column vector
-    float AT[noPara];
-    float b;
-
-    if (!computePerPointGH_Depth_Ab<iterationType>(
-        AT, b, x, y, depth,
-        viewImageSize, viewIntrinsics, sceneImageSize, sceneIntrinsics,
-        T_g_k_estimate, scenePose, pointsMap, normalsMap, distThresh))
-        return false;
-
-    // apply ||.||_2^2 to b to obtain local contribution to cost function f
-    localF = b * b;
-
-    // Compute AT_b and AT_A
-    for (int r = 0, counter = 0; r < noPara; r++)
-    {
-        AT_b[r] = AT[r] * b;
-
-        for (int c = 0; c <= r; c++)
-            AT_A_tri[counter++] = AT[r] * AT[c]; // row fixed, column counting to the right
-    }
-
-    return true;
-}
-
-
-
+#define REDUCE_BLOCK_SIZE 256 // must be power of 2. Used for reduction of a sum.
 template<TrackerIterationType iterationType>
 __device__ void depthTrackerOneLevel_g_rt_device_main(
     ITMDepthTracker::AccuCell *accu,
@@ -196,10 +147,7 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
 
     int locId_local = threadIdx.x + threadIdx.y * blockDim.x;
 
-    __shared__ float dim_shared1[256];
-    __shared__ float dim_shared2[256];
-    __shared__ float dim_shared3[256];
-    __shared__ bool should_prefix;
+    __shared__ bool should_prefix; // set to true if any point is valid
 
     should_prefix = false;
     __syncthreads();
@@ -226,32 +174,24 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
 
     if (!should_prefix) return;
 
+    __shared__ float dim_shared1[REDUCE_BLOCK_SIZE];
+    __shared__ float dim_shared2[REDUCE_BLOCK_SIZE];
+    __shared__ float dim_shared3[REDUCE_BLOCK_SIZE];
+
     { //reduction for noValidPoints
-        dim_shared1[locId_local] = isValidPoint;
-        __syncthreads();
-
-        if (locId_local < 128) dim_shared1[locId_local] += dim_shared1[locId_local + 128];
-        __syncthreads();
-        if (locId_local < 64) dim_shared1[locId_local] += dim_shared1[locId_local + 64];
-        __syncthreads();
-
-        if (locId_local < 32) warpReduce(dim_shared1, locId_local);
-
-        if (locId_local == 0) atomicAdd(&(accu->noValidPoints), (int)dim_shared1[locId_local]);
+        warpReduce256<int>(
+            isValidPoint,
+            dim_shared1,
+            locId_local,
+            &(accu->noValidPoints));
     }
 
     { //reduction for energy function value
-        dim_shared1[locId_local] = b*b;
-        __syncthreads();
-
-        if (locId_local < 128) dim_shared1[locId_local] += dim_shared1[locId_local + 128];
-        __syncthreads();
-        if (locId_local < 64) dim_shared1[locId_local] += dim_shared1[locId_local + 64];
-        __syncthreads();
-
-        if (locId_local < 32) warpReduce(dim_shared1, locId_local);
-
-        if (locId_local == 0) atomicAdd(&(accu->f), dim_shared1[locId_local]);
+        warpReduce256<float>(
+            b*b,
+            dim_shared1,
+            locId_local,
+            &(accu->f));
     }
 
     __syncthreads();
@@ -355,7 +295,9 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
     Vector4f viewIntrinsics = currentTrackingLevel->intrinsics;
     Vector2i viewImageSize = currentTrackingLevel->depth->noDims;
 
-    dim3 blockSize(16, 16);
+    dim3 blockSize(16, 16); // must equal REDUCE_BLOCK_SIZE
+    assert(16 * 16 == REDUCE_BLOCK_SIZE);
+
     dim3 gridSize(
         (int)ceil((float)viewImageSize.x / (float)blockSize.x),
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
