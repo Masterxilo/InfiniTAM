@@ -16,7 +16,6 @@
 #include "Engine/DeviceSpecific/CUDA/ITMSceneReconstructionEngine_CUDA.h"
 
 #include "Engine/ITMVisualisationEngine.h"
-#include "Engine/DeviceSpecific/CUDA/ITMVisualisationEngine_CUDA.h"
 
 #include "Engine/ITMViewBuilder.h"
 

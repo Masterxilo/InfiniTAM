@@ -180,12 +180,6 @@
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMSceneReconstructionEngine.h">
       <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.h">
-      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMVisualisationEngine.h">
-      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
       <Filter>ITMLib\Engine\VisualisationEngine</Filter>
     </ClInclude>
@@ -236,9 +230,6 @@
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.cu">
       <Filter>ITMLib\Engine\SceneReconstructionEngine</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.cu">
-      <Filter>ITMLib\Engine\VisualisationEngine</Filter>
     </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
       <Filter>ITMLib\Engine\VisualisationEngine</Filter>

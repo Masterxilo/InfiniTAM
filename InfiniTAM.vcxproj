@@ -129,11 +129,9 @@
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMPixelUtils.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMRepresentationAccess.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMSceneReconstructionEngine.h" />
-    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMVisualisationEngine.h" />
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h" />
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.h" />
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.h" />
     <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h" />
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMMainEngine.h" />
@@ -171,7 +169,6 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.cu" />
-    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMVisualisationEngine_CUDA.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="png\lodepng.cpp" />

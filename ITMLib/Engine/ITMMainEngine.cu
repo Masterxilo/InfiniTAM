@@ -12,7 +12,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 
 	lowLevelEngine = new ITMLowLevelEngine();
 	viewBuilder = new ITMViewBuilder(calib);
-	visualisationEngine = new ITMVisualisationEngine_CUDA(scene);
+	visualisationEngine = new ITMVisualisationEngine(scene);
 
     Vector2i trackedImageSize = imgSize_d;
 

@@ -15,6 +15,12 @@ namespace ITMLib
 {
 	namespace Engine
     {
+        /*!private!*/
+        struct RenderingBlock {
+            Vector2s upperLeft;
+            Vector2s lowerRight;
+            Vector2f zRange;
+        };
 
         /** \brief
         Interface to engines helping with the visualisation of
@@ -31,11 +37,28 @@ namespace ITMLib
         class ITMVisualisationEngine
         {
         protected:
+        private:
+
+
+            int *noVisibleEntries_device;
+
+            RenderingBlock *renderingBlockList_device;
+            uint *noTotalBlocks_device;
+            /** Given scene, pose and intrinsics, create an estimate
+            of the minimum and maximum depths at each pixel of
+            an image.
+
+            Called by rendering methods (CreateICPMaps, RenderImage).
+
+            Creates the list of RenderingBlocks
+            */
+            void CreateExpectedDepths(
+                const ITMPose *pose,
+                const ITMIntrinsics *intrinsics,
+                ITMRenderState *renderState //!< [out] initializes renderingRangeImage
+                ) const;
+
             const ITMScene *scene;
-            ITMVisualisationEngine(const ITMScene *scene)
-            {
-                this->scene = scene;
-            }
 
 
 		public:
@@ -46,43 +69,43 @@ namespace ITMLib
 				RENDER_COLOUR_FROM_NORMAL
 			};
 
-            virtual ~ITMVisualisationEngine(void) {}
+            explicit ITMVisualisationEngine(ITMScene *scene);
+            virtual ~ITMVisualisationEngine(void);
 
             /// Heatmap style color gradient for depth
             static void DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src);
+
+            /** Creates a render state, containing rendering info
+            for the scene.
+            */
+            ITMRenderState* CreateRenderState(const Vector2i & imgSize) const;
 
 			/** Given a scene, pose and intrinsics, compute the
 			visible subset of the scene and store it in an
 			appropriate visualisation state object, created
 			previously using allocateInternalState().
 			*/
-			virtual void FindVisibleBlocks(
+			void FindVisibleBlocks(
                 const ITMPose *pose, 
                 const ITMIntrinsics *intrinsics,
                 ITMRenderState *renderState //!< [out] initializes visibleEntryIDs(), noVisibleEntries, entriesVisibleType
-                ) const = 0;
+                ) const;
 
 			/** This will render an image using raycasting. */
-			virtual void RenderImage(
-                const ITMPose *pose, 
-                const ITMIntrinsics *intrinsics,
-				ITMRenderState *renderState, 
-                ITMUChar4Image *outputImage, 
-                RenderImageType type = RENDER_SHADED_GREYSCALE) const = 0;
+            void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics,
+                ITMRenderState *renderState, //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
+                ITMUChar4Image *outputImage,
+                RenderImageType type = RENDER_SHADED_GREYSCALE) const;
 
 			/** Create an image of reference points and normals as
 			required by the ITMLib::Engine::ITMDepthTracker classes.
 			*/
-            virtual void CreateICPMaps(
+            void CreateICPMaps(
                 const ITMIntrinsics * intrinsics_d,
                 ITMTrackingState *trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
                 ITMRenderState *renderState //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
-                ) const = 0;
+                ) const;
 
-			/** Creates a render state, containing rendering info
-			for the scene.
-			*/
-			virtual ITMRenderState* CreateRenderState(const Vector2i & imgSize) const = 0;
 		};
 	}
 }
