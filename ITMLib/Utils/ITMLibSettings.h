@@ -11,17 +11,6 @@ namespace ITMLib
 		class ITMLibSettings
 		{
 		public:
-			/// The tracking regime used by the tracking controller
-			TrackerIterationType *trackingRegime;
-
-			/// The number of levels in the trackingRegime
-			int noHierarchyLevels;
-			
-			/// Run ICP till # Hierarchy level, then switch to ITMRenTracker for local refinement.
-			int noICPRunTillLevel;
-
-			/// For ITMColorTracker: skip every other point in energy function evaluation.
-			bool skipPoints;
 
 			/// For ITMDepthTracker: ICP distance threshold
 			float depthTrackerICPThreshold;
@@ -32,8 +21,16 @@ namespace ITMLib
 			/// Further, scene specific parameters such as voxel size
 			ITMLib::Objects::ITMSceneParams sceneParams;
 
-			ITMLibSettings(void);
-			~ITMLibSettings(void);
+            ITMLibSettings::ITMLibSettings(void)
+                : sceneParams(0.02f, 100, 0.005f, 0.2f, 3.0f)
+            {
+                /// depth threashold for the ICP tracker
+                depthTrackerICPThreshold = 0.1f * 0.1f;
+
+                /// For ITMDepthTracker: ICP iteration termination threshold
+                depthTrackerTerminationThreshold = 1e-3f;
+            }
+
 		};
 	}
 }

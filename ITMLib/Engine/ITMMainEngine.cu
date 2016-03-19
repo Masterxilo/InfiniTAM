@@ -19,7 +19,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	renderState_live = visualisationEngine->CreateRenderState(trackedImageSize);
 	renderState_freeview = NULL; //will be created by the visualisation engine on demand
 
-    sceneRecoEngine = new ITMSceneReconstructionEngine_CUDA();
+    sceneRecoEngine = new ITMSceneReconstructionEngine();
     ResetScene();
 
     tracker = new ITMDepthTracker(

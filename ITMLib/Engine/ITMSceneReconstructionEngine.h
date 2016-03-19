@@ -31,32 +31,17 @@ namespace ITMLib
 			/** Clear and reset a scene to set up a new empty
 			    one.
 			*/
-			virtual void ResetScene(
+            void ResetScene(
                 ITMScene *scene //<! scene to be reset. 
-                ) = 0;
-
-			/** Given a view with a new depth image, compute the
-			    visible blocks, allocate them and update the hash
-			    table so that the new image data can be integrated.
-			*/
-			virtual void AllocateSceneFromDepth(
-                ITMScene *scene,
-                const ITMView *view,
-                const ITMTrackingState *trackingState,
-				ITMRenderState *renderState //<! [in, out] initializes visibility
-                ) = 0;
-
-			/** Update the voxel blocks by integrating depth and
-			    possibly colour information from the given view.
-			*/
-			virtual void IntegrateIntoScene(
-                ITMScene *scene,
-                const ITMView *view,
-                const ITMTrackingState *trackingState,
-				const ITMRenderState *renderState) = 0;
+                );
 
             /// Fusion stage of the system
-            void ProcessFrame(const ITMView *view, const ITMTrackingState *trackingState, ITMScene *scene, ITMRenderState *renderState)
+            void ProcessFrame(
+                const ITMView *view,
+                const ITMTrackingState *trackingState,
+                ITMScene *scene,
+                ITMRenderState *renderState //!< [in, out] modifies visible list
+                )
             {
                 // allocation & visible list update
                 AllocateSceneFromDepth(scene, view, trackingState, renderState);
@@ -65,8 +50,35 @@ namespace ITMLib
                 IntegrateIntoScene(scene, view, trackingState, renderState);
             }
 
-			ITMSceneReconstructionEngine(void) { }
-			virtual ~ITMSceneReconstructionEngine(void) { }
+            ITMSceneReconstructionEngine(void);
+            virtual ~ITMSceneReconstructionEngine(void);
+
+        private:
+
+            /** Given a view with a new depth image, compute the
+            visible blocks, allocate them and update the hash
+            table so that the new image data can be integrated.
+            */
+            void AllocateSceneFromDepth(
+                ITMScene *scene,
+                const ITMView *view,
+                const ITMTrackingState *trackingState,
+                ITMRenderState *renderState //<! [in, out] initializes visibility
+                );
+
+            /** Update the voxel blocks by integrating depth and
+            possibly colour information from the given view.
+            */
+            void IntegrateIntoScene(
+                ITMScene *scene,
+                const ITMView *view,
+                const ITMTrackingState *trackingState,
+                const ITMRenderState *renderState);
+
+            void *allocationTempData_device;
+            void *allocationTempData_host;
+            unsigned char *entriesAllocType_device;
+            Vector4s *blockCoords_device;
 		};
 	}
 }

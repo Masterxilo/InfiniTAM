@@ -6,7 +6,7 @@
 
 #include "DeviceAgnostic/ITMRepresentationAccess.h"
 #include "../Utils/ITMLibDefines.h"
-#include "DeviceAgnostic/ITMSceneReconstructionEngine.h"
+#include "ITMSceneReconstructionEngine.h"
 
 using namespace ITMLib::Engine;
 

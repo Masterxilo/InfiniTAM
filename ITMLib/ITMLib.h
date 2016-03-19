@@ -13,7 +13,6 @@
 #include "Engine/ITMDepthTracker.h"
 
 #include "Engine/ITMSceneReconstructionEngine.h"
-#include "Engine/DeviceSpecific/CUDA/ITMSceneReconstructionEngine_CUDA.h"
 
 #include "Engine/ITMVisualisationEngine.h"
 

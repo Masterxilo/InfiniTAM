@@ -112,9 +112,9 @@
     <CudaCompile Include="Engine\UIEngine.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMViewBuilder.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu" />
-    <CudaCompile Include="ITMLib\Utils\ITMLibSettings.cu" />
     <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu" />
     <CudaCompile Include="InfiniTAM.cu" />
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu" />
@@ -128,10 +128,8 @@
     <ClInclude Include="HashMap.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMPixelUtils.h" />
     <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMRepresentationAccess.h" />
-    <ClInclude Include="ITMLib\Engine\DeviceAgnostic\ITMSceneReconstructionEngine.h" />
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h" />
     <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMLowLevelEngine.h" />
-    <ClInclude Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.h" />
     <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h" />
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMMainEngine.h" />
@@ -166,9 +164,6 @@
     <ClInclude Include="ORUtils\Vector.h" />
     <ClInclude Include="Utils\FileUtils.h" />
     <ClInclude Include="Utils\NVTimer.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="ITMLib\Engine\DeviceSpecific\CUDA\ITMSceneReconstructionEngine_CUDA.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="png\lodepng.cpp" />
