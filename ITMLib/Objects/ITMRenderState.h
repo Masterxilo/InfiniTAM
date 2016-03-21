@@ -20,36 +20,6 @@ namespace ITMLib
 		class ITMRenderState
         {
 		public:
-            struct EntryVisibilityInformation {
-            public:
-                EntryVisibilityInformation(const int noTotalEntries) : 
-                    visibleEntryIDs(SDF_LOCAL_BLOCK_NUM, MEMORYDEVICE_CUDA),
-                    entriesVisibleType(noTotalEntries, MEMORYDEVICE_CUDA) {
-
-                    cudaMallocManaged(&noVisibleEntries, sizeof(int));
-                    cudaDeviceSynchronize();
-                    *noVisibleEntries = 0;
-
-                }
-
-                /** Number of entries valid in visibleEntryIDs list. 
-                Managed memory. */
-                int* noVisibleEntries;
-
-                /** compacted hash-table-entry ids j of those with entriesVisibleType[j] == VT_VISIBLE
-
-                at most SDF_LOCAL_BLOCK_NUM many, valid up to noVisibleEntries-1
-                */
-                ORUtils::MemoryBlock<int> visibleEntryIDs;
-
-                /** Per hash-table-entry visibility information.
-
-                noTotalEntries == SDF_GLOBAL_BLOCK_NUM many
-                */
-                ORUtils::MemoryBlock<uchar> entriesVisibleType;
-            };
-            EntryVisibilityInformation* const entryVisibilityInformation;
-
 
 			/** @brief
 			Gives the raycasting operations an idea of the
@@ -81,8 +51,7 @@ namespace ITMLib
                 const int noTotalEntries,
                 const Vector2i &imgSize,
                 float vf_min, float vf_max,
-                MemoryDeviceType memoryType) : 
-                entryVisibilityInformation(new EntryVisibilityInformation(noTotalEntries))
+                MemoryDeviceType memoryType) 
 			{
 				renderingRangeImage = new ORUtils::Image<Vector2f>(imgSize, memoryType);
 				raycastResult = new ORUtils::Image<Vector4f>(imgSize, memoryType);

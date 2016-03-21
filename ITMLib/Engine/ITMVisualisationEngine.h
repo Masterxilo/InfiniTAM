@@ -77,21 +77,10 @@ namespace ITMLib
             for the scene.
             */
             ITMRenderState* CreateRenderState(const Vector2i & imgSize) const;
-
-			/** Given a scene, pose and intrinsics, compute the
-			visible subset of the scene and store it in an
-			appropriate visualisation state object, created
-			previously using allocateInternalState().
-			*/
-            void FindVisibleBlocks(
-                const ITMPose *pose, 
-                const ITMIntrinsics *intrinsics,
-                ITMRenderState *renderState //!< [out] initializes visibleEntryIDs(), noVisibleEntries, entriesVisibleType
-                ) const;
-
+            
 			/** This will render an image using raycasting. */
             void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics,
-                ITMRenderState *renderState, //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
+                ITMRenderState *renderState, //!< [in, out] builds renderingRangeImage for one-time use
                 ITMUChar4Image *outputImage,
                 RenderImageType type = RENDER_SHADED_GREYSCALE) const;
 
@@ -101,7 +90,7 @@ namespace ITMLib
             void CreateICPMaps(
                 const ITMIntrinsics * intrinsics_d,
                 ITMTrackingState *trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
-                ITMRenderState *renderState //!< [in, out] uses visibility information, builds renderingRangeImage for one-time use
+                ITMRenderState *renderState //!< [in, out] builds renderingRangeImage for one-time use
                 ) const;
 
 		};

@@ -363,37 +363,3 @@ _CPU_AND_GPU_CODE_ inline Vector3f computeSingleNormalFromSDF(
 }
 
 #undef COMPUTE_COEFF_POS_FROM_POINT
-
-
-
-_CPU_AND_GPU_CODE_ inline void checkPointVisibility(THREADPTR(bool) &isVisible,
-    const THREADPTR(Vector4f) &pt_model, const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) &projParams_d,
-    const CONSTPTR(Vector2i) &imgSize)
-{
-    Vector4f pt_camera; Vector2f pt_image;
-    if (projectModel(projParams_d, M_d, imgSize, pt_model, pt_camera, pt_image)) {
-        isVisible = true;
-    }
-}
-
-#define indicator(x) (x ? 1.f : 0.f)
-/// project the eight corners of the given voxel block
-/// into the camera viewpoint and check their visibility
-_CPU_AND_GPU_CODE_ inline void checkBlockVisibility(THREADPTR(bool) &isVisible,
-    const THREADPTR(Vector3s) &hashPos, const CONSTPTR(Matrix4f) & M_d, const CONSTPTR(Vector4f) &projParams_d,
-    const CONSTPTR(float) &voxelSize, const CONSTPTR(Vector2i) &imgSize)
-{
-    Vector4f pt_model;
-    const float voxelBlockWorldSize = (float)SDF_BLOCK_SIZE * voxelSize;
-
-    isVisible = false;
-
-    pt_model = Vector4f(hashPos.toFloat() * voxelBlockWorldSize, 1);
-    // loop over corners
-    for (int xyz = 0; xyz <= 7; xyz++) {
-        checkPointVisibility(isVisible,
-            pt_model + voxelBlockWorldSize * Vector4f(indicator(xyz & 4), indicator(xyz & 2), indicator(xyz & 1), 0),
-            M_d, projParams_d, imgSize);
-        if (isVisible) return;
-    }
-}

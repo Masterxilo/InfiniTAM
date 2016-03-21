@@ -1,6 +1,4 @@
-﻿// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
-#include "ITMVisualisationEngine.h"
+﻿#include "ITMVisualisationEngine.h"
 #include "DeviceAgnostic/ITMPixelUtils.h"
 #include "DeviceSpecific\CUDA\ITMCUDAUtils.h"
 
@@ -492,50 +490,9 @@ inline dim3 getGridSize(Vector2i taskSize, dim3 blockSize) { return getGridSize(
 
 //device implementations
 
-__global__ void buildVisibleList_device(
-    const ITMHashEntry * const hashTable,
-    const int noTotalEntries,
-    int * const visibleEntryIDs, //!< [out]
-    int * const noVisibleEntries, //!< [out]
-    const Matrix4f M, const Vector4f projParams, const Vector2i imgSize, const float voxelSize)
-{
-    int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (targetIdx > noTotalEntries - 1) return;
-
-    __shared__ bool shouldPrefix;
-
-    unsigned char hashVisibleType = 0; 
-    const ITMHashEntry &hashEntry = hashTable[targetIdx];
-
-    shouldPrefix = false;
-    __syncthreads();
-
-    if (hashEntry.ptr >= 0)
-    {
-        shouldPrefix = true;
-
-        bool isVisible;
-        checkBlockVisibility(isVisible, hashEntry.pos, M, projParams, voxelSize, imgSize);
-
-        hashVisibleType = isVisible;
-    }
-
-    if (hashVisibleType > 0) shouldPrefix = true;
-
-    __syncthreads();
-
-    if (shouldPrefix)
-    {
-        int offset = computePrefixSum_device<int>(hashVisibleType > 0, noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
-        if (offset != -1) visibleEntryIDs[offset] = targetIdx;
-    }
-}
-
 __global__ void projectAndSplitBlocks_device(
     const ITMHashEntry * const hashEntries,
     const ITMVoxelBlock * const localVBA,
-    const int * const visibleEntryIDs,
-    const int noVisibleEntries,
     const Matrix4f pose_M,
     const Vector4f intrinsics,
     const Vector2i imgSize,
@@ -549,10 +506,6 @@ __global__ void projectAndSplitBlocks_device(
     bool validProjection = false;
 
     const int in_offset = threadIdx.x + blockDim.x * blockIdx.x;
-
-    // with visible list:
-    //const ITMHashEntry & blockData(hashEntries[visibleEntryIDs[in_offset]]);
-    //if (in_offset < noVisibleEntries) if (blockData.ptr >= 0)
 
     // ignoring visible list:
     VoxelBlockPos pos = localVBA[in_offset].pos;
@@ -661,36 +614,6 @@ ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSi
         );
 }
 
-void ITMVisualisationEngine::FindVisibleBlocks(
-    const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const
-{
-    const ITMHashEntry *hashTable = this->scene->index.GetEntries();
-    int noTotalEntries = this->scene->index.noTotalEntries;
-    float voxelSize = this->scene->sceneParams->voxelSize;
-    Vector2i imgSize = renderState->renderingRangeImage->noDims;
-
-    Matrix4f M = pose->GetM();
-    Vector4f projParams = intrinsics->projectionParamsSimple.all;
-
-
-    // Brute-force full visibility test
-    int * const visibleEntryIDs = renderState->entryVisibilityInformation->visibleEntryIDs.GetData(MEMORYDEVICE_CUDA);
-    cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
-    int* const noVisibleEntries = renderState->entryVisibilityInformation->noVisibleEntries;
-
-    *noVisibleEntries = 0;
-
-    dim3 cudaBlockSizeAL(256, 1);
-    dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
-    buildVisibleList_device << <gridSizeAL, cudaBlockSizeAL >> >(
-        hashTable, 
-        noTotalEntries,
-        visibleEntryIDs,
-        noVisibleEntries,
-        M, projParams, imgSize, voxelSize);
-
-}
-
 void ITMVisualisationEngine::CreateExpectedDepths(
     const ITMPose *pose, const ITMIntrinsics *intrinsics,
     ITMRenderState *renderState) const
@@ -703,23 +626,15 @@ void ITMVisualisationEngine::CreateExpectedDepths(
     {
         const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
 
-        const int * const visibleEntryIDs = renderState->entryVisibilityInformation->visibleEntryIDs.GetData(MEMORYDEVICE_CUDA);
-        cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
-        const int noVisibleEntries = *renderState->entryVisibilityInformation->noVisibleEntries;
-
         dim3 blockSize(256);
-        // ignoring visible list:
         dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
-        // with visible list
-        //dim3 gridSize((int)ceil((float)noVisibleEntries / (float)blockSize.x));
 
         ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
 
         projectAndSplitBlocks_device << <gridSize, blockSize >> >(
             hash_entries,
             scene->localVBA.GetVoxelBlocks(), 
-            visibleEntryIDs, 
-            noVisibleEntries, pose->GetM(),
+            pose->GetM(),
             intrinsics->projectionParamsSimple.all, imgSize, voxelSize, 
             
             renderingBlockList_device, noTotalBlocks_device);

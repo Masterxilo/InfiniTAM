@@ -104,11 +104,6 @@ _CPU_AND_GPU_CODE_ static void computeUpdatedVoxelInfo(
 #define AT_NEEDS_ALLOC_FITS 1 //needs allocation, fits in the ordered list
 #define AT_NEEDS_ALLOC_EXCESS 2 //needs allocation in the excess list
 
-// visible type (values of entriesVisibleType entries)
-//#define VT_NOT_VISIBLE 0 // default
-#define VT_VISIBLE 1 
-#define VT_VISIBLE_PREVIOUS 3 // visible at previous frame
-
 /// For allocation and visibility determination. 
 ///
 /// Determine the blocks around a given depth sample that are currently visible
@@ -116,19 +111,18 @@ _CPU_AND_GPU_CODE_ static void computeUpdatedVoxelInfo(
 /// Builds hashVisibility and entriesAllocType.
 /// \param x,y [in] loop over depth image.
 _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
-    DEVICEPTR(uchar) *entriesAllocType, //!< [out] allocation type (AT_*) for each hash table bucket, indexed by values computed from hashIndex, or in excess part
-    DEVICEPTR(uchar) *entriesVisibleType,//!< [out] visibility type (VT_*) for each hash table bucket, indexed by values computed from hashIndex, or in excess part
-    int x, int y,
-    DEVICEPTR(Vector4s) *blockCoords, //!< [out] blockPos coordinate of each voxel block that needs allocation, indexed by values computed from hashIndex, or in excess part
-    const CONSTPTR(float) *depth,
-    Matrix4f invM_d, //!< depth to world transformation
-    Vector4f invProjParams_d, //!< Note: Inverse projection parameters to avoid division by fx, fy.
-    float mu,
-    Vector2i imgSize,
-    float oneOverVoxelBlockWorldspaceSize, //!< 1 / (voxelSize * SDF_BLOCK_SIZE)
-    const CONSTPTR(ITMHashEntry) *hashTable, //<! [in] hash table buckets, indexed by values computed from hashIndex
-    float viewFrustum_min, //!< znear
-    float viewFrustum_max  //!< zfar
+    DEVICEPTR(uchar) * const entriesAllocType, //!< [out] allocation type (AT_*) for each hash table bucket, indexed by values computed from hashIndex, or in excess part
+    const int x, const int y,
+    DEVICEPTR(Vector4s) * const  blockCoords, //!< [out] blockPos coordinate of each voxel block that needs allocation, indexed by values computed from hashIndex, or in excess part
+    const CONSTPTR(float) * const  depth,
+    const Matrix4f invM_d, //!< depth to world transformation
+    const Vector4f invProjParams_d, //!< Note: Inverse projection parameters to avoid division by fx, fy.
+    const float mu,
+    const Vector2i imgSize,
+    const float oneOverVoxelBlockWorldspaceSize, //!< 1 / (voxelSize * SDF_BLOCK_SIZE)
+    const CONSTPTR(ITMHashEntry) *const hashTable, //<! [in] hash table buckets, indexed by values computed from hashIndex
+    const float viewFrustum_min, //!< znear
+    const float viewFrustum_max  //!< zfar
     )
 {
     float depth_measure; unsigned int hashIdx; int noSteps;
@@ -175,7 +169,6 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
             hashEntry = hashTable[hashIdx]; \
             if (IS_EQUAL3(hashEntry.pos, blockPos) && hashEntry.isAllocated()) \
                         {\
-                entriesVisibleType[hashIdx] = VT_VISIBLE; \
                 isFound = true; \
                 BREAK;\
                         }
@@ -197,8 +190,7 @@ _CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
 
             if (!isFound) //still not found: needs allocation 
             {
-                entriesAllocType[hashIdx] = isExcess ? AT_NEEDS_ALLOC_EXCESS : AT_NEEDS_ALLOC_FITS; //needs allocation 
-
+                entriesAllocType[hashIdx] = isExcess ? AT_NEEDS_ALLOC_EXCESS : AT_NEEDS_ALLOC_FITS; //needs allocation
                 blockCoords[hashIdx] = Vector4s(blockPos, 1);
             }
         }
@@ -223,7 +215,6 @@ ITMHashEntry *hashTable,
 ITMVoxelBlock *localVBA,
 
 uchar *entriesAllocType,
-uchar *entriesVisibleType,
 Vector4s *blockCoords)
 {
     unsigned char hashChangeType = entriesAllocType[targetIdx];
@@ -254,33 +245,8 @@ Vector4s *blockCoords)
     }
 
     hashTable[targetIdx] = hashEntry;
-    entriesVisibleType[targetIdx] = VT_VISIBLE; //every new entry is visible
 }
 
-/// Tests blocks with VT_VISIBLE_PREVIOUS
-/// \returns hashVisibleType > 0
-_CPU_AND_GPU_CODE_ inline bool visibilityTestIfNeeded(
-    int targetIdx,
-    uchar *entriesVisibleType,
-    ITMHashEntry *hashTable,
-    Matrix4f M_d, Vector4f projParams_d, Vector2i depthImgSize, float voxelSize
-    ) {
-    unsigned char hashVisibleType = entriesVisibleType[targetIdx];
-
-    //  -- perform visibility check for voxel blocks that where visible in the last frame
-    // but not yet detected in the current depth frame
-    // (many of these will actually not be visible anymore)
-    if (hashVisibleType == VT_VISIBLE_PREVIOUS)
-    {
-        const ITMHashEntry &hashEntry = hashTable[targetIdx];
-        bool isVisible;
-        checkBlockVisibility(isVisible, hashEntry.pos, M_d, projParams_d, voxelSize, depthImgSize);
-        if (!isVisible) hashVisibleType = entriesVisibleType[targetIdx] = 0; // no longer visible
-        //else entriesVisibleType[targetIdx] = VT_VISIBLE; // writing this is not strictly necessary - the entry is added to visible list anyways
-    }
-
-    return hashVisibleType > 0;
-}
 
 _CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
     Vector3i globalPos,
@@ -311,7 +277,6 @@ __global__ void integrateIntoScene_device(
     ITMVoxelBlock *localVBA, //!< [out]
 
     const ITMHashEntry * const hashTable,
-    const int * const visibleEntryIDs,
     const Vector4u * const rgb,
     const Vector2i rgbImgSize, 
     const float * const depth,
@@ -319,18 +284,6 @@ __global__ void integrateIntoScene_device(
     const Vector4f projParams_rgb, const float voxelSize, const float mu, const int maxW)
 {
     // one thread block for each voxel block
-
-    // with visible list:
-    /*
-    const ITMHashEntry &currentHashEntry = hashTable[visibleEntryIDs[blockIdx.x]];
-    if (!currentHashEntry.isAllocated()) return;
-
-    const Vector3i globalPos = currentHashEntry.pos.toInt() * SDF_BLOCK_SIZE;
-
-    ITMVoxelBlock * const localVoxelBlock = &(localVBA[currentHashEntry.ptr]);
-    assert(localVoxelBlock->pos == currentHashEntry.pos);
-    */
-    // ignoring visible list:
     ITMVoxelBlock * const localVoxelBlock = &(localVBA[blockIdx.x]); 
     if (localVoxelBlock->pos == INVALID_VOXEL_BLOCK_POS) return; 
 
@@ -342,7 +295,10 @@ __global__ void integrateIntoScene_device(
         M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
 
-__global__ void buildHashAllocAndVisibleType_device(uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords, const float *depth,
+__global__ void buildHashAllocAndVisibleType_device(
+    uchar *entriesAllocType, //!< [out]
+    Vector4s *blockCoords,//!< [out]
+    const float *depth,
     Matrix4f invM_d, Vector4f projParams_d, float mu, Vector2i imgSize, float voxelSize, ITMHashEntry *hashTable, float viewFrustum_min,
     float viewFrustum_max)
 {
@@ -350,22 +306,15 @@ __global__ void buildHashAllocAndVisibleType_device(uchar *entriesAllocType, uch
 
     if (x > imgSize.x - 1 || y > imgSize.y - 1) return;
 
-    buildHashAllocAndVisibleTypePP(entriesAllocType, entriesVisibleType, x, y, blockCoords, depth, invM_d,
+    buildHashAllocAndVisibleTypePP(entriesAllocType, x, y, blockCoords, depth, invM_d,
         projParams_d, mu, imgSize, voxelSize, hashTable, viewFrustum_min, viewFrustum_max);
-}
-
-__global__ void setToType3(uchar *entriesVisibleType, int *visibleEntryIDs, int noVisibleEntries)
-{
-    const int entryId = threadIdx.x + blockIdx.x * blockDim.x;
-    if (entryId > noVisibleEntries - 1) return;
-    entriesVisibleType[visibleEntryIDs[entryId]] = VT_VISIBLE_PREVIOUS;
 }
 
 
 __global__ void allocateVoxelBlocksList_device(
     typename ITMLocalVBA::VoxelAllocationList *voxelAllocationList,
     ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList, ITMHashEntry *hashTable, ITMVoxelBlock* localVBA, int noTotalEntries,
-    uchar *entriesAllocType, uchar *entriesVisibleType, Vector4s *blockCoords)
+    uchar *entriesAllocType, Vector4s *blockCoords)
 {
     const int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
@@ -377,41 +326,9 @@ __global__ void allocateVoxelBlocksList_device(
         localVBA,
 
         entriesAllocType,
-        entriesVisibleType,
         blockCoords);
 }
 
-/// Compacts entries with visible type VT_VISIBLE and those with VT_VISIBLE_PREVIOUS that test sucessfully
-__global__ void buildVisibleList_device(
-    ITMHashEntry * const hashTable,
-    const int noTotalEntries,
-    int * const visibleEntryIDs,  //!< [out]
-    int * const noVisibleEntries, //!< [out]
-    uchar * const entriesVisibleType,//!< [in,out] sets to 0 those entries that are no longer visible
-    const Matrix4f M_d, const Vector4f projParams_d, const Vector2i depthImgSize, const float voxelSize)
-{
-    const int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (targetIdx > noTotalEntries - 1) return;
-
-    __shared__ bool shouldPrefix;
-    shouldPrefix = false;
-    __syncthreads();
-
-    const bool visible = visibilityTestIfNeeded(
-        targetIdx, entriesVisibleType, hashTable,
-        M_d, projParams_d, depthImgSize, voxelSize
-        );
-
-    if (visible) shouldPrefix = true;
-
-    __syncthreads();
-
-    if (shouldPrefix)
-    {
-        const int offset = computePrefixSum_device<int>(visible, noVisibleEntries, blockDim.x * blockDim.y, threadIdx.x);
-        if (offset != -1) visibleEntryIDs[offset] = targetIdx;
-    }
-}
 
 // host methods
 
@@ -483,33 +400,21 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
 
     const int noTotalEntries = scene->index.noTotalEntries;
 
-    int * const visibleEntryIDs = renderState->entryVisibilityInformation->visibleEntryIDs.GetData(MEMORYDEVICE_CUDA);
-    uchar * const entriesVisibleType = renderState->entryVisibilityInformation->entriesVisibleType.GetData(MEMORYDEVICE_CUDA); 
-    cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
-    int* const noVisibleEntries = renderState->entryVisibilityInformation->noVisibleEntries;
-
     const dim3 cudaBlockSizeHV(16, 16);
     const dim3 gridSizeHV((int)ceil((float)depthImgSize.x / (float)cudaBlockSizeHV.x), (int)ceil((float)depthImgSize.y / (float)cudaBlockSizeHV.y));
 
 	const dim3 cudaBlockSizeAL(256, 1);
 	const dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
 
-	const dim3 cudaBlockSizeVS(256, 1);
-    const dim3 gridSizeVS((int)ceil((float)*noVisibleEntries / (float)cudaBlockSizeVS.x));
-
     const float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
 
-    // Mark previously visible entries as such.
-    if (gridSizeVS.x > 0) setToType3 << <gridSizeVS, cudaBlockSizeVS >> > (entriesVisibleType, visibleEntryIDs, *noVisibleEntries);
-    cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
-    *noVisibleEntries = 0;
+    // Determine blocks currently visible in depth map but not allocated  for preparing allocation list
 
-    // Determine blocks currently visible in depth map and prepare allocation list
 	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
+
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(
         entriesAllocType_device,
-        entriesVisibleType, 
 		blockCoords_device,
         depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min,
@@ -524,16 +429,7 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
 
 		noTotalEntries, 
         entriesAllocType_device, 
-        entriesVisibleType,
 		blockCoords_device);
-
-    // Visibility test for remaining blocks and count visible entries
-	buildVisibleList_device<< <gridSizeAL, cudaBlockSizeAL >> >(
-        hashTable, 
-        noTotalEntries,
-        visibleEntryIDs,
-        noVisibleEntries,
-        entriesVisibleType, M_d, projParams_d, depthImgSize, voxelSize);
 }
 
 void ITMSceneReconstructionEngine::IntegrateIntoScene(ITMScene *scene, const ITMView *view,
@@ -559,17 +455,11 @@ void ITMSceneReconstructionEngine::IntegrateIntoScene(ITMScene *scene, const ITM
     ITMVoxelBlock *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
 
-
-    const int * const visibleEntryIDs = renderState->entryVisibilityInformation->visibleEntryIDs.GetData(MEMORYDEVICE_CUDA);
-    cudaDeviceSynchronize(); // TODO needed to unlock noVisibleEntries but slow, consider manual management
-    const int noVisibleEntries = *renderState->entryVisibilityInformation->noVisibleEntries;
-
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-    //dim3 gridSize(noVisibleEntries); // with visible list
-    dim3 gridSize(SDF_LOCAL_BLOCK_NUM);// ignoring visible list
+    dim3 gridSize(SDF_LOCAL_BLOCK_NUM);
 
     integrateIntoScene_device<< <gridSize, cudaBlockSize >> >(
-        localVBA, hashTable, visibleEntryIDs, 
+        localVBA, hashTable, 
         rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
 }
 
