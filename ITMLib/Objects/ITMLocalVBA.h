@@ -35,14 +35,9 @@ namespace ITMLib
                 /// This index is considered free in the list
                 int lastFreeEntry;
                 const int capacity;
-                ORUtils::MemoryBlock<int> _allocationList;
-                /// Lists numbers that will eventually be assigned, becoming indices into the local voxel block array
-                int* allocationList;
 
             public:
-                VoxelAllocationList(int capacity) : 
-                    capacity(capacity), _allocationList(capacity, MEMORYDEVICE_CUDA) {
-                    allocationList = _allocationList.GetData(MEMORYDEVICE_CUDA);
+                VoxelAllocationList(int capacity) : capacity(capacity) {
                     Reset();
                 }
 
@@ -51,34 +46,14 @@ namespace ITMLib
                 // Assume single threaded
                 // TODO return 0 when nothing can be allocated (full)
                 __device__ int Allocate() {
-                    int ptr;
-
                     // Must atomically decrease lastFreeEntry, but retrieve the value at the previous
                     int newlyReservedEntry = atomicSub(&lastFreeEntry, 1);
-
-                    ptr = allocationList[newlyReservedEntry];
-                    allocationList[newlyReservedEntry] = -1; // now illegal - updating this is not strictly necessary
-
-                    return ptr;
-                }
-
-                __device__ void Free(int ptr) {
-                    // TODO dont accept when list is full already or when this was never allocated
-                    // that is, when lastFreeEntry >= SDF_LOCAL_BLOCK_NUM - 1
-                    // ^^ should never happen
-
-                    int newlyFreedEntry = atomicAdd(&lastFreeEntry, 1) + 1; // atomicAdd returns the last value, but the new value
-                    // is what is newly free. We should not read the changed lastFreeEntry as it might have changed yet again!
-
-                    allocationList[newlyFreedEntry] = ptr;
+                    return newlyReservedEntry;
                 }
 
                 void Reset() {
                     cudaDeviceSynchronize(); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
                     lastFreeEntry = capacity - 1;
-
-                    // allocationList initially contains [0:capacity-1]
-                    fillArrayKernel<int>(allocationList, capacity);
                 }
             } *voxelAllocationList;
 

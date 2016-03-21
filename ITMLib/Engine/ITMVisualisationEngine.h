@@ -40,8 +40,6 @@ namespace ITMLib
         private:
 
 
-            int *noVisibleEntries_device;
-
             RenderingBlock *renderingBlockList_device;
             uint *noTotalBlocks_device;
             /** Given scene, pose and intrinsics, create an estimate
@@ -85,7 +83,7 @@ namespace ITMLib
 			appropriate visualisation state object, created
 			previously using allocateInternalState().
 			*/
-			void FindVisibleBlocks(
+            void FindVisibleBlocks(
                 const ITMPose *pose, 
                 const ITMIntrinsics *intrinsics,
                 ITMRenderState *renderState //!< [out] initializes visibleEntryIDs(), noVisibleEntries, entriesVisibleType

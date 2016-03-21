@@ -531,19 +531,36 @@ __global__ void buildVisibleList_device(
     }
 }
 
-__global__ void projectAndSplitBlocks_device(const ITMHashEntry *hashEntries, const int *visibleEntryIDs, int noVisibleEntries,
-    const Matrix4f pose_M, const Vector4f intrinsics, const Vector2i imgSize, float voxelSize, RenderingBlock *renderingBlocks,
-    uint *noTotalBlocks)
+__global__ void projectAndSplitBlocks_device(
+    const ITMHashEntry * const hashEntries,
+    const ITMVoxelBlock * const localVBA,
+    const int * const visibleEntryIDs,
+    const int noVisibleEntries,
+    const Matrix4f pose_M,
+    const Vector4f intrinsics,
+    const Vector2i imgSize,
+    const float voxelSize,
+    RenderingBlock *renderingBlocks, //!< [out]
+    uint *noTotalBlocks //!< [out]
+    )
 {
-    int in_offset = threadIdx.x + blockDim.x * blockIdx.x;
-
-    const ITMHashEntry & blockData(hashEntries[visibleEntryIDs[in_offset]]);
-
     Vector2i upperLeft, lowerRight;
     Vector2f zRange;
     bool validProjection = false;
-    if (in_offset < noVisibleEntries) if (blockData.ptr >= 0)
-        validProjection = ProjectSingleBlock(blockData.pos, pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
+
+    const int in_offset = threadIdx.x + blockDim.x * blockIdx.x;
+
+    // with visible list:
+    //const ITMHashEntry & blockData(hashEntries[visibleEntryIDs[in_offset]]);
+    //if (in_offset < noVisibleEntries) if (blockData.ptr >= 0)
+
+    // ignoring visible list:
+    VoxelBlockPos pos = localVBA[in_offset].pos;
+    if (pos != INVALID_VOXEL_BLOCK_POS)
+        // Shared:
+        validProjection = ProjectSingleBlock(
+            pos,//blockData.pos, 
+            pose_M, intrinsics, imgSize, voxelSize, upperLeft, lowerRight, zRange);
 
     Vector2i requiredRenderingBlocks(ceilf((float)(lowerRight.x - upperLeft.x + 1) / renderingBlockSizeX),
         ceilf((float)(lowerRight.y - upperLeft.y + 1) / renderingBlockSizeY));
@@ -627,14 +644,12 @@ ITMVisualisationEngine::ITMVisualisationEngine(ITMScene *scene)
     this->scene = scene;
     ITMSafeCall(cudaMalloc((void**)&renderingBlockList_device, sizeof(RenderingBlock) * MAX_RENDERING_BLOCKS));
     ITMSafeCall(cudaMalloc((void**)&noTotalBlocks_device, sizeof(uint)));
-    ITMSafeCall(cudaMalloc((void**)&noVisibleEntries_device, sizeof(uint)));
 }
 
 ITMVisualisationEngine::~ITMVisualisationEngine(void)
 {
     ITMSafeCall(cudaFree(noTotalBlocks_device));
     ITMSafeCall(cudaFree(renderingBlockList_device));
-    ITMSafeCall(cudaFree(noVisibleEntries_device));
 }
 
 ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSize) const
@@ -646,7 +661,8 @@ ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSi
         );
 }
 
-void ITMVisualisationEngine::FindVisibleBlocks(const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const
+void ITMVisualisationEngine::FindVisibleBlocks(
+    const ITMPose *pose, const ITMIntrinsics *intrinsics, ITMRenderState *renderState) const
 {
     const ITMHashEntry *hashTable = this->scene->index.GetEntries();
     int noTotalEntries = this->scene->index.noTotalEntries;
@@ -667,14 +683,16 @@ void ITMVisualisationEngine::FindVisibleBlocks(const ITMPose *pose, const ITMInt
     dim3 cudaBlockSizeAL(256, 1);
     dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
     buildVisibleList_device << <gridSizeAL, cudaBlockSizeAL >> >(
-        hashTable, noTotalEntries,
+        hashTable, 
+        noTotalEntries,
         visibleEntryIDs,
         noVisibleEntries,
         M, projParams, imgSize, voxelSize);
 
 }
 
-void ITMVisualisationEngine::CreateExpectedDepths(const ITMPose *pose, const ITMIntrinsics *intrinsics,
+void ITMVisualisationEngine::CreateExpectedDepths(
+    const ITMPose *pose, const ITMIntrinsics *intrinsics,
     ITMRenderState *renderState) const
 {
     float voxelSize = this->scene->sceneParams->voxelSize;
@@ -690,10 +708,21 @@ void ITMVisualisationEngine::CreateExpectedDepths(const ITMPose *pose, const ITM
         const int noVisibleEntries = *renderState->entryVisibilityInformation->noVisibleEntries;
 
         dim3 blockSize(256);
-        dim3 gridSize((int)ceil((float)noVisibleEntries / (float)blockSize.x));
+        // ignoring visible list:
+        dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
+        // with visible list
+        //dim3 gridSize((int)ceil((float)noVisibleEntries / (float)blockSize.x));
+
         ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
-        projectAndSplitBlocks_device << <gridSize, blockSize >> >(hash_entries, visibleEntryIDs, noVisibleEntries, pose->GetM(),
-            intrinsics->projectionParamsSimple.all, imgSize, voxelSize, renderingBlockList_device, noTotalBlocks_device);
+
+        projectAndSplitBlocks_device << <gridSize, blockSize >> >(
+            hash_entries,
+            scene->localVBA.GetVoxelBlocks(), 
+            visibleEntryIDs, 
+            noVisibleEntries, pose->GetM(),
+            intrinsics->projectionParamsSimple.all, imgSize, voxelSize, 
+            
+            renderingBlockList_device, noTotalBlocks_device);
     }
 
     uint noTotalBlocks;

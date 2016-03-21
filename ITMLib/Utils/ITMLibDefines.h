@@ -145,8 +145,6 @@ struct ITMVoxelBlock {
 */
 typedef ITMLib::Objects::ITMVoxelBlockHash ITMVoxelIndex;
 
-
-
 /// The tracker iteration type used to define the tracking iteration regime
 enum TrackerIterationType
 {
