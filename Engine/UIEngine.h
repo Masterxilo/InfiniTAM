@@ -4,8 +4,8 @@
 
 #include "../ITMLib/Engine/ITMMainEngine.h"
 #include "../ITMLib/Utils/ITMLibSettings.h"
-#include "../Utils/FileUtils.h"
-#include "../Utils/NVTimer.h"
+#include "FileUtils.h"
+#include "NVTimer.h"
 
 #include "ImageSourceEngine.h"
 

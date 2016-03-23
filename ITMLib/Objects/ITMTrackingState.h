@@ -2,10 +2,9 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
 #include "ITMPose.h"
-#include "ITMPointCloud.h"
 #include "ITMScene.h"
 
 namespace ITMLib

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
 #include "ITMSceneParams.h"
 #include "ITMLocalVBA.h"

@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "../ITMLib.h"
-#include "../Utils/ITMLibSettings.h"
+#include "ITMLib.h"
+#include "ITMLibSettings.h"
 #include "ITMLowLevelEngine.h"
 
 /** \mainpage
@@ -67,6 +67,7 @@ namespace ITMLib
 			ITMScene* scene;
             /// Describes the tracked camera position and possibly a frame rendered from that position
 			ITMRenderState *renderState_live;
+
             /// Describes a free camera position and frame rendered from that position
 			ITMRenderState *renderState_freeview;
 
@@ -99,10 +100,9 @@ namespace ITMLib
             /// Key method.
 			void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage);
 
-			/// Get a result image as output
-			Vector2i GetImageSize(void) const;
-
-			void GetImage(ITMUChar4Image *out, GetImageType getImageType, 
+			void GetImage(
+                ITMUChar4Image * const out, //!< [in] must be allocated on cuda and host. On exit, host version will be requested image, cuda image undefined
+                const GetImageType getImageType, 
                 const ITMPose * const pose = NULL, //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
                 const ITMIntrinsics * const intrinsics = NULL //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
                 );

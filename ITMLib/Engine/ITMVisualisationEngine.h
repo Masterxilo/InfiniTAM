@@ -2,12 +2,12 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
-#include "../Objects/ITMScene.h"
-#include "../Objects/ITMView.h"
-#include "../Objects/ITMTrackingState.h"
-#include "../Objects/ITMRenderState.h"
+#include "ITMScene.h"
+#include "ITMView.h"
+#include "ITMTrackingState.h"
+#include "ITMRenderState.h"
 
 using namespace ITMLib::Objects;
 
@@ -88,9 +88,9 @@ namespace ITMLib
 			required by the ITMLib::Engine::ITMDepthTracker classes.
 			*/
             void CreateICPMaps(
-                const ITMIntrinsics * intrinsics_d,
-                ITMTrackingState *trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
-                ITMRenderState *renderState //!< [in, out] builds renderingRangeImage for one-time use
+                const ITMIntrinsics * const intrinsics_d,
+                ITMTrackingState * const trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
+                ITMRenderState *const renderStateTemp //!< [in, out] builds renderingRangeImage for one-time use
                 ) const;
 
 		};

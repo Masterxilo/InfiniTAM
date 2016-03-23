@@ -65,23 +65,21 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
     tracker->TrackCamera(trackingState, view);
 
 	// fusion
-    sceneRecoEngine->ProcessFrame(view, trackingState, scene, renderState_live);
+    sceneRecoEngine->ProcessFrame(view, trackingState, scene);
 
-	// raycast to create point cloud for tracking in next iteration
+    // raycast scene from current viewpoint 
+    // to create point cloud for tracking
     visualisationEngine->CreateICPMaps(&view->calib->intrinsics_d, trackingState, renderState_live);
 }
 
-
-Vector2i ITMMainEngine::GetImageSize(void) const
-{
-	return renderState_live->raycastImage->noDims;
-}
-
-void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType, 
+void ITMMainEngine::GetImage(
+    ITMUChar4Image * const out,
+    const GetImageType getImageType, 
     const ITMPose * const pose, //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
     const ITMIntrinsics * const intrinsics  //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
     )
 {
+    assert(out->isAllocated_CPU() && out->isAllocated_CUDA());
 	if (view == NULL) return;
 
 	out->Clear();
@@ -99,14 +97,8 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType,
         ITMVisualisationEngine::DepthToUchar4(out, view->depth);
 		break;
 
-	case ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST:
-	{
-		ORUtils::Image<Vector4u> *srcImage = renderState_live->raycastImage;
-		out->ChangeDims(srcImage->noDims);
-        
-        out->SetFrom(srcImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);	
-		break;
-	}
+
+    case ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL:
@@ -119,9 +111,8 @@ void ITMMainEngine::GetImage(ITMUChar4Image *out, GetImageType getImageType,
 
 		if (renderState_freeview == NULL) renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
 
-		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, renderState_freeview->raycastImage, type);
-
-        out->SetFrom(renderState_freeview->raycastImage, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
+		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, out, type);
+        out->UpdateHostFromDevice();
 		break;
 	}
 	case ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN:

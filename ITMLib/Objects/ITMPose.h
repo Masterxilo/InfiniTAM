@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
 #define Rij(row, col) R.m[row + 3 * col]
 

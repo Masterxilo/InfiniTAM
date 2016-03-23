@@ -1,9 +1,9 @@
 ﻿#include "ITMVisualisationEngine.h"
-#include "DeviceAgnostic/ITMPixelUtils.h"
-#include "DeviceSpecific\CUDA\ITMCUDAUtils.h"
+#include "ITMPixelUtils.h"
+#include "ITMCUDAUtils.h"
 
-#include "DeviceAgnostic/ITMRepresentationAccess.h"
-#include "../Utils/ITMLibDefines.h"
+#include "ITMRepresentationAccess.h"
+#include "ITMLibDefines.h"
 #include "ITMSceneReconstructionEngine.h"
 
 using namespace ITMLib::Engine;
@@ -33,7 +33,7 @@ projection of all eight corners in image space and store the minimum
 and maximum Z coordinates of the block in the camera coordinate
 system
 */
-_CPU_AND_GPU_CODE_ inline bool ProjectSingleBlock(
+CPU_AND_GPU inline bool ProjectSingleBlock(
     const THREADPTR(Vector3s) & blockPos,
     const THREADPTR(Matrix4f) & pose,
     const THREADPTR(Vector4f) & intrinsics,
@@ -94,7 +94,7 @@ into (renderingBlockSizeX by renderingBlockSizeY) pixel (or less) RenderingBlock
 Store the resulting blocks into renderingBlockList,
 incrementing the current position 'offset' in this list.
 */
-_CPU_AND_GPU_CODE_ inline void CreateRenderingBlocks(
+CPU_AND_GPU inline void CreateRenderingBlocks(
     DEVICEPTR(RenderingBlock) *renderingBlockList, //!< [out]
     int offset, //!< [out]
 
@@ -127,7 +127,7 @@ _CPU_AND_GPU_CODE_ inline void CreateRenderingBlocks(
 
 /// \param x,y [in] camera space pixel determining ray direction
 /// \returns whether any intersection was found
-_CPU_AND_GPU_CODE_ inline bool castRay(
+CPU_AND_GPU inline bool castRay(
     DEVICEPTR(Vector4f) &pt_out, //!< [out] the intersection point. w is 1 for a valid point, 0 for no intersection; in voxel-fractional-world-coordinates
 
     const int x, const int y,
@@ -223,7 +223,7 @@ _CPU_AND_GPU_CODE_ inline bool castRay(
 
 /// Compute normal in the distance field via the gradient.
 /// c.f. computeSingleNormalFromSDF
-_CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
+CPU_AND_GPU inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out
     const THREADPTR(Vector3f) & point,
     const CONSTPTR(ITMVoxelBlock) *voxelBlockData,
@@ -250,7 +250,7 @@ there are only 4 uninterpolated read operations followed by a cross-product.
 \returns normal_out[idx].w = sigmaZ_out[idx] = -1 on error where idx = x + y * imgDims.x
 */
 template <bool useSmoothing>
-_CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
+CPU_AND_GPU inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out. Set to false when the normal cannot be computed
     const THREADPTR(int) &x, const THREADPTR(int) &y,
     const CONSTPTR(Vector4f) *pointsRay,
@@ -316,7 +316,7 @@ _CPU_AND_GPU_CODE_ inline void computeNormalAndAngle(
 
 #define DRAWFUNCTIONPARAMS \
 DEVICEPTR(Vector4u) & dest,\
-const CONSTPTR(Vector3f) & point,\
+const CONSTPTR(Vector3f) & point, /* in voxel-fractional world coordinates, comes from raycastResult*/\
 const CONSTPTR(ITMVoxelBlock) *voxelBlockData, \
 const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,\
 const THREADPTR(Vector3f) & normal_obj,\
@@ -324,32 +324,27 @@ const THREADPTR(float) & angle
 
 // PIXEL SHADERS
 // " Finally a coloured or shaded rendering of the surface is trivially computed, as desired for the visualisation."
-_CPU_AND_GPU_CODE_ inline void drawPixelGrey(DRAWFUNCTIONPARAMS)
+CPU_AND_GPU inline void drawPixelGrey(DRAWFUNCTIONPARAMS)
 {
     float outRes = (0.8f * angle + 0.2f) * 255.0f;
     dest = Vector4u((uchar)outRes);
 }
 
-_CPU_AND_GPU_CODE_ inline void drawPixelNormal(DRAWFUNCTIONPARAMS)
+CPU_AND_GPU inline void drawPixelNormal(DRAWFUNCTIONPARAMS)
 {
     dest.r = (uchar)((0.3f + (-normal_obj.r + 1.0f)*0.35f)*255.0f);
     dest.g = (uchar)((0.3f + (-normal_obj.g + 1.0f)*0.35f)*255.0f);
     dest.b = (uchar)((0.3f + (-normal_obj.b + 1.0f)*0.35f)*255.0f);
 }
 
-_CPU_AND_GPU_CODE_ inline void drawPixelColour(DRAWFUNCTIONPARAMS)
+CPU_AND_GPU inline void drawPixelColour(DRAWFUNCTIONPARAMS)
 {
-    
-    Vector4f clr = readFromSDF_color4u_interpolated(voxelBlockData, indexData, point);
-
-    dest.x = (uchar)(clr.x * 255.0f);
-    dest.y = (uchar)(clr.y * 255.0f);
-    dest.z = (uchar)(clr.z * 255.0f);
-    dest.w = 255;
+    Vector3f clr = readFromSDF_color4u_interpolated(voxelBlockData, indexData, point);
+    dest = Vector4u(TO_UCHAR3(clr), 255); 
 }
 
 #define PROCESS_AND_DRAW_PIXEL(PROCESSFUNCTION, DRAWFUNCTION) \
-_CPU_AND_GPU_CODE_ inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
+CPU_AND_GPU inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
     bool foundPoint, const CONSTPTR(ITMVoxelBlock) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,\
 	Vector3f lightSource) {\
 	Vector3f outNormal;\
@@ -364,10 +359,9 @@ PROCESS_AND_DRAW_PIXEL(processPixelGrey, drawPixelGrey)
 PROCESS_AND_DRAW_PIXEL(processPixelNormal, drawPixelNormal)
 
 
-_CPU_AND_GPU_CODE_ inline void processPixelICPPost(
+CPU_AND_GPU inline void processPixelICPPost(
 const float angle,
 const Vector3f outNormal,
-DEVICEPTR(Vector4u) &outRendering,
 DEVICEPTR(Vector4f) &pointsMap, //<! [out] trackingState->pointCloud->locations (world space conversion of point)
 DEVICEPTR(Vector4f) &normalsMap,
 const THREADPTR(Vector3f) & point, //<! [in] renderState->raycastResult, in voxel-fractional-world-coordinates!
@@ -378,14 +372,10 @@ const float voxelSize)
     if (!foundPoint)
     {
         pointsMap = normalsMap = IllegalColor<Vector4f>::make();
-        outRendering = Vector4u((uchar)0);
         return;
     }
 
-    drawPixelGrey(outRendering, point, 0, 0 /*assume these are unused*/, outNormal, angle);
-
     pointsMap = Vector4f(point * voxelSize, 1);
-
     normalsMap = Vector4f(outNormal, 0);
 }
 
@@ -395,8 +385,7 @@ Uses image space normals.
 */
 /// \param useSmoothing whether to compute normals by forward differences two pixels away (true) or just one pixel away (false)
 template<bool useSmoothing>
-_CPU_AND_GPU_CODE_ inline void processPixelICP(
-    DEVICEPTR(Vector4u) *const outRendering,
+CPU_AND_GPU inline void processPixelICP(
     DEVICEPTR(Vector4f) *const pointsMap, //!< [out] receives output points in world coordinates
     DEVICEPTR(Vector4f) *const normalsMap,
 
@@ -419,7 +408,6 @@ _CPU_AND_GPU_CODE_ inline void processPixelICP(
 
     processPixelICPPost(
         angle, outNormal,
-        outRendering[locId],
         pointsMap[locId],
         normalsMap[locId],
         point.toVector3(),
@@ -561,14 +549,14 @@ __global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock 
     castRay(out_ptsRay[locId], x, y, voxelData, voxelIndex, invM, invProjParams, oneOverVoxelSize, mu, minmaximg[locId2]);
 }
 
-__global__ void renderICP_device(Vector4u *outRendering, Vector4f *pointsMap, Vector4f *normalsMap, const Vector4f *pointsRay,
+__global__ void renderICP_device(Vector4f *pointsMap, Vector4f *normalsMap, const Vector4f *pointsRay,
     float voxelSize, Vector2i imgSize, Vector3f lightSource)
 {
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
 
     if (x >= imgSize.x || y >= imgSize.y) return;
 
-    processPixelICP<true>(outRendering, pointsMap, normalsMap, pointsRay, imgSize, x, y, voxelSize, lightSource);
+    processPixelICP<true>(pointsMap, normalsMap, pointsRay, imgSize, x, y, voxelSize, lightSource);
 }
 
 /*
@@ -595,14 +583,14 @@ ITMVisualisationEngine::ITMVisualisationEngine(ITMScene *scene)
 {
 
     this->scene = scene;
-    ITMSafeCall(cudaMalloc((void**)&renderingBlockList_device, sizeof(RenderingBlock) * MAX_RENDERING_BLOCKS));
-    ITMSafeCall(cudaMalloc((void**)&noTotalBlocks_device, sizeof(uint)));
+    cudaSafeCall(cudaMalloc((void**)&renderingBlockList_device, sizeof(RenderingBlock) * MAX_RENDERING_BLOCKS));
+    cudaSafeCall(cudaMalloc((void**)&noTotalBlocks_device, sizeof(uint)));
 }
 
 ITMVisualisationEngine::~ITMVisualisationEngine(void)
 {
-    ITMSafeCall(cudaFree(noTotalBlocks_device));
-    ITMSafeCall(cudaFree(renderingBlockList_device));
+    cudaSafeCall(cudaFree(noTotalBlocks_device));
+    cudaSafeCall(cudaFree(renderingBlockList_device));
 }
 
 ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSize) const
@@ -629,7 +617,7 @@ void ITMVisualisationEngine::CreateExpectedDepths(
         dim3 blockSize(256);
         dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
 
-        ITMSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
+        cudaSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
 
         projectAndSplitBlocks_device << <gridSize, blockSize >> >(
             hash_entries,
@@ -641,7 +629,7 @@ void ITMVisualisationEngine::CreateExpectedDepths(
     }
 
     uint noTotalBlocks;
-    ITMSafeCall(cudaMemcpy(&noTotalBlocks, noTotalBlocks_device, sizeof(uint), cudaMemcpyDeviceToHost));
+    cudaSafeCall(cudaMemcpy(&noTotalBlocks, noTotalBlocks_device, sizeof(uint), cudaMemcpyDeviceToHost));
     if (noTotalBlocks > (unsigned)MAX_RENDERING_BLOCKS) noTotalBlocks = MAX_RENDERING_BLOCKS;
 
     // go through rendering blocks and fill minmaxData
@@ -654,6 +642,7 @@ void ITMVisualisationEngine::CreateExpectedDepths(
     fillBlocks_device << <gridSize, blockSize >> >(noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
 }
 
+/// uses renderingRangeImage, creates raycastResult
 static void GenericRaycast(
     const ITMScene *const scene,
     const Vector2i& imgSize,
@@ -732,14 +721,13 @@ void CreateICPMaps_common(const ITMScene *scene, Vector4f intrinsics_d, ITMTrack
 
     Vector4f *pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
     Vector4f *normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
-    Vector4u *outRendering = renderState->raycastImage->GetData(MEMORYDEVICE_CUDA);
     Vector4f *pointsRay = renderState->raycastResult->GetData(MEMORYDEVICE_CUDA);
 
     Vector3f lightSource = -Vector3f(invM.getColumn(2));
 
     dim3 cudaBlockSize(16, 12);
     dim3 gridSize((int)ceil((float)imgSize.x / (float)cudaBlockSize.x), (int)ceil((float)imgSize.y / (float)cudaBlockSize.y));
-    renderICP_device << <gridSize, cudaBlockSize >> >(outRendering, pointsMap, normalsMap, pointsRay,
+    renderICP_device << <gridSize, cudaBlockSize >> >(pointsMap, normalsMap, pointsRay,
         scene->sceneParams->voxelSize, imgSize, lightSource);
 }
 
@@ -753,9 +741,9 @@ void ITMVisualisationEngine::RenderImage(const ITMPose *pose, const ITMIntrinsic
 void ITMVisualisationEngine::CreateICPMaps(
     const ITMIntrinsics * intrinsics_d,
     ITMTrackingState *trackingState,
-    ITMRenderState *renderState) const
+    ITMRenderState *renderStateTemp) const
 {
-    CreateExpectedDepths(trackingState->pose_d, intrinsics_d, renderState);
-    CreateICPMaps_common(this->scene, intrinsics_d->projectionParamsSimple.all, trackingState, renderState);
+    CreateExpectedDepths(trackingState->pose_d, intrinsics_d, renderStateTemp);
+    CreateICPMaps_common(this->scene, intrinsics_d->projectionParamsSimple.all, trackingState, renderStateTemp);
 }
 

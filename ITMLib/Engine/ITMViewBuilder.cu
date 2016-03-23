@@ -1,10 +1,10 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
 #include "ITMViewBuilder.h"
-#include "../../ORUtils/CUDADefines.h"
-#include "../../ORUtils/MemoryBlock.h"
+#include "CUDADefines.h"
+#include "MemoryBlock.h"
 
-#include "DeviceAgnostic/ITMPixelUtils.h"
+#include "ITMPixelUtils.h"
 
 using namespace ITMLib::Engine;
 using namespace ORUtils;
@@ -18,7 +18,7 @@ using namespace ORUtils;
 
 /// case ITMDisparityCalib::TRAFO_KINECT:
 /// Raw values are transformed according to \f$\frac{8 c_2 f_x}{c_1 - d}\f$
-_CPU_AND_GPU_CODE_ inline void convertDisparityToDepth(DEVICEPTR(float) *d_out, int x, int y, const CONSTPTR(short) *d_in,
+CPU_AND_GPU inline void convertDisparityToDepth(DEVICEPTR(float) *d_out, int x, int y, const CONSTPTR(short) *d_in,
     Vector2f disparityCalibParams, float fx_depth, Vector2i imgSize)
 {
     int locId = x + y * imgSize.x;

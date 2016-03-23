@@ -5,7 +5,7 @@
 #include <math.h>
 #include <ostream>
 
-#include "../../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
 #define weightedCombine(oldX, oldW, newX, newW) \
     newX = (float)oldW * oldX + (float)newW * newX; \
@@ -14,11 +14,11 @@
     newW = MIN(newW, maxW);
 
 /// Linearized pixel index
-_CPU_AND_GPU_CODE_ inline int pixelLocId(int x, int y, const THREADPTR(Vector2i) &imgSize) {
+CPU_AND_GPU inline int pixelLocId(int x, int y, const THREADPTR(Vector2i) &imgSize) {
     return x + y * imgSize.x;
 }
 
-_CPU_AND_GPU_CODE_ inline void updateVoxelColorInformation(
+CPU_AND_GPU inline void updateVoxelColorInformation(
     DEVICEPTR(ITMVoxel) & voxel,
     Vector3f oldC, int oldW, Vector3f newC, int newW,
     int maxW)
@@ -31,7 +31,7 @@ _CPU_AND_GPU_CODE_ inline void updateVoxelColorInformation(
     voxel.w_color = (uchar)newW;
 }
 
-_CPU_AND_GPU_CODE_ inline void updateVoxelDepthInformation(
+CPU_AND_GPU inline void updateVoxelDepthInformation(
     DEVICEPTR(ITMVoxel) & voxel,
     float oldF, int oldW, float newF, int newW,
     int maxW)
@@ -48,7 +48,7 @@ _CPU_AND_GPU_CODE_ inline void updateVoxelDepthInformation(
 /// Computes a position in camera space given a 2d image coordinate and a depth.
 /// \f$ z K^{-1}u\f$
 /// \param x,y \f$ u\f$
-_CPU_AND_GPU_CODE_ inline Vector4f depthTo3D(
+CPU_AND_GPU inline Vector4f depthTo3D(
     const CONSTPTR(Vector4f) & viewIntrinsics, //!< K
     const THREADPTR(int) & x, const THREADPTR(int) & y,
     const CONSTPTR(float) &depth //!< z
@@ -64,7 +64,7 @@ _CPU_AND_GPU_CODE_ inline Vector4f depthTo3D(
 }
 
 
-_CPU_AND_GPU_CODE_ inline Vector4f depthTo3DInvProjParams(
+CPU_AND_GPU inline Vector4f depthTo3DInvProjParams(
     const CONSTPTR(Vector4f) & invProjParams, //!< <inverse projection parameters> which contain (1/fx, 1/fy, cx, cy)
     const THREADPTR(int) & x, const THREADPTR(int) & y, const CONSTPTR(float) &depth) {
     Vector4f o;
@@ -75,7 +75,7 @@ _CPU_AND_GPU_CODE_ inline Vector4f depthTo3DInvProjParams(
     return o;
 }
 
-_CPU_AND_GPU_CODE_ inline bool projectNoBounds(
+CPU_AND_GPU inline bool projectNoBounds(
     Vector4f projParams, Vector4f pt_camera, Vector2f& pt_image) {
     if (pt_camera.z <= 0) return false;
 
@@ -88,7 +88,7 @@ _CPU_AND_GPU_CODE_ inline bool projectNoBounds(
 /// $$\\pi(K p)$$
 /// Projects pt_model, given in camera coordinates to 2d image coordinates (dropping depth).
 /// \returns false when point projects outside of image
-_CPU_AND_GPU_CODE_ inline bool project(
+CPU_AND_GPU inline bool project(
     Vector4f projParams, //!< K 
     const CONSTPTR(Vector2i) & imgSize,
     Vector4f pt_camera, //!< p
@@ -105,7 +105,7 @@ _CPU_AND_GPU_CODE_ inline bool project(
 
 /// Reject pixels on the right lower boundary of the image 
 // (which have an incomplete forward-neighborhood)
-_CPU_AND_GPU_CODE_ inline bool projectExtraBounds(
+CPU_AND_GPU inline bool projectExtraBounds(
     Vector4f projParams, const CONSTPTR(Vector2i) & imgSize,
     Vector4f pt_camera, Vector2f& pt_image) {
     if (!projectNoBounds(projParams, pt_camera, pt_image)) return false;
@@ -118,7 +118,7 @@ _CPU_AND_GPU_CODE_ inline bool projectExtraBounds(
 /// $$\\pi(K M p)$$
 /// Projects pt_model, given in model coordinates to 2d image coordinates (dropping depth).
 /// \returns false when point projects outside of image
-_CPU_AND_GPU_CODE_ inline bool projectModel(
+CPU_AND_GPU inline bool projectModel(
     Vector4f projParams, Matrix4f M, const CONSTPTR(Vector2i) & imgSize,
     Vector4f pt_model,
     Vector4f& pt_camera, Vector2f& pt_image) {
@@ -127,7 +127,7 @@ _CPU_AND_GPU_CODE_ inline bool projectModel(
 }
 
 /// Sample image without interpolation at integer location
-template<typename T> _CPU_AND_GPU_CODE_
+template<typename T> CPU_AND_GPU
 inline T sampleNearest(
 const CONSTPTR(T) *source,
 int x, int y,
@@ -137,7 +137,7 @@ const CONSTPTR(Vector2i) & imgSize)
 }
 
 /// Sample image without interpolation at rounded location
-template<typename T> _CPU_AND_GPU_CODE_
+template<typename T> CPU_AND_GPU
 inline T sampleNearest(
     const CONSTPTR(T) *source,
     const THREADPTR(Vector2f) & pt_image,
@@ -151,34 +151,34 @@ inline T sampleNearest(
 
 template<typename T>
 struct IllegalColor {
-    static _CPU_AND_GPU_CODE_ T make();
+    static CPU_AND_GPU T make();
 };
-inline _CPU_AND_GPU_CODE_ float IllegalColor<float>::make() {
+inline CPU_AND_GPU float IllegalColor<float>::make() {
     return -1;
 }
-inline _CPU_AND_GPU_CODE_ Vector4f IllegalColor<Vector4f>::make() {
+inline CPU_AND_GPU Vector4f IllegalColor<Vector4f>::make() {
     return Vector4f(0, 0, 0, -1);
 }
-inline _CPU_AND_GPU_CODE_ bool isLegalColor(float c) {
+inline CPU_AND_GPU bool isLegalColor(float c) {
     return c >= 0;
 }
-inline _CPU_AND_GPU_CODE_ bool isLegalColor(Vector4f c) {
+inline CPU_AND_GPU bool isLegalColor(Vector4f c) {
     return c.w >= 0;
 }
-inline _CPU_AND_GPU_CODE_ bool isLegalColor(Vector4u c) {
+inline CPU_AND_GPU bool isLegalColor(Vector4u c) {
     // NOTE this should never be called -- withHoles should be false for a Vector4u
     // implementing this just calms the compiler
     assert(false);
     return false;
 }
-inline _CPU_AND_GPU_CODE_ Vector4f toFloat(Vector4u c) {
+inline CPU_AND_GPU Vector4f toFloat(Vector4u c) {
     return c.toFloat();
 }
 
-inline _CPU_AND_GPU_CODE_ Vector4f toFloat(Vector4f c) {
+inline CPU_AND_GPU Vector4f toFloat(Vector4f c) {
     return c;
 }
-inline _CPU_AND_GPU_CODE_ float toFloat(float c) {
+inline CPU_AND_GPU float toFloat(float c) {
     return c;
 }
 
@@ -187,7 +187,7 @@ inline _CPU_AND_GPU_CODE_ float toFloat(float c) {
 /// Sample 4 channel image with bilinear interpolation (T::toFloat must return Vector4f)
 /// IF withHoles == WITH_HOLES: returns makeIllegalColor<OUT>() when any of the four surrounding pixels is illegal (has negative w).
 template<typename T_OUT, //!< Vector4f or float
-    bool withHoles = false, typename T_IN> _CPU_AND_GPU_CODE_ inline Vector4f interpolateBilinear(
+    bool withHoles = false, typename T_IN> CPU_AND_GPU inline Vector4f interpolateBilinear(
     const CONSTPTR(T_IN) *source,
 	const THREADPTR(Vector2f) & position, const CONSTPTR(Vector2i) & imgSize)
 {

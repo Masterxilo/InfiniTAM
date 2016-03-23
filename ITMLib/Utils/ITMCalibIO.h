@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "../Objects/ITMRGBDCalib.h"
+#include "ITMRGBDCalib.h"
 
 
 namespace ITMLib

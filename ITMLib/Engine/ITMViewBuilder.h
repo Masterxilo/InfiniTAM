@@ -2,13 +2,13 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
-#include "../Utils/ITMLibSettings.h"
+#include "ITMLibDefines.h"
+#include "ITMLibSettings.h"
 
-#include "../Objects/ITMView.h"
-#include "../Objects/ITMRGBDCalib.h"
+#include "ITMView.h"
+#include "ITMRGBDCalib.h"
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
 using namespace ITMLib::Objects;
 

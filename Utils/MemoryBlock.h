@@ -18,12 +18,6 @@ namespace ORUtils
 	{
 	protected:
 
-        bool isAllocated_CPU() const {
-            return data_cpu != 0;
-        }
-        bool isAllocated_CUDA() const {
-            return data_cuda != 0;
-        }
 		/** Pointer to memory on CPU host. */
 		DEVICEPTR(T)* data_cpu;
 
@@ -34,6 +28,13 @@ namespace ORUtils
         size_t _dataSize;
 
     public:
+        bool isAllocated_CPU() const {
+            return data_cpu != 0;
+        }
+        bool isAllocated_CUDA() const {
+            return data_cuda != 0;
+        }
+
         size_t getDataSize() const { return _dataSize; } // getter must be public
         /** Total #number of allocated entries in the data array. Read-only.
         Number of allocated BYTES computes as dataSize * sizeof(T)*/
@@ -95,18 +96,18 @@ namespace ORUtils
 		void Clear(unsigned char defaultValue = 0)
 		{
 			if (isAllocated_CPU()) memset(data_cpu, defaultValue, dataSize * sizeof(T));
-			if (isAllocated_CUDA()) ORcudaSafeCall(cudaMemset(data_cuda, defaultValue, dataSize * sizeof(T)));
+			if (isAllocated_CUDA()) cudaSafeCall(cudaMemset(data_cuda, defaultValue, dataSize * sizeof(T)));
 		}
 
 		/** Transfer data from CPU to GPU, if possible. */
 		void UpdateDeviceFromHost() const {
 			if (isAllocated_CUDA() && isAllocated_CPU())
-				ORcudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSize * sizeof(T), cudaMemcpyHostToDevice));
+				cudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSize * sizeof(T), cudaMemcpyHostToDevice));
 		}
 		/** Transfer data from GPU to CPU, if possible. */
 		void UpdateHostFromDevice() const {
             if (isAllocated_CUDA() && isAllocated_CPU())
-				ORcudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSize * sizeof(T), cudaMemcpyDeviceToHost));
+				cudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSize * sizeof(T), cudaMemcpyDeviceToHost));
 		}
 
 		/** Copy data */
@@ -119,13 +120,13 @@ namespace ORUtils
 				break;
 
 			case CPU_TO_CUDA:
-				ORcudaSafeCall(cudaMemcpyAsync(this->data_cuda, source->data_cpu, source->dataSize * sizeof(T), cudaMemcpyHostToDevice));
+				cudaSafeCall(cudaMemcpyAsync(this->data_cuda, source->data_cpu, source->dataSize * sizeof(T), cudaMemcpyHostToDevice));
 				break;
 			case CUDA_TO_CPU:
-				ORcudaSafeCall(cudaMemcpy(this->data_cpu, source->data_cuda, source->dataSize * sizeof(T), cudaMemcpyDeviceToHost));
+				cudaSafeCall(cudaMemcpy(this->data_cpu, source->data_cuda, source->dataSize * sizeof(T), cudaMemcpyDeviceToHost));
 				break;
 			case CUDA_TO_CUDA:
-				ORcudaSafeCall(cudaMemcpyAsync(this->data_cuda, source->data_cuda, source->dataSize * sizeof(T), cudaMemcpyDeviceToDevice));
+				cudaSafeCall(cudaMemcpyAsync(this->data_cuda, source->data_cuda, source->dataSize * sizeof(T), cudaMemcpyDeviceToDevice));
 				break;
 
 			default: break;
@@ -145,7 +146,7 @@ namespace ORUtils
 			Free();
             this->_dataSize = dataSize;
 			if (allocate_CPU) data_cpu = new T[dataSize];
-			if (allocate_CUDA) ORcudaSafeCall(cudaMalloc((void**)&data_cuda, dataSize * sizeof(T)));
+			if (allocate_CUDA) cudaSafeCall(cudaMalloc((void**)&data_cuda, dataSize * sizeof(T)));
 		}
 
 		void Free()
@@ -156,7 +157,7 @@ namespace ORUtils
 			}
 
 			if (isAllocated_CUDA()) {
-                ORcudaSafeCall(cudaFree(data_cuda));
+                cudaSafeCall(cudaFree(data_cuda));
                 data_cuda = 0;
 			}
 		}

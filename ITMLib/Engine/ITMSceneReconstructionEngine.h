@@ -4,12 +4,12 @@
 
 #include <math.h>
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
-#include "../Objects/ITMScene.h"
-#include "../Objects/ITMView.h"
-#include "../Objects/ITMTrackingState.h"
-#include "../Objects/ITMRenderState.h"
+#include "ITMScene.h"
+#include "ITMView.h"
+#include "ITMTrackingState.h"
+#include "ITMRenderState.h"
 
 using namespace ITMLib::Objects;
 
@@ -32,22 +32,21 @@ namespace ITMLib
 			    one.
 			*/
             void ResetScene(
-                ITMScene *scene //<! scene to be reset. 
+                ITMScene * const scene //<! scene to be reset. 
                 );
 
             /// Fusion stage of the system
             void ProcessFrame(
-                const ITMView *view,
-                const ITMTrackingState *trackingState,
-                ITMScene *scene,
-                ITMRenderState *renderState //!< [in, out] modifies visible list
+                const ITMView * const view,
+                const ITMTrackingState * const trackingState,
+                ITMScene * const scene
                 )
             {
                 // allocation & visible list update
-                AllocateSceneFromDepth(scene, view, trackingState, renderState);
+                AllocateSceneFromDepth(scene, view, trackingState);
 
                 // camera data integration
-                IntegrateIntoScene(scene, view, trackingState, renderState);
+                IntegrateIntoScene(scene, view, trackingState);
             }
 
             ITMSceneReconstructionEngine(void);
@@ -62,8 +61,7 @@ namespace ITMLib
             void AllocateSceneFromDepth(
                 ITMScene *scene,
                 const ITMView *view,
-                const ITMTrackingState *trackingState,
-                ITMRenderState *renderState //<! [in, out] initializes visibility
+                const ITMTrackingState *trackingState
                 );
 
             /** Update the voxel blocks by integrating depth and
@@ -72,8 +70,7 @@ namespace ITMLib
             void IntegrateIntoScene(
                 ITMScene *scene,
                 const ITMView *view,
-                const ITMTrackingState *trackingState,
-                const ITMRenderState *renderState);
+                const ITMTrackingState *trackingState);
 
             void *allocationTempData_device;
             void *allocationTempData_host;

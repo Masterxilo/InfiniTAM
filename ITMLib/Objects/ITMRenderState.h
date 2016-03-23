@@ -5,9 +5,9 @@
 
 #include <stdlib.h>
 
-#include "../Utils/ITMLibDefines.h"
-#include "../Engine/DeviceSpecific/CUDA/ITMCUDAUtils.h"
-#include "../../ORUtils/Image.h"
+#include "ITMLibDefines.h"
+#include "ITMCUDAUtils.h"
+#include "Image.h"
 
 namespace ITMLib
 {
@@ -45,8 +45,6 @@ namespace ITMLib
 			*/
 			ORUtils::Image<Vector4f> *raycastResult;
 
-			ORUtils::Image<Vector4u> *raycastImage;
-
             ITMRenderState(
                 const int noTotalEntries,
                 const Vector2i &imgSize,
@@ -55,7 +53,6 @@ namespace ITMLib
 			{
 				renderingRangeImage = new ORUtils::Image<Vector2f>(imgSize, memoryType);
 				raycastResult = new ORUtils::Image<Vector4f>(imgSize, memoryType);
-				raycastImage = new ORUtils::Image<Vector4u>(imgSize, memoryType);
 
                 // Initialize renderingRangeImage to (vf_min, vf_max)
                 Vector2f v_lims(vf_min, vf_max);
@@ -74,7 +71,6 @@ namespace ITMLib
 			{
 				delete renderingRangeImage;
 				delete raycastResult;
-				delete raycastImage;
 			}
 		};
 	}

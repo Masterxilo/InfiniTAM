@@ -1,0 +1,189 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="UnitTests|x64">
+      <Configuration>UnitTests</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{148ABC4E-E0F8-4AEE-A7D2-412398BEB3C5}</ProjectGuid>
+    <RootNamespace>TestedInfiniTAM</RootNamespace>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.0.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
+    <LibraryPath>freeglut\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">
+    <IncludePath>$(VCInstallDir)UnitTest\include;Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(VCInstallDir)UnitTest\lib;freeglut\lib\x64;$(LibraryPath)</LibraryPath>
+    <OutDir>$(SolutionDir)</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
+    <LibraryPath>freeglut\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CudaCompile>
+      <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <GenerateLineInfo>true</GenerateLineInfo>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>UNIT_TESTING=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <CudaCompile>
+      <CodeGeneration>compute_50,sm_50</CodeGeneration>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <CudaCompile>
+      <CodeGeneration>compute_50,sm_50</CodeGeneration>
+    </CudaCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="Engine\ImageSourceEngine.h" />
+    <ClInclude Include="Engine\UIEngine.h" />
+    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h" />
+    <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h" />
+    <ClInclude Include="ITMLib\Engine\ITMMainEngine.h" />
+    <ClInclude Include="ITMLib\Engine\ITMPixelUtils.h" />
+    <ClInclude Include="ITMLib\Engine\ITMRepresentationAccess.h" />
+    <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h" />
+    <ClInclude Include="ITMLib\Engine\ITMTracker.h" />
+    <ClInclude Include="ITMLib\Engine\ITMViewBuilder.h" />
+    <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h" />
+    <ClInclude Include="ITMLib\ITMLib.h" />
+    <ClInclude Include="ITMLib\Objects\ITMDisparityCalib.h" />
+    <ClInclude Include="ITMLib\Objects\ITMExtrinsics.h" />
+    <ClInclude Include="ITMLib\Objects\ITMIntrinsics.h" />
+    <ClInclude Include="ITMLib\Objects\ITMLocalVBA.h" />
+    <ClInclude Include="ITMLib\Objects\ITMPose.h" />
+    <ClInclude Include="ITMLib\Objects\ITMRenderState.h" />
+    <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
+    <ClInclude Include="ITMLib\Objects\ITMScene.h" />
+    <ClInclude Include="ITMLib\Objects\ITMSceneParams.h" />
+    <ClInclude Include="ITMLib\Objects\ITMTrackingState.h" />
+    <ClInclude Include="ITMLib\Objects\ITMView.h" />
+    <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h" />
+    <ClInclude Include="ITMLib\Utils\ITMCalibIO.h" />
+    <ClInclude Include="ITMLib\Utils\ITMLibDefines.h" />
+    <ClInclude Include="ITMLib\Utils\ITMLibSettings.h" />
+    <ClInclude Include="ITMLib\Utils\ITMMath.h" />
+    <ClInclude Include="Utils\HashMap.h" />
+    <ClInclude Include="Utils\MyAssert.h" />
+    <ClInclude Include="Utils\Cholesky.h" />
+    <ClInclude Include="Utils\CUDADefines.h" />
+    <ClInclude Include="Utils\cudaSafeCall.h" />
+    <ClInclude Include="Utils\FileUtils.h" />
+    <ClInclude Include="Utils\Image.h" />
+    <ClInclude Include="Utils\LexicalCast.h" />
+    <ClInclude Include="Utils\MathUtils.h" />
+    <ClInclude Include="Utils\Matrix.h" />
+    <ClInclude Include="Utils\MemoryBlock.h" />
+    <ClInclude Include="Utils\MemoryBlockPersister.h" />
+    <ClInclude Include="Utils\MetalContext.h" />
+    <ClInclude Include="Utils\NVTimer.h" />
+    <ClInclude Include="Utils\PlatformIndependence.h" />
+    <ClInclude Include="Utils\Vector.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="Engine\ImageSourceEngine.cu" />
+    <CudaCompile Include="Engine\UIEngine.cu" />
+    <CudaCompile Include="InfiniTAM.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMViewBuilder.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu" />
+    <CudaCompile Include="ITMLib\Objects\ITMPose.cu" />
+    <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu">
+      <Keep Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</Keep>
+    </CudaCompile>
+    <CudaCompile Include="Tests\Tests.cu" />
+    <CudaCompile Include="Tests\TestUtils.cu" />
+    <CudaCompile Include="Utils\FileUtils.cu" />
+    <CudaCompile Include="Utils\FileUtilsPNG.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="lodepng\lodepng.cpp" />
+    <ClCompile Include="Tests\TestClasses.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="stderr.txt" />
+    <Text Include="stdout.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.0.targets" />
+  </ImportGroup>
+</Project>

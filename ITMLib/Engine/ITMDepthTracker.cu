@@ -1,13 +1,11 @@
 /// \file c.f. newcombe_etal_ismar2011.pdf
 
 #include "ITMDepthTracker.h"
-#include "DeviceSpecific\CUDA\ITMCUDAUtils.h"
-#include "../../ORUtils/CUDADefines.h"
-#include "../../ORUtils/Cholesky.h"
-#include "../Utils/ITMLibDefines.h"
-#include "DeviceAgnostic\ITMPixelUtils.h"
-
-#include <math.h>
+#include "ITMCUDAUtils.h"
+#include "CUDADefines.h"
+#include "Cholesky.h"
+#include "ITMLibDefines.h"
+#include "ITMPixelUtils.h"
 
 using namespace ITMLib::Engine;
 
@@ -55,7 +53,7 @@ the direction in which \f$p_k\f$ is observed (projective data association).
 \see newcombe_etal_ismar2011.pdf Sensor Pose Estimation
 */
 template<TrackerIterationType iterationType>
-_CPU_AND_GPU_CODE_ inline bool computePerPointGH_Depth_Ab(
+CPU_AND_GPU inline bool computePerPointGH_Depth_Ab(
     THREADPTR(float) *AT, //!< [out]
     THREADPTR(float) &b,//!< [out]
 
@@ -302,7 +300,7 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
         (int)ceil((float)viewImageSize.x / (float)blockSize.x),
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
-    ITMSafeCall(cudaMemset(accu, 0, sizeof(AccuCell)));
+    cudaSafeCall(cudaMemset(accu, 0, sizeof(AccuCell)));
 
     struct ITMDepthTracker_KernelParameters args;
     args.accu = accu;
@@ -352,12 +350,12 @@ ITMDepthTracker::ITMDepthTracker(
     trackingLevels.push_back(TrackingLevel(10, TRACKER_ITERATION_ROTATION, distThresh, depthImgSize / 16));
     assert(trackingLevels.size() == noHierarchyLevels);
 
-    ITMSafeCall(cudaMallocManaged((void**)&accu, sizeof(AccuCell)));
+    cudaSafeCall(cudaMallocManaged((void**)&accu, sizeof(AccuCell)));
 }
 
 ITMDepthTracker::~ITMDepthTracker(void)
 {
-    ITMSafeCall(cudaFree(accu));
+    cudaSafeCall(cudaFree(accu));
 }
 
 void ITMDepthTracker::ComputeDelta(float *step, float *nabla, float *hessian) const

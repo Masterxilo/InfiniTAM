@@ -2,10 +2,10 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 
-#include "../Objects/ITMTrackingState.h"
-#include "../Objects/ITMView.h"
+#include "ITMTrackingState.h"
+#include "ITMView.h"
 
 using namespace ITMLib::Objects;
 

@@ -2,11 +2,9 @@
 
 #pragma once
 
-#include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
-#include <stdlib.h>
-
-#include "../Utils/ITMLibDefines.h"
-#include "../../ORUtils/MemoryBlock.h"
+#include "ITMCUDAUtils.h"
+#include "ITMLibDefines.h"
+#include "MemoryBlock.h"
 
 namespace ITMLib
 {
@@ -52,8 +50,9 @@ namespace ITMLib
                 }
 
                 void Reset() {
-                    cudaDeviceSynchronize(); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
+                    cudaSafeCall(cudaDeviceSynchronize()); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
                     lastFreeEntry = capacity - 1;
+                    cudaDeviceSynchronize(); // commit lastFreeEntry (TODO: needed?)
                 }
             } *voxelAllocationList;
 

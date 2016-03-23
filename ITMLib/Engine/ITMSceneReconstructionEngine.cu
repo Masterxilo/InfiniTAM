@@ -1,11 +1,11 @@
 // Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
 
 #include "ITMSceneReconstructionEngine.h"
-#include "DeviceSpecific\CUDA\ITMCUDAUtils.h"
-#include "../Utils/ITMLibDefines.h"
-#include "DeviceAgnostic\ITMPixelUtils.h"
-#include "DeviceAgnostic\ITMRepresentationAccess.h"
-#include "../Objects/ITMLocalVBA.h"
+#include "ITMCUDAUtils.h"
+#include "ITMLibDefines.h"
+#include "ITMPixelUtils.h"
+#include "ITMRepresentationAccess.h"
+#include "ITMLocalVBA.h"
 
 using namespace ITMLib::Engine;
 
@@ -15,7 +15,7 @@ using namespace ITMLib::Engine;
 /// \returns \f$\eta\f$, -1 on failure
 // Note that the stored T-SDF values are normalized to lie
 // in [-1,1] within the truncation band.
-_CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
+CPU_AND_GPU inline float computeUpdatedVoxelDepthInfo(
     DEVICEPTR(ITMVoxel) &voxel, //!< X
     const THREADPTR(Vector4f) & pt_model, //!< voxel location X
     const CONSTPTR(Matrix4f) & M_d, //!< depth camera pose
@@ -61,7 +61,7 @@ _CPU_AND_GPU_CODE_ inline float computeUpdatedVoxelDepthInfo(
 }
 
 /// \returns early on failure
-_CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(ITMVoxel) &voxel, const THREADPTR(Vector4f) & pt_model, const CONSTPTR(Matrix4f) & M_rgb,
+CPU_AND_GPU inline void computeUpdatedVoxelColorInfo(DEVICEPTR(ITMVoxel) &voxel, const THREADPTR(Vector4f) & pt_model, const CONSTPTR(Matrix4f) & M_rgb,
     const CONSTPTR(Vector4f) & projParams_rgb, float mu, uchar maxW, float eta, const CONSTPTR(Vector4u) *rgb, const CONSTPTR(Vector2i) & imgSize)
 {
     Vector4f pt_camera; Vector2f pt_image;
@@ -84,7 +84,7 @@ _CPU_AND_GPU_CODE_ inline void computeUpdatedVoxelColorInfo(DEVICEPTR(ITMVoxel) 
 }
 
 
-_CPU_AND_GPU_CODE_ static void computeUpdatedVoxelInfo(
+CPU_AND_GPU static void computeUpdatedVoxelInfo(
     DEVICEPTR(ITMVoxel) & voxel, //!< [in, out] updated voxel
     const THREADPTR(Vector4f) & pt_model,
     const THREADPTR(Matrix4f) & M_d, const THREADPTR(Vector4f) & projParams_d,
@@ -110,7 +110,7 @@ _CPU_AND_GPU_CODE_ static void computeUpdatedVoxelInfo(
 /// and need to be allocated.
 /// Builds hashVisibility and entriesAllocType.
 /// \param x,y [in] loop over depth image.
-_CPU_AND_GPU_CODE_ inline void buildHashAllocAndVisibleTypePP(
+CPU_AND_GPU inline void buildHashAllocAndVisibleTypePP(
     DEVICEPTR(uchar) * const entriesAllocType, //!< [out] allocation type (AT_*) for each hash table bucket, indexed by values computed from hashIndex, or in excess part
     const int x, const int y,
     DEVICEPTR(Vector4s) * const  blockCoords, //!< [out] blockPos coordinate of each voxel block that needs allocation, indexed by values computed from hashIndex, or in excess part
@@ -217,10 +217,11 @@ ITMVoxelBlock *localVBA,
 uchar *entriesAllocType,
 Vector4s *blockCoords)
 {
-    unsigned char hashChangeType = entriesAllocType[targetIdx];
+    const unsigned char hashChangeType = entriesAllocType[targetIdx];
     if (hashChangeType == 0) return;
-    int ptr = voxelAllocationList->Allocate();
-    if (ptr < 0) return; //there is no room in the voxel block array
+    const int ptr = voxelAllocationList->Allocate();
+    assert(ptr >= 0 && ptr < SDF_LOCAL_BLOCK_NUM);
+    //if (ptr < 0) return; //there is no room in the voxel block array
 
 
     ITMHashEntry hashEntry;
@@ -232,9 +233,8 @@ Vector4s *blockCoords)
     assert(localVBA[ptr].pos == INVALID_VOXEL_BLOCK_POS); // make sure this was free before
     localVBA[ptr].pos = hashEntry.pos;
 
-    int exlOffset;
     if (hashChangeType == AT_NEEDS_ALLOC_EXCESS) { //needs allocation in the excess list
-        exlOffset = excessAllocationList->Allocate();
+        const int exlOffset = excessAllocationList->Allocate();
 
         if (exlOffset >= 0) //there is room in the excess list
         {
@@ -248,7 +248,7 @@ Vector4s *blockCoords)
 }
 
 
-_CPU_AND_GPU_CODE_ inline void integrateVoxel(int x, int y, int z,
+CPU_AND_GPU inline void integrateVoxel(int x, int y, int z,
     Vector3i globalPos,
     ITMVoxelBlock *localVoxelBlock,
     float voxelSize,
@@ -312,9 +312,13 @@ __global__ void buildHashAllocAndVisibleType_device(
 
 
 __global__ void allocateVoxelBlocksList_device(
-    typename ITMLocalVBA::VoxelAllocationList *voxelAllocationList,
-    ITMVoxelBlockHash::ExcessAllocationList *excessAllocationList, ITMHashEntry *hashTable, ITMVoxelBlock* localVBA, int noTotalEntries,
-    uchar *entriesAllocType, Vector4s *blockCoords)
+    typename ITMLocalVBA::VoxelAllocationList * const voxelAllocationList,
+    ITMVoxelBlockHash::ExcessAllocationList * const excessAllocationList,
+    ITMHashEntry *hashTable,
+    ITMVoxelBlock* localVBA,
+    const int noTotalEntries,
+    uchar *entriesAllocType,
+    Vector4s *blockCoords)
 {
     const int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
     if (targetIdx > noTotalEntries - 1) return;
@@ -335,18 +339,18 @@ __global__ void allocateVoxelBlocksList_device(
 ITMSceneReconstructionEngine::ITMSceneReconstructionEngine(void) 
 {
 	const int noTotalEntries = ITMVoxelBlockHash::noTotalEntries;
-	ITMSafeCall(cudaMalloc((void**)&entriesAllocType_device, noTotalEntries));
-	ITMSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
+	cudaSafeCall(cudaMalloc((void**)&entriesAllocType_device, noTotalEntries));
+	cudaSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
 }
 
 ITMSceneReconstructionEngine::~ITMSceneReconstructionEngine(void) 
 {
-	ITMSafeCall(cudaFree(entriesAllocType_device));
-	ITMSafeCall(cudaFree(blockCoords_device));
+	cudaSafeCall(cudaFree(entriesAllocType_device));
+	cudaSafeCall(cudaFree(blockCoords_device));
 }
 
 /// thread blocks 0:numBlocks-1, threads 0:SDF_BLOCK_SIZE3-1
-static __global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
+__global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
     voxelBlocks_ptr[blockIdx.x].blockVoxels[threadIdx.x] = ITMVoxel();
 
     if (threadIdx.x == 0) voxelBlocks_ptr[blockIdx.x].pos = INVALID_VOXEL_BLOCK_POS;
@@ -354,13 +358,13 @@ static __global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
 
 void ITMSceneReconstructionEngine::ResetScene(ITMScene *scene)
 {
+    printf("ResetScene\n");
 	const int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
 	const int blockSize = scene->index.getVoxelBlockSize();
 
     // Reset sdf data of all voxels in all voxel blocks
     ITMVoxelBlock *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
     resetVoxelBlocks << <numBlocks, SDF_BLOCK_SIZE3 >> >(voxelBlocks_ptr);
-    //memsetKernel<ITMVoxelBlock>(voxelBlocks_ptr, ITMVoxelBlock(), numBlocks * blockSize); // TODO we might use a smarter kernel to not submit that much data
 
     // Reset voxel allocation list
     scene->localVBA.voxelAllocationList->Reset();
@@ -372,24 +376,21 @@ void ITMSceneReconstructionEngine::ResetScene(ITMScene *scene)
 
     // Reset excess allocation list
     scene->index.excessAllocationList->Reset();
+    printf("ResetScene done\n");
 }
 
 void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
     ITMScene *scene,
     const ITMView *view, 
-	const ITMTrackingState *trackingState, 
-    ITMRenderState *renderState)
+	const ITMTrackingState *trackingState)
 {
 	const Vector2i depthImgSize = view->depth->noDims;
     const float voxelSize = scene->sceneParams->voxelSize;
     
     const Matrix4f M_d = trackingState->pose_d->GetM();
-    Matrix4f invM_d; M_d.inv(invM_d);
+    const Matrix4f invM_d = trackingState->pose_d->GetInvM();
 
-    const Vector4f projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
-    Vector4f invProjParams_d = projParams_d;
-	invProjParams_d.x = 1.0f / invProjParams_d.x;
-	invProjParams_d.y = 1.0f / invProjParams_d.y;
+    const Vector4f invProjParams_d = view->calib->intrinsics_d.getInverseProjParams();
 
 	const float mu = scene->sceneParams->mu;
 
@@ -411,7 +412,7 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
 
     // Determine blocks currently visible in depth map but not allocated  for preparing allocation list
 
-	ITMSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
+	cudaSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
 
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(
         entriesAllocType_device,
@@ -433,7 +434,7 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
 }
 
 void ITMSceneReconstructionEngine::IntegrateIntoScene(ITMScene *scene, const ITMView *view,
-	const ITMTrackingState *trackingState, const ITMRenderState *renderState)
+	const ITMTrackingState *trackingState)
 {
 	Vector2i rgbImgSize = view->rgb->noDims;
 	Vector2i depthImgSize = view->depth->noDims;

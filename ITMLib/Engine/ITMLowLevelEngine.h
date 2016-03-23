@@ -2,14 +2,14 @@
 
 #pragma once
 
-#include "../../ORUtils/CUDADefines.h"
-#include "../../ORUtils/Image.h"
-#include "../Utils/ITMLibDefines.h"
-#include "DeviceAgnostic/ITMPixelUtils.h"
+#include "CUDADefines.h"
+#include "Image.h"
+#include "ITMLibDefines.h"
+#include "ITMPixelUtils.h"
 
 
 template<bool withHoles = false, typename T>
-_CPU_AND_GPU_CODE_ inline void filterSubsample(
+CPU_AND_GPU inline void filterSubsample(
     DEVICEPTR(T) *imageData_out, int x, int y, Vector2i newDims,
     const CONSTPTR(T) *imageData_in, Vector2i oldDims)
 {
@@ -46,7 +46,7 @@ Convolution of image around x,y with
 \f]
 Gradient and color image are of size imgSize.
 */
-_CPU_AND_GPU_CODE_ inline void gradientX(
+CPU_AND_GPU inline void gradientX(
     DEVICEPTR(Vector4s) *grad, int x, int y,
     const CONSTPTR(Vector4u) *image,
     Vector2i imgSize)
@@ -84,7 +84,7 @@ Convolution of image around x,y with
 \f]
 Gradient and color image are of size imgSize.
 */
-_CPU_AND_GPU_CODE_ inline void gradientY(DEVICEPTR(Vector4s) *grad, int x, int y, const CONSTPTR(Vector4u) *image, Vector2i imgSize)
+CPU_AND_GPU inline void gradientY(DEVICEPTR(Vector4s) *grad, int x, int y, const CONSTPTR(Vector4u) *image, Vector2i imgSize)
 {
     Vector4s d1, d2, d3, d_out;
 
@@ -141,7 +141,7 @@ namespace ITMLib
             template<typename T>
             void CopyImage(ORUtils::Image<T> *image_out, const ORUtils::Image<T> *image_in) const
             {
-                ITMSafeCall(cudaMemcpy(
+                cudaSafeCall(cudaMemcpy(
                     image_out->GetData(MEMORYDEVICE_CUDA),
                     image_in->GetData(MEMORYDEVICE_CUDA),
                     image_in->dataSize * sizeof(T), cudaMemcpyDeviceToDevice));
@@ -179,7 +179,7 @@ FILTERMETHOD(FilterSubsampleWithHoles, WITH_HOLES)
 	dim3 blockSize(16, 16);\
 	dim3 gridSize((int)ceil((float)imgSize.x / (float)blockSize.x), (int)ceil((float)imgSize.y / (float)blockSize.y));\
     \
-	ITMSafeCall(cudaMemset(grad, 0, imgSize.x * imgSize.y * sizeof(Vector4s)));\
+	cudaSafeCall(cudaMemset(grad, 0, imgSize.x * imgSize.y * sizeof(Vector4s)));\
     \
     gradient ## X_OR_Y ## _device << <gridSize, blockSize >> >(grad, image, imgSize);\
 }

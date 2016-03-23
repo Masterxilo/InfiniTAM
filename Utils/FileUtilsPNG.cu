@@ -6,7 +6,7 @@
 #include <fstream>
 using namespace std;
 
-#include "..\png\lodepng.h"
+#include "lodepng.h"
 
 namespace png {
     void SaveImageToFile(const ITMUChar4Image* image, const char* fileName, bool flipVertical)

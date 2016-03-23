@@ -42,9 +42,14 @@ void pause() {
 }
 void record();
 
+void tests();
+void redirectStd();
 // Files\Calibrations\Kinect2\calib.txt
 // Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/%2504i.ppm Files/Scenes/Teddy/Frames/%2504i.pgm
 int main(int argc, char** argv) {
+
+    redirectStd();
+    tests();
     atexit(pause);
 	const char *arg1 = "";
 	const char *arg2 = NULL;

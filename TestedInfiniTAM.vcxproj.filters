@@ -1,0 +1,224 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Tests">
+      <UniqueIdentifier>{18f60fca-1eec-44dc-9934-513a0e7ec1dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib">
+      <UniqueIdentifier>{9391b942-a383-4a73-8da6-65b2acd7868e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib\Objects">
+      <UniqueIdentifier>{f0337035-fc5c-4b55-9ee4-e549e2e17557}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib\Engine">
+      <UniqueIdentifier>{17ed2260-6b53-4f29-af70-c8d6c54f04d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{983589be-77bd-4091-aa0a-52fba0c1a9cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Engine">
+      <UniqueIdentifier>{77b658cf-0647-406d-8f2c-eab6e28c6296}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ITMLib\Utils">
+      <UniqueIdentifier>{4e05ef16-b5e6-4fb8-970f-9991e53f8db7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lodepng">
+      <UniqueIdentifier>{60e28f76-cc88-4e49-91a2-74ea81ec8d3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Tests\Framework">
+      <UniqueIdentifier>{cac1f627-384f-4740-b050-61c5a07b0d34}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Utils\Matrix.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\MemoryBlock.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\MemoryBlockPersister.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\MetalContext.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\NVTimer.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\PlatformIndependence.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Vector.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Cholesky.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\CUDADefines.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\FileUtils.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Image.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\LexicalCast.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\MathUtils.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\ImageSourceEngine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Engine\UIEngine.h">
+      <Filter>Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\ITMLib.h">
+      <Filter>ITMLib</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Utils\ITMCalibIO.h">
+      <Filter>ITMLib\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Utils\ITMLibDefines.h">
+      <Filter>ITMLib\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Utils\ITMLibSettings.h">
+      <Filter>ITMLib\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Utils\ITMMath.h">
+      <Filter>ITMLib\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMDisparityCalib.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMExtrinsics.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMIntrinsics.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMLocalVBA.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMPose.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMRenderState.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMScene.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMSceneParams.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMTrackingState.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMView.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h">
+      <Filter>ITMLib\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMMainEngine.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMPixelUtils.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMRepresentationAccess.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMTracker.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMViewBuilder.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\HashMap.h">
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\MyAssert.h">
+      <Filter>Tests\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\cudaSafeCall.h">
+      <Filter>Tests\Framework</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="InfiniTAM.cu" />
+    <CudaCompile Include="Utils\FileUtils.cu">
+      <Filter>Utils</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Utils\FileUtilsPNG.cu">
+      <Filter>Utils</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Engine\ImageSourceEngine.cu">
+      <Filter>Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Engine\UIEngine.cu">
+      <Filter>Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu">
+      <Filter>ITMLib\Utils</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Objects\ITMPose.cu">
+      <Filter>ITMLib\Objects</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMViewBuilder.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Tests\Tests.cu">
+      <Filter>Tests</Filter>
+    </CudaCompile>
+    <CudaCompile Include="Tests\TestUtils.cu">
+      <Filter>Tests\Framework</Filter>
+    </CudaCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="lodepng\lodepng.cpp">
+      <Filter>lodepng</Filter>
+    </ClCompile>
+    <ClCompile Include="Tests\TestClasses.cpp">
+      <Filter>Tests\Framework</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="stdout.txt">
+      <Filter>Tests</Filter>
+    </Text>
+    <Text Include="stderr.txt">
+      <Filter>Tests</Filter>
+    </Text>
+  </ItemGroup>
+</Project>

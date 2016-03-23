@@ -3,7 +3,7 @@
 #pragma once
 
 
-#include "../Utils/ITMLibDefines.h"
+#include "ITMLibDefines.h"
 #define ITMFloatImage ORUtils::Image<float>
 #define ITMFloat2Image ORUtils::Image<Vector2f>
 #define ITMFloat4Image ORUtils::Image<Vector4f>
@@ -17,8 +17,8 @@
 #define ITMUChar4Image ORUtils::Image<Vector4u>
 #define ITMBoolImage ORUtils::Image<bool>
 
-#include "../Objects/ITMRGBDCalib.h"
-#include "../Utils/ITMCalibIO.h"
+#include "ITMRGBDCalib.h"
+#include "ITMCalibIO.h"
 
 
 namespace ITMLib

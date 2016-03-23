@@ -2,10 +2,9 @@
 
 #pragma once
 
-#include "../Utils/ITMLibDefines.h"
-
-#include "../Engine/ITMTracker.h"
-#include "../Engine/ITMLowLevelEngine.h"
+#include "ITMLibDefines.h"
+#include "ITMTracker.h"
+#include "ITMLowLevelEngine.h"
 
 using namespace ITMLib::Objects;
 

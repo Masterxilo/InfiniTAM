@@ -2,12 +2,9 @@
 
 #pragma once
 
-
-#include "..\Engine\DeviceSpecific\CUDA\ITMCUDAUtils.h"
-
-#include "../Utils/ITMLibDefines.h"
-
-#include "../../ORUtils/MemoryBlock.h"
+#include "ITMCUDAUtils.h"
+#include "ITMLibDefines.h"
+#include "MemoryBlock.h"
 
 namespace ITMLib
 {
@@ -30,7 +27,7 @@ namespace ITMLib
                 VoxelBlockPos blockPos;
                 // Offset into the voxel block array, caches a .ptr of HashEntry
 				int blockPtr;
-				_CPU_AND_GPU_CODE_ IndexCache(void) : blockPos(0x7fffffff), blockPtr(-1) {}
+				CPU_AND_GPU IndexCache(void) : blockPos(0x7fffffff), blockPtr(-1) {}
 			};
 
 			/** Maximum number of total entries. */

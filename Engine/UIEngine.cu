@@ -8,7 +8,7 @@
 #include <GL/glut.h>
 #include <GL/freeglut.h>
 
-#include "../Utils/FileUtils.h"
+#include "FileUtils.h"
 
 using namespace InfiniTAM::Engine;
 UIEngine* UIEngine::instance;
@@ -359,7 +359,7 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 	needsRefresh = false;
 	processedFrameNo = 0;
 
-	ITMSafeCall(cudaThreadSynchronize());
+	cudaSafeCall(cudaThreadSynchronize());
 
 	sdkCreateTimer(&timer_instant);
 	sdkCreateTimer(&timer_average);
@@ -380,7 +380,7 @@ void UIEngine::ProcessFrame()
 	//actual processing on the mainEngine
     mainEngine->ProcessFrame(inputRGBImage, inputRawDepthImage);
 
-	ITMSafeCall(cudaThreadSynchronize());
+	cudaSafeCall(cudaThreadSynchronize());
 	sdkStopTimer(&timer_instant); sdkStopTimer(&timer_average);
     
 

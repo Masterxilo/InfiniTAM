@@ -2,16 +2,7 @@
 
 #pragma once
 
-
-
-#include <assert.h>
-#include <cuda_runtime.h>
-
-#ifndef ITMSafeCall
-#define ITMSafeCall ORcudaSafeCall
-#endif
-
-#include "../../ORUtils/PlatformIndependence.h"
+#include "PlatformIndependence.h"
 #include "ITMMath.h"
 
 
@@ -63,8 +54,8 @@ struct ITMHashEntry
     to compute the next hashIdx.
     This value is at most SDF_EXCESS_LIST_SIZE.*/
 	int offset;
-    _CPU_AND_GPU_CODE_ bool hasExcessListOffset() { return offset >= 1; }
-	_CPU_AND_GPU_CODE_ int getHashIndexOfNextExcessEntry() {
+    CPU_AND_GPU bool hasExcessListOffset() { return offset >= 1; }
+	CPU_AND_GPU int getHashIndexOfNextExcessEntry() {
         return SDF_BUCKET_NUM + offset - 1;
     }
     
@@ -80,13 +71,13 @@ struct ITMHashEntry
 	*/
     int ptr;
 
-    _CPU_AND_GPU_CODE_ bool isAllocatedAndActive() const { return ptr >= 0; }
+    CPU_AND_GPU bool isAllocatedAndActive() const { return ptr >= 0; }
 
     /// Was once allocated, but is maybe not in active memory.
     /// But this space is permanently reserved.
-    _CPU_AND_GPU_CODE_ bool isAllocated() const { return ptr >= -1; }
+    CPU_AND_GPU bool isAllocated() const { return ptr >= -1; }
 
-    _CPU_AND_GPU_CODE_ bool isUnallocated() const { return ptr < -1; }
+    CPU_AND_GPU bool isUnallocated() const { return ptr < -1; }
 
     // an unallocated entry, used for resetting
     static ITMHashEntry createIllegalEntry() {
@@ -97,7 +88,7 @@ struct ITMHashEntry
     }
 };
 
-#include "../Objects/ITMVoxelBlockHash.h"
+#include "ITMVoxelBlockHash.h"
 
 // #define USE_FLOAT_SDF_STORAGE // uses 4 instead of 2 bytes
 /** \brief
@@ -106,14 +97,14 @@ struct ITMHashEntry
 struct ITMVoxel
 {    /** Value of the truncated signed distance transformation. */
 #ifdef USE_FLOAT_SDF_STORAGE
-    _CPU_AND_GPU_CODE_ static float SDF_initialValue() { return 1.0f; }
-    _CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return x; }
-    _CPU_AND_GPU_CODE_ static float SDF_floatToValue(float x) { return x; }
+    CPU_AND_GPU static float SDF_initialValue() { return 1.0f; }
+    CPU_AND_GPU static float SDF_valueToFloat(float x) { return x; }
+    CPU_AND_GPU static float SDF_floatToValue(float x) { return x; }
     float sdf;
 #else
-	_CPU_AND_GPU_CODE_ static short SDF_initialValue() { return 32767; }
-	_CPU_AND_GPU_CODE_ static float SDF_valueToFloat(float x) { return (float)(x) / 32767.0f; }
-	_CPU_AND_GPU_CODE_ static short SDF_floatToValue(float x) { return (short)((x) * 32767.0f); }
+	CPU_AND_GPU static short SDF_initialValue() { return 32767; }
+	CPU_AND_GPU static float SDF_valueToFloat(float x) { return (float)(x) / 32767.0f; }
+	CPU_AND_GPU static short SDF_floatToValue(float x) { return (short)((x) * 32767.0f); }
     short sdf;
 #endif
 
@@ -125,7 +116,7 @@ struct ITMVoxel
 	/** Number of observations that made up @p clr. */
 	uchar w_color;
 
-    _CPU_AND_GPU_CODE_ ITMVoxel()
+    CPU_AND_GPU ITMVoxel()
 	{
 		sdf = SDF_initialValue();
 		w_depth = 0;
@@ -155,7 +146,7 @@ enum TrackerIterationType
     TRACKER_ITERATION_NONE = 4
 };
 
-#include "../../ORUtils/Image.h"
+#include "Image.h"
 
 #define ITMFloatImage ORUtils::Image<float>
 #define ITMFloat2Image ORUtils::Image<Vector2f>

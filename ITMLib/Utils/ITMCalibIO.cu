@@ -1,5 +1,3 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #include "ITMCalibIO.h"
 
 #include <fstream>
@@ -71,10 +69,6 @@ bool ITMLib::Objects::readRGBDCalib(std::istream & src, ITMRGBDCalib & dest)
 bool ITMLib::Objects::readRGBDCalib(const char *fileName, ITMRGBDCalib & dest)
 {
 	std::ifstream f(fileName);
-    if (!f.is_open()) {
-        printf("could not open %s\n", fileName);
-        exit(1);
-    }
+    assert(f.is_open());
 	return ITMLib::Objects::readRGBDCalib(f, dest);
 }
-
