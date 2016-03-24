@@ -101,7 +101,7 @@ namespace ITMLib
 			void ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage);
 
 			void GetImage(
-                ITMUChar4Image * const out, //!< [in] must be allocated on cuda and host. On exit, host version will be requested image, cuda image undefined
+                ITMUChar4Image * const out, //!< [in] must be allocated on cuda and host. On exit, host version will be requested image, cuda image undefined. Dimensions must not change from call to call.
                 const GetImageType getImageType, 
                 const ITMPose * const pose = NULL, //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
                 const ITMIntrinsics * const intrinsics = NULL //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type

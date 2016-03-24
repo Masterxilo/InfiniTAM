@@ -25,7 +25,8 @@ namespace ITMLib
         {
         public:
 
-            void TrackCamera(ITMTrackingState *trackingState, //!< [in/out] the computed best fit camera pose for the new view
+            void TrackCamera(
+                ITMTrackingState *trackingState, //!< [in,out] in: the current and out: the computed best fit adjusted camera pose for the new view
                 const ITMView *view //<! latest camera data, for which the camera pose shall be adjusted
                 );
 

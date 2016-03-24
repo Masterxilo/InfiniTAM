@@ -96,7 +96,7 @@ CPU_AND_GPU inline ITMVoxel readVoxel(
     const CONSTPTR(ITMHashEntry) * const voxelIndex,
 	const THREADPTR(Vector3i) & point,
     THREADPTR(bool) &isFound,
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelIndex::IndexCache())
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
 {
     short linearIdx;
     VoxelBlockPos blockPos;
@@ -129,7 +129,7 @@ CPU_AND_GPU inline float readFromSDF_float_uninterpolated(
     const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
     THREADPTR(bool) &isFound,
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelIndex::IndexCache())
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
 {
     ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound, cache);
     return ITMVoxel::SDF_valueToFloat(res.sdf);
@@ -144,7 +144,7 @@ CPU_AND_GPU inline float readFromSDF_float_interpolated(
     const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
     THREADPTR(bool) &isFound, 
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelIndex::IndexCache())
+    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
 {
 	float res1, res2, v1, v2;
     COMPUTE_COEFF_POS_FROM_POINT();
@@ -174,9 +174,9 @@ CPU_AND_GPU inline float readFromSDF_float_interpolated(
 /// Assumes voxels store color in some type convertible to Vector3f (e.g. Vector3u)
 CPU_AND_GPU inline Vector3f readFromSDF_color4u_interpolated(
     const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex, 
+    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex, 
     const THREADPTR(Vector3f) & point, //!< in voxel-fractional world coordinates, comes e.g. from raycastResult
-    THREADPTR(typename ITMVoxelIndex::IndexCache) & cache = ITMVoxelIndex::IndexCache())
+    THREADPTR(typename ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
 {
     ITMVoxel resn; 
     Vector3f ret = 0.0f; 
@@ -209,7 +209,7 @@ CPU_AND_GPU inline Vector3f readFromSDF_color4u_interpolated(
 // Note: this gets the localVBA list, not just a *single* voxel block.
 CPU_AND_GPU inline Vector3f computeSingleNormalFromSDF(
     const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
+    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,
     const THREADPTR(Vector3f) &point)
 {
 

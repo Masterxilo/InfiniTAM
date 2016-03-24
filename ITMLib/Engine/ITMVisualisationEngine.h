@@ -36,7 +36,6 @@ namespace ITMLib
         */
         class ITMVisualisationEngine
         {
-        protected:
         private:
 
 
@@ -56,7 +55,7 @@ namespace ITMLib
                 ITMRenderState *renderState //!< [out] initializes renderingRangeImage
                 ) const;
 
-            const ITMScene *scene;
+            const ITMScene * const scene;
 
 
 		public:

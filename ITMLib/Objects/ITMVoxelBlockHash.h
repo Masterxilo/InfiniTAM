@@ -31,16 +31,12 @@ namespace ITMLib
 			};
 
 			/** Maximum number of total entries. */
-			static const CONSTPTR(int) noTotalEntries = SDF_GLOBAL_BLOCK_NUM;
 			static const CONSTPTR(int) voxelBlockSize = SDF_BLOCK_SIZE3;
 
 		private:
 
 			/** The actual data in the hash table. */
 			ORUtils::MemoryBlock<ITMHashEntry> hashEntries;
-
-
-			const MemoryDeviceType memoryType;
 
 		public:
             /// Allocation list generating sequential ids
@@ -69,9 +65,8 @@ namespace ITMLib
                 }
             } * excessAllocationList; // Must be allocated with new for Managed memory management to kick in.
             
-			ITMVoxelBlockHash(MemoryDeviceType memoryType) :
-                memoryType(memoryType),
-                hashEntries(noTotalEntries, memoryType)
+			ITMVoxelBlockHash() :
+                hashEntries(SDF_GLOBAL_BLOCK_NUM, MEMORYDEVICE_CUDA)
             {
                 excessAllocationList = new ExcessAllocationList(SDF_EXCESS_LIST_SIZE);
             }
@@ -81,17 +76,9 @@ namespace ITMLib
             }
 
 			/** Get the list of actual entries in the hash table. */
-			const ITMHashEntry *GetEntries(void) const { return hashEntries.GetData(memoryType); }
-			ITMHashEntry *GetEntries(void) { return hashEntries.GetData(memoryType); }
+            const ITMHashEntry *GetEntries(void) const { return hashEntries.GetData(MEMORYDEVICE_CUDA); }
+            ITMHashEntry *GetEntries(void) { return hashEntries.GetData(MEMORYDEVICE_CUDA); }
 
-			const IndexData *getIndexData(void) const { return hashEntries.GetData(memoryType); }
-			IndexData *getIndexData(void) { return hashEntries.GetData(memoryType); }
-
-			
-			/** Maximum number of locally allocated entries. */
-			int getNumAllocatedVoxelBlocks(void) { return SDF_LOCAL_BLOCK_NUM; }
-            /// Amount of voxels per block
-			int getVoxelBlockSize(void) { return SDF_BLOCK_SIZE3; }
 		};
 	}
 }

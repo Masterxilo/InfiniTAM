@@ -131,11 +131,6 @@ struct ITMVoxelBlock {
     ITMVoxel blockVoxels[SDF_BLOCK_SIZE3];
 };
 
-
-/** This chooses the way the voxels are addressed and indexed.
-*/
-typedef ITMLib::Objects::ITMVoxelBlockHash ITMVoxelIndex;
-
 /// The tracker iteration type used to define the tracking iteration regime
 enum TrackerIterationType
 {

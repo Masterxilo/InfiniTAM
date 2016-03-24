@@ -23,14 +23,12 @@ namespace ITMLib
 			const ITMSceneParams *sceneParams;
 
 			/** Hash table to reference the 8x8x8 blocks */
-			ITMVoxelIndex index;
+			ITMVoxelBlockHash index;
 
-			/** Current local content of the 8x8x8 voxel blocks -- stored host or device */
+			/** Current local content of the 8x8x8 voxel blocks */
 			ITMLocalVBA localVBA;
 
-			ITMScene(const ITMSceneParams *sceneParams)
-                : index(MEMORYDEVICE_CUDA),
-                localVBA(index.getNumAllocatedVoxelBlocks())
+			ITMScene(const ITMSceneParams *sceneParams) 
 			{
 				this->sceneParams = sceneParams;
 			}

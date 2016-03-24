@@ -39,7 +39,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 ITMMainEngine::~ITMMainEngine()
 {
 	delete renderState_live;
-	if (renderState_freeview!=NULL) delete renderState_freeview;
+    delete renderState_freeview;
 
 	delete scene;
 
@@ -110,6 +110,7 @@ void ITMMainEngine::GetImage(
             type = ITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
 
 		if (renderState_freeview == NULL) renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+        assert(renderState_freeview->raycastResult->noDims == out->noDims);
 
 		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, out, type);
         out->UpdateHostFromDevice();

@@ -45,26 +45,10 @@ namespace ITMLib
 			*/
 			ORUtils::Image<Vector4f> *raycastResult;
 
-            ITMRenderState(
-                const int noTotalEntries,
-                const Vector2i &imgSize,
-                float vf_min, float vf_max,
-                MemoryDeviceType memoryType) 
+            ITMRenderState(const Vector2i &imgSize) 
 			{
-				renderingRangeImage = new ORUtils::Image<Vector2f>(imgSize, memoryType);
-				raycastResult = new ORUtils::Image<Vector4f>(imgSize, memoryType);
-
-                // Initialize renderingRangeImage to (vf_min, vf_max)
-                Vector2f v_lims(vf_min, vf_max);
-				ORUtils::Image<Vector2f> *buffImage = new ORUtils::Image<Vector2f>(imgSize, MEMORYDEVICE_CPU);
-				for (int i = 0; i < imgSize.x * imgSize.y; i++) buffImage->GetData(MEMORYDEVICE_CPU)[i] = v_lims;
-
-				if (memoryType == MEMORYDEVICE_CUDA)
-                    renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CUDA);
-				else
-                    renderingRangeImage->SetFrom(buffImage, ORUtils::MemoryBlock<Vector2f>::CPU_TO_CPU);
-
-				delete buffImage;
+                renderingRangeImage = new ORUtils::Image<Vector2f>(imgSize, MEMORYDEVICE_CUDA);
+                raycastResult = new ORUtils::Image<Vector4f>(imgSize, MEMORYDEVICE_CUDA);
 			}
 
 			virtual ~ITMRenderState()

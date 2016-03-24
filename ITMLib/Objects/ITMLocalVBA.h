@@ -32,10 +32,9 @@ namespace ITMLib
             private:
                 /// This index is considered free in the list
                 int lastFreeEntry;
-                const int capacity;
 
             public:
-                VoxelAllocationList(int capacity) : capacity(capacity) {
+                VoxelAllocationList() {
                     Reset();
                 }
 
@@ -51,16 +50,16 @@ namespace ITMLib
 
                 void Reset() {
                     cudaSafeCall(cudaDeviceSynchronize()); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
-                    lastFreeEntry = capacity - 1;
+                    lastFreeEntry = SDF_LOCAL_BLOCK_NUM - 1;
                     cudaDeviceSynchronize(); // commit lastFreeEntry (TODO: needed?)
                 }
             } *voxelAllocationList;
 
 
-            ITMLocalVBA(int noBlocks) 
+            ITMLocalVBA() 
 			{
-                voxelBlocks = new ORUtils::MemoryBlock<ITMVoxelBlock>(noBlocks, MEMORYDEVICE_CUDA);
-                voxelAllocationList = new VoxelAllocationList(noBlocks);
+                voxelBlocks = new ORUtils::MemoryBlock<ITMVoxelBlock>(SDF_LOCAL_BLOCK_NUM, MEMORYDEVICE_CUDA);
+                voxelAllocationList = new VoxelAllocationList();
 			}
 
 			~ITMLocalVBA(void)

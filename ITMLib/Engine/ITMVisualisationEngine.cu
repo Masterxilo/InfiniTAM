@@ -132,7 +132,7 @@ CPU_AND_GPU inline bool castRay(
 
     const int x, const int y,
     const CONSTPTR(ITMVoxelBlock) *voxelData,
-    const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,
+    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,
     const Matrix4f invM, //!< camera-to-world transform
     const Vector4f invProjParams, //!< camera-to-world transform
     const float oneOverVoxelSize,
@@ -162,7 +162,7 @@ CPU_AND_GPU inline bool castRay(
     const Vector3f rayDirection = normalize(pt_block_e - pt_block_s);
     Vector3f pt_result = pt_block_s; // Current position in voxel-fractional-world-coordinates
     const float stepScale = mu * oneOverVoxelSize;
-    typename ITMVoxelIndex::IndexCache cache;
+    typename ITMVoxelBlockHash::IndexCache cache;
     float sdfValue = 1.0f;
     bool hash_found;
     float stepLength;
@@ -227,7 +227,7 @@ CPU_AND_GPU inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out
     const THREADPTR(Vector3f) & point,
     const CONSTPTR(ITMVoxelBlock) *voxelBlockData,
-    const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,
+    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *indexData,
     const THREADPTR(Vector3f) & lightSource,
     THREADPTR(Vector3f) & outNormal,
     THREADPTR(float) & angle //!< outNormal . lightSource
@@ -318,7 +318,7 @@ CPU_AND_GPU inline void computeNormalAndAngle(
 DEVICEPTR(Vector4u) & dest,\
 const CONSTPTR(Vector3f) & point, /* in voxel-fractional world coordinates, comes from raycastResult*/\
 const CONSTPTR(ITMVoxelBlock) *voxelBlockData, \
-const CONSTPTR(typename ITMVoxelIndex::IndexData) *indexData,\
+const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *indexData,\
 const THREADPTR(Vector3f) & normal_obj,\
 const THREADPTR(float) & angle
 
@@ -345,7 +345,7 @@ CPU_AND_GPU inline void drawPixelColour(DRAWFUNCTIONPARAMS)
 
 #define PROCESS_AND_DRAW_PIXEL(PROCESSFUNCTION, DRAWFUNCTION) \
 CPU_AND_GPU inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
-    bool foundPoint, const CONSTPTR(ITMVoxelBlock) *voxelData, const CONSTPTR(typename ITMVoxelIndex::IndexData) *voxelIndex,\
+    bool foundPoint, const CONSTPTR(ITMVoxelBlock) *voxelData, const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,\
 	Vector3f lightSource) {\
 	Vector3f outNormal;\
 	float angle;\
@@ -536,7 +536,7 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
     atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
 }
 
-__global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock *voxelData, const typename ITMVoxelIndex::IndexData *voxelIndex,
+__global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock *voxelData, const typename ITMVoxelBlockHash::IndexData *voxelIndex,
     Vector2i imgSize, Matrix4f invM, Vector4f invProjParams, float oneOverVoxelSize, const Vector2f *minmaximg, float mu)
 {
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
@@ -566,7 +566,7 @@ renderColour_device, processPixelColour
 */
 #define RENDER_PROCESS_PIXEL(RENDERFUN, PROCESSPIXELFUN) \
 __global__ void RENDERFUN ## _device(Vector4u *outRendering, const Vector4f *ptsRay, const ITMVoxelBlock *voxelData,\
-    const typename ITMVoxelIndex::IndexData *voxelIndex, Vector2i imgSize, Vector3f lightSource) { \
+    const typename ITMVoxelBlockHash::IndexData *voxelIndex, Vector2i imgSize, Vector3f lightSource) { \
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);\
     if (x >= imgSize.x || y >= imgSize.y) return;\
     int locId = pixelLocId(x, y, imgSize);\
@@ -579,10 +579,8 @@ RENDER_PROCESS_PIXEL(renderColourFromNormal, processPixelNormal)
 RENDER_PROCESS_PIXEL(renderColour, processPixelColour)
 
 // class implementation
-ITMVisualisationEngine::ITMVisualisationEngine(ITMScene *scene)
+ITMVisualisationEngine::ITMVisualisationEngine(ITMScene *scene) : scene(scene)
 {
-
-    this->scene = scene;
     cudaSafeCall(cudaMalloc((void**)&renderingBlockList_device, sizeof(RenderingBlock) * MAX_RENDERING_BLOCKS));
     cudaSafeCall(cudaMalloc((void**)&noTotalBlocks_device, sizeof(uint)));
 }
@@ -596,7 +594,6 @@ ITMVisualisationEngine::~ITMVisualisationEngine(void)
 ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSize) const
 {
     return new ITMRenderState(
-        ITMVoxelBlockHash::noTotalEntries,
         imgSize,
         this->scene->sceneParams->viewFrustum_min, this->scene->sceneParams->viewFrustum_max, MEMORYDEVICE_CUDA
         );
@@ -606,27 +603,25 @@ void ITMVisualisationEngine::CreateExpectedDepths(
     const ITMPose *pose, const ITMIntrinsics *intrinsics,
     ITMRenderState *renderState) const
 {
-    float voxelSize = this->scene->sceneParams->voxelSize;
+    const float voxelSize = this->scene->sceneParams->voxelSize;
 
     Vector2i imgSize = renderState->renderingRangeImage->noDims;
 
-    //go through list of visible 8x8x8 blocks
-    {
-        const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
+    //go through list of voxel blocks, create rendering blocks storing min and max depth in that range
+    const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
 
-        dim3 blockSize(256);
-        dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
+    dim3 blockSize(256);
+    dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
 
-        cudaSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
+    cudaSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
 
-        projectAndSplitBlocks_device << <gridSize, blockSize >> >(
-            hash_entries,
-            scene->localVBA.GetVoxelBlocks(), 
-            pose->GetM(),
-            intrinsics->projectionParamsSimple.all, imgSize, voxelSize, 
+    projectAndSplitBlocks_device << <gridSize, blockSize >> >(
+        hash_entries,
+        scene->localVBA.GetVoxelBlocks(), 
+        pose->GetM(),
+        intrinsics->projectionParamsSimple.all, imgSize, voxelSize, 
             
-            renderingBlockList_device, noTotalBlocks_device);
-    }
+        renderingBlockList_device, noTotalBlocks_device);
 
     uint noTotalBlocks;
     cudaSafeCall(cudaMemcpy(&noTotalBlocks, noTotalBlocks_device, sizeof(uint), cudaMemcpyDeviceToHost));
@@ -634,9 +629,10 @@ void ITMVisualisationEngine::CreateExpectedDepths(
 
     // go through rendering blocks and fill minmaxData
     Vector2f * const minmaxData = renderState->renderingRangeImage->GetData(MEMORYDEVICE_CUDA);
+    // 1. reset
     memsetKernel<Vector2f>(minmaxData, Vector2f(FAR_AWAY, VERY_CLOSE), renderState->renderingRangeImage->dataSize);
 
-
+    // 2. copy from rendering blocks
     dim3 blockSize(16, 16);
     dim3 gridSize((unsigned int)ceil((float)noTotalBlocks / 4.0f), 4);
     fillBlocks_device << <gridSize, blockSize >> >(noTotalBlocks_device, renderingBlockList_device, imgSize, minmaxData);
@@ -662,7 +658,7 @@ static void GenericRaycast(
     genericRaycast_device << <gridSize, cudaBlockSize >> >(
         renderState->raycastResult->GetData(MEMORYDEVICE_CUDA),
         scene->localVBA.GetVoxelBlocks(),
-        scene->index.getIndexData(),
+        scene->index.GetEntries(),
         imgSize,
         invM,
         invProjParams,
@@ -695,16 +691,16 @@ static void RenderImage_common(
     switch (type) {
     case ITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME:
         renderColour_device << <gridSize, cudaBlockSize >> >(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
-            scene->index.getIndexData(), imgSize, lightSource);
+            scene->index.GetEntries(), imgSize, lightSource);
         break;
     case ITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL:
         renderColourFromNormal_device << <gridSize, cudaBlockSize >> >(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
-            scene->index.getIndexData(), imgSize, lightSource);
+            scene->index.GetEntries(), imgSize, lightSource);
         break;
     case ITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
     default:
         renderGrey_device << <gridSize, cudaBlockSize >> >(outRendering, pointsRay, scene->localVBA.GetVoxelBlocks(),
-            scene->index.getIndexData(), imgSize, lightSource);
+            scene->index.GetEntries(), imgSize, lightSource);
         break;
     }
 }
@@ -739,9 +735,9 @@ void ITMVisualisationEngine::RenderImage(const ITMPose *pose, const ITMIntrinsic
 }
 
 void ITMVisualisationEngine::CreateICPMaps(
-    const ITMIntrinsics * intrinsics_d,
-    ITMTrackingState *trackingState,
-    ITMRenderState *renderStateTemp) const
+    const ITMIntrinsics * const intrinsics_d,
+    ITMTrackingState *const trackingState,
+    ITMRenderState *const renderStateTemp) const
 {
     CreateExpectedDepths(trackingState->pose_d, intrinsics_d, renderStateTemp);
     CreateICPMaps_common(this->scene, intrinsics_d->projectionParamsSimple.all, trackingState, renderStateTemp);

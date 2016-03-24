@@ -316,12 +316,11 @@ __global__ void allocateVoxelBlocksList_device(
     ITMVoxelBlockHash::ExcessAllocationList * const excessAllocationList,
     ITMHashEntry *hashTable,
     ITMVoxelBlock* localVBA,
-    const int noTotalEntries,
     uchar *entriesAllocType,
     Vector4s *blockCoords)
 {
     const int targetIdx = threadIdx.x + blockIdx.x * blockDim.x;
-    if (targetIdx > noTotalEntries - 1) return;
+    if (targetIdx > SDF_GLOBAL_BLOCK_NUM - 1) return;
 
     allocateVoxelBlock(targetIdx,
         voxelAllocationList,
@@ -338,9 +337,8 @@ __global__ void allocateVoxelBlocksList_device(
 
 ITMSceneReconstructionEngine::ITMSceneReconstructionEngine(void) 
 {
-	const int noTotalEntries = ITMVoxelBlockHash::noTotalEntries;
-	cudaSafeCall(cudaMalloc((void**)&entriesAllocType_device, noTotalEntries));
-	cudaSafeCall(cudaMalloc((void**)&blockCoords_device, noTotalEntries * sizeof(Vector4s)));
+    cudaSafeCall(cudaMalloc((void**)&entriesAllocType_device, SDF_GLOBAL_BLOCK_NUM));
+    cudaSafeCall(cudaMalloc((void**)&blockCoords_device, SDF_GLOBAL_BLOCK_NUM * sizeof(Vector4s)));
 }
 
 ITMSceneReconstructionEngine::~ITMSceneReconstructionEngine(void) 
@@ -359,20 +357,19 @@ __global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
 void ITMSceneReconstructionEngine::ResetScene(ITMScene *scene)
 {
     printf("ResetScene\n");
-	const int numBlocks = scene->index.getNumAllocatedVoxelBlocks();
-	const int blockSize = scene->index.getVoxelBlockSize();
 
     // Reset sdf data of all voxels in all voxel blocks
     ITMVoxelBlock *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
-    resetVoxelBlocks << <numBlocks, SDF_BLOCK_SIZE3 >> >(voxelBlocks_ptr);
+    resetVoxelBlocks << <SDF_LOCAL_BLOCK_NUM, SDF_BLOCK_SIZE3 >> >(voxelBlocks_ptr);
 
     // Reset voxel allocation list
     scene->localVBA.voxelAllocationList->Reset();
 
     // Reset hash entries
-    ITMHashEntry tmpEntry = ITMHashEntry::createIllegalEntry();
-	ITMHashEntry *hashEntry_ptr = scene->index.GetEntries();
-	memsetKernel<ITMHashEntry>(hashEntry_ptr, tmpEntry, scene->index.noTotalEntries);
+    memsetKernel<ITMHashEntry>(
+        scene->index.GetEntries(),
+        ITMHashEntry::createIllegalEntry(),
+        SDF_GLOBAL_BLOCK_NUM);
 
     // Reset excess allocation list
     scene->index.excessAllocationList->Reset();
@@ -399,20 +396,19 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
     auto excessAllocationList = scene->index.excessAllocationList;
     ITMHashEntry * const hashTable = scene->index.GetEntries();
 
-    const int noTotalEntries = scene->index.noTotalEntries;
 
     const dim3 cudaBlockSizeHV(16, 16);
     const dim3 gridSizeHV((int)ceil((float)depthImgSize.x / (float)cudaBlockSizeHV.x), (int)ceil((float)depthImgSize.y / (float)cudaBlockSizeHV.y));
 
 	const dim3 cudaBlockSizeAL(256, 1);
-	const dim3 gridSizeAL((int)ceil((float)noTotalEntries / (float)cudaBlockSizeAL.x));
+	const dim3 gridSizeAL((int)ceil((float)SDF_GLOBAL_BLOCK_NUM / (float)cudaBlockSizeAL.x));
 
     const float oneOverVoxelSize = 1.0f / (voxelSize * SDF_BLOCK_SIZE);
 
 
     // Determine blocks currently visible in depth map but not allocated  for preparing allocation list
 
-	cudaSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* noTotalEntries));
+    cudaSafeCall(cudaMemsetAsync(entriesAllocType_device, 0, sizeof(unsigned char)* SDF_GLOBAL_BLOCK_NUM));
 
 	buildHashAllocAndVisibleType_device << <gridSizeHV, cudaBlockSizeHV >> >(
         entriesAllocType_device,
@@ -427,8 +423,6 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
         excessAllocationList, 
         hashTable,
         scene->localVBA.GetVoxelBlocks(),
-
-		noTotalEntries, 
         entriesAllocType_device, 
 		blockCoords_device);
 }
