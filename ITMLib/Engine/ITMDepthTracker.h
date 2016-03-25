@@ -43,7 +43,7 @@ namespace ITMLib
                 const ITMLowLevelEngine *lowLevelEngine);
             virtual ~ITMDepthTracker(void);
 
-            /** !private! */
+            /** private */
             struct AccuCell {
                 int noValidPoints;
                 float f;
