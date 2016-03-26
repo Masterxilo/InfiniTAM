@@ -44,29 +44,7 @@ namespace png {
 
     void SaveImageToFile(const ITMShortImage* image, const char* fileName)
     {
-        short *data = (short*)malloc(sizeof(short) * image->dataSize);
-        const short *dataSource = image->GetData(MEMORYDEVICE_CPU);
-        for (size_t i = 0; i < image->dataSize; i++) data[i] = (dataSource[i] << 8) | ((dataSource[i] >> 8) & 255);
-
-
-        lodepng_encode_file(fileName, (unsigned char*)data, image->noDims.x, image->noDims.y, LCT_GREY, 16);
-
-        delete data;
-    }
-
-    void SaveImageToFile(const ITMFloatImage* image, const char* fileName)
-    {
-        unsigned short *data = new unsigned short[image->dataSize];
-        for (size_t i = 0; i < image->dataSize; i++)
-        {
-            float localData = image->GetData(MEMORYDEVICE_CPU)[i];
-            data[i] = localData >= 0 ? (unsigned short)(localData * 1000.0f) : 0;
-        }
-
-
-        lodepng_encode_file(fileName, (unsigned char*)data, image->noDims.x, image->noDims.y, LCT_GREY, 16);
-
-        delete[] data;
+        lodepng_encode_file(fileName, (unsigned char*)image->GetData(MEMORYDEVICE_CPU), image->noDims.x, image->noDims.y, LCT_GREY, 16);
     }
 
     bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName)

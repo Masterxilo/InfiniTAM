@@ -594,8 +594,7 @@ ITMVisualisationEngine::~ITMVisualisationEngine(void)
 ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSize) const
 {
     return new ITMRenderState(
-        imgSize,
-        this->scene->sceneParams->viewFrustum_min, this->scene->sceneParams->viewFrustum_max, MEMORYDEVICE_CUDA
+        imgSize
         );
 }
 
@@ -609,20 +608,20 @@ void ITMVisualisationEngine::CreateExpectedDepths(
 
     //go through list of voxel blocks, create rendering blocks storing min and max depth in that range
     const ITMHashEntry *hash_entries = this->scene->index.GetEntries();
+    {
+        dim3 blockSize(256);
+        dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
 
-    dim3 blockSize(256);
-    dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
+        cudaSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
 
-    cudaSafeCall(cudaMemset(noTotalBlocks_device, 0, sizeof(uint)));
+        projectAndSplitBlocks_device << <gridSize, blockSize >> >(
+            hash_entries,
+            scene->localVBA.GetVoxelBlocks(),
+            pose->GetM(),
+            intrinsics->projectionParamsSimple.all, imgSize, voxelSize,
 
-    projectAndSplitBlocks_device << <gridSize, blockSize >> >(
-        hash_entries,
-        scene->localVBA.GetVoxelBlocks(), 
-        pose->GetM(),
-        intrinsics->projectionParamsSimple.all, imgSize, voxelSize, 
-            
-        renderingBlockList_device, noTotalBlocks_device);
-
+            renderingBlockList_device, noTotalBlocks_device);
+    }
     uint noTotalBlocks;
     cudaSafeCall(cudaMemcpy(&noTotalBlocks, noTotalBlocks_device, sizeof(uint), cudaMemcpyDeviceToHost));
     if (noTotalBlocks > (unsigned)MAX_RENDERING_BLOCKS) noTotalBlocks = MAX_RENDERING_BLOCKS;

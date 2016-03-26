@@ -306,24 +306,6 @@ void SaveImageToFile(const ITMShortImage* image, const char* fileName)
     delete data;
 }
 
-void SaveImageToFile(const ITMFloatImage* image, const char* fileName)
-{
-    unsigned short *data = new unsigned short[image->dataSize];
-    for (size_t i = 0; i < image->dataSize; i++)
-    {
-        float localData = image->GetData(MEMORYDEVICE_CPU)[i];
-        data[i] = localData >= 0 ? (unsigned short)(localData * 1000.0f) : 0;
-    }
-
-    FILE *f = fopen(fileName, "wb");
-    if (!pnm_writeheader(f, image->noDims.x, image->noDims.y, MONO_16u)) {
-        fclose(f); return;
-    }
-    pnm_writedata(f, image->noDims.x, image->noDims.y, MONO_16u, data);
-    fclose(f);
-
-    delete[] data;
-}
 
 bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName)
 {

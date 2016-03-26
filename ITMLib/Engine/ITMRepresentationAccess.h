@@ -204,6 +204,27 @@ CPU_AND_GPU inline Vector3f readFromSDF_color4u_interpolated(
     return ret;
 }
 
+#define lookup(dx,dy,dz) readVoxel(voxelData, voxelIndex, pos + Vector3i(dx,dy,dz), isFound).sdf
+
+CPU_AND_GPU inline Vector3f computeSingleNormalFromSDFByForwardDifference(
+    const CONSTPTR(ITMVoxelBlock) * const voxelData,
+    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,
+
+    const THREADPTR(Vector3i) &pos, //!< [in] global voxel position
+    bool& isFound //!< [out] whether all values needed existed;
+    ) {
+    float sdf0 = lookup(0,0,0);
+    if (!isFound) return Vector3f();
+
+    // TODO handle !isFound
+    Vector3f n(
+        lookup(1, 0, 0) - sdf0,
+        lookup(0, 1, 0) - sdf0,
+        lookup(0, 0, 1) - sdf0
+        );
+    return n.normalised(); // TODO in a distance field, normalization should not be necesary. But this is not a true distance field.
+}
+
 /// Compute SDF normal 
 /// Used in processPixelGrey
 // Note: this gets the localVBA list, not just a *single* voxel block.
@@ -217,8 +238,7 @@ CPU_AND_GPU inline Vector3f computeSingleNormalFromSDF(
     COMPUTE_COEFF_POS_FROM_POINT();
     Vector3f ncoeff = Vector3f(1,1,1) - coeff;
 
-    bool isFound;
-#define lookup(dx,dy,dz) readVoxel(voxelData, voxelIndex, pos + Vector3i(dx,dy,dz), isFound).sdf
+    bool isFound; // swallow
 
     /*
     x direction gradient at point is evaluated by computing interpolated sdf value in next (1 -- 2, v2) and previous (-1 -- 0, v1) cell:

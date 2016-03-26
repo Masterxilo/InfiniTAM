@@ -6,10 +6,11 @@
 
 #include "../ITMLib/Utils/ITMLibDefines.h"
 
+// Image must exist but can have any size.
+
 #define imfun \
 void SaveImageToFile(const ITMUChar4Image* image, const char* fileName, bool flipVertical = false);    \
 void SaveImageToFile(const ITMShortImage* image, const char* fileName);                                \
-void SaveImageToFile(const ITMFloatImage* image, const char* fileName);                                \
 bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName);                                   \
 bool ReadImageFromFile(ITMShortImage *image, const char *fileName);
 

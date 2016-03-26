@@ -13,7 +13,7 @@ namespace ORUtils
 		int size, rank;
 
 	public:
-        /// Solve Ax = b for A symmetric & positive-definite.
+        /// Solve Ax = b for A symmetric & positive-definite of size*size 
         static void solve(const float* mat, int size, const float* b, float* result) {
             ORUtils::Cholesky cholA(mat, size);
             cholA.Backsub(result, b);

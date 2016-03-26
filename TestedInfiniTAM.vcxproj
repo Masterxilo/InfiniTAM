@@ -176,6 +176,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp" />
+    <CudaCompile Include="Source.cu">
+      <FileType>CppCode</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
     <ClCompile Include="Tests\TestClasses.cpp" />
   </ItemGroup>
   <ItemGroup>

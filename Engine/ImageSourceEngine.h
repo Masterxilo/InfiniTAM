@@ -42,6 +42,7 @@ namespace InfiniTAM
 			~ImageFileReader();
 
 			bool hasMoreImages(void);
+            /// images must exist on cpu and be of correct dimensions
 			void getImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth);
 			Vector2i getDepthImageSize(void);
 			Vector2i getRGBImageSize(void);

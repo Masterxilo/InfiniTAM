@@ -69,7 +69,12 @@ bool ImageFileReader::hasMoreImages(void)
 
 void ImageFileReader::getImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth)
 {
-	bool bUsedCache = false;
+    assert(rgb->noDims == cached_rgb->noDims);
+    assert(rawDepth->noDims == cached_depth->noDims);
+    assert(rawDepth->isAllocated_CPU());
+    assert(rgb->isAllocated_CPU());
+    
+    bool bUsedCache = false;
 	if (cached_rgb != NULL) {
 		rgb->SetFrom(cached_rgb, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
 		delete cached_rgb;

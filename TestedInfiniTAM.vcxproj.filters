@@ -204,6 +204,7 @@
     <CudaCompile Include="Tests\TestUtils.cu">
       <Filter>Tests\Framework</Filter>
     </CudaCompile>
+    <CudaCompile Include="Source.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">
