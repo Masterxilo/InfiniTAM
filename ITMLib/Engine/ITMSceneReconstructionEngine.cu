@@ -416,6 +416,30 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
         depth, invM_d, invProjParams_d, mu, depthImgSize, oneOverVoxelSize, hashTable,
 		scene->sceneParams->viewFrustum_min,
         scene->sceneParams->viewFrustum_max);
+    // [[ dump block coords that should be allocated
+    {
+        printf("allocate planned: ");
+        uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
+        Vector4s *blockCoords = (Vector4s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector4s));
+
+        cudaMemcpy(entriesAllocType,
+            entriesAllocType_device,
+            SDF_GLOBAL_BLOCK_NUM,
+            cudaMemcpyDeviceToHost);
+
+        cudaMemcpy(blockCoords,
+            blockCoords_device,
+            SDF_GLOBAL_BLOCK_NUM * sizeof(Vector4s),
+            cudaMemcpyDeviceToHost);
+        cudaError e = cudaGetLastError();
+        for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
+            if (entriesAllocType[targetIdx] == 0) continue;
+            printf("(%d %d %d)\n", blockCoords[targetIdx].x, blockCoords[targetIdx].y, blockCoords[targetIdx].z);
+        }
+        while (1);
+        exit(0);
+    }
+    // ]]
 
     // Do allocation
     allocateVoxelBlocksList_device << <gridSizeAL, cudaBlockSizeAL >> >(

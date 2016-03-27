@@ -53,8 +53,8 @@ using namespace std;
 // Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/%2504i.ppm Files/Scenes/Teddy/Frames/%2504i.pgm
 int main(int argc, char** argv) {
 
-    redirectStd();
-    tests();
+   // redirectStd();
+   // tests();
     atexit(pause);
 	const char *arg1 = "";
 	const char *arg2 = NULL;
