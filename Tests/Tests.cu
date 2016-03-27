@@ -198,7 +198,11 @@ KERNEL checkS(Scene* scene) {
 
 __managed__ int counter = 0;
 struct DoForEach {
-    static GPU_ONLY void process(ITMVoxelBlock* vb) {
+    static GPU_ONLY void process(ITMVoxelBlock* vb, ITMVoxel*, Vector3i localPos) {
+        assert(localPos.x >= 0 && localPos.y >= 0 && localPos.z >= 0);
+        assert(localPos.x  < SDF_BLOCK_SIZE && localPos.y < SDF_BLOCK_SIZE && localPos.z < SDF_BLOCK_SIZE);
+        if (localPos != Vector3i(0, 0, 0)) return;
+
         assert(vb);
         assert(vb->pos == VoxelBlockPos(0, 0, 0) ||
             vb->pos == VoxelBlockPos(1,2,3)); 
@@ -236,7 +240,7 @@ void testScene() {
 
     // do for each
     counter = 0;
-    s->doForEachAllocatedBlock<DoForEach>();
+    s->doForEachAllocatedVoxel<DoForEach>();
     assert(counter == 2);
 
     delete s;

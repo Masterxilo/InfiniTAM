@@ -3,15 +3,17 @@
 #include "cudadefines.h"
 #include "hashmap.h"
 
-// T must have a function process(ITMVoxelBlock*)
+// see doForEachAllocatedVoxel for T
 template<typename T>
 KERNEL doForEachAllocatedBlock(
     ITMVoxelBlock* localVBA,
     int nextFreeSequenceId) {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int index = blockIdx.x;
     if (index <= 0 || index >= nextFreeSequenceId) return;
 
-    T::process(&localVBA[index]);
+    ITMVoxelBlock* vb = &localVBA[index];
+    Vector3i localPos(threadIdx.x, threadIdx.y, threadIdx.z);
+    T::process(vb, &vb->blockVoxels[threadIdx.x], localPos);
 }
 
 
@@ -29,19 +31,15 @@ public:
     virtual ~Scene();
 
 
-    // T must have an operator(ITMVoxelBlock*)
+    /// T must have an operator(ITMVoxelBlock*, ITMVoxel*, Vector3i localPos)
+    /// where localPos will run from 0,0,0 to (SDF_BLOCK_SIZE-1)^3
+    /// runs threadblock per voxel block and thread per thread
     template<typename T>
-    void doForEachAllocatedBlock() {
-        const float blockSize = 256.f;
-        int lfs = voxelBlockHash->getLowestFreeSequenceNumber();
-
-        int gridSize = ceil(voxelBlockHash->getLowestFreeSequenceNumber() / blockSize);
-        
-        assert(gridSize);
+    void doForEachAllocatedVoxel() {
         LAUNCH_KERNEL(
             ::doForEachAllocatedBlock<T>, 
-            gridSize,
-            blockSize,
+            SDF_LOCAL_BLOCK_NUM,
+            dim3(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE),
             localVBA,
             voxelBlockHash->getLowestFreeSequenceNumber()
             );
