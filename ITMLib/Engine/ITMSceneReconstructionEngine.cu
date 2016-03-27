@@ -356,6 +356,7 @@ __global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
 
 void ITMSceneReconstructionEngine::ResetScene(ITMScene *scene)
 {
+    return;
     printf("ResetScene\n");
 
     // Reset sdf data of all voxels in all voxel blocks
