@@ -101,10 +101,11 @@ private:
         uint sequenceId;
     };
 
+public:
     /// 0 or 1, BUCKET_NUM + EXCESS_NUM many
     GPU(uchar*) needsAllocation;
     GPU(KeyType*) naKey;
-
+private:
     /// BUCKET_NUM + EXCESS_NUM many
     /// Indexed by Hasher::hash() return value
     // or BUCKET_NUM + HashEntry.nextInExcessList (which is any of 1 to lowestFreeExcessListEntry-1)

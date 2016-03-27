@@ -132,7 +132,7 @@ private:
 
     GPU_ONLY DEVICEPTR(ITMVoxelBlock*) getVoxelBlock(VoxelBlockPos pos);
     DEVICEPTR(ITMVoxelBlock*) localVBA;
-
+    public:
     /// Gives indices into localVBA for allocated voxel blocks
     HashMap<Z3Hasher, AllocateVB>* voxelBlockHash;
 

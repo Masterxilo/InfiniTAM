@@ -195,6 +195,34 @@ void ITMSceneReconstructionEngine_ProcessFrame(
 
     LAUNCH_KERNEL(buildHashAllocAndVisibleType_device, gridSizeHV, cudaBlockSizeHV);
 
+    cudaDeviceSynchronize();
+    ///
+    // [[ dump block coords that should be allocated
+    {
+        printf("allocate planned: ");
+        uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
+        Vector3s *blockCoords = (Vector3s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector3s));
+
+        cudaMemcpy(entriesAllocType,
+            Scene::getCurrentScene()->voxelBlockHash->needsAllocation,
+            SDF_GLOBAL_BLOCK_NUM,
+            cudaMemcpyDeviceToHost);
+
+        cudaMemcpy(blockCoords,
+
+            Scene::getCurrentScene()->voxelBlockHash->naKey,
+            SDF_GLOBAL_BLOCK_NUM * sizeof(VoxelBlockPos),
+            cudaMemcpyDeviceToHost);
+        cudaError e = cudaGetLastError();
+        for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
+            if (entriesAllocType[targetIdx] == 0) continue;
+            printf("(%d %d %d)\n", blockCoords[targetIdx].x, blockCoords[targetIdx].y, blockCoords[targetIdx].z);
+        }
+        while (1);
+        exit(0);
+    }
+    // ]]
+
     Scene::performCurrentSceneAllocations();
 
     // camera data integration
