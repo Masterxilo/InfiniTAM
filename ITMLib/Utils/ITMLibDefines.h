@@ -174,6 +174,4 @@ enum TrackerIterationType
 
 #include "ITMLibSettings.h" // must be included after tracker iteration type is defined
 
-struct ITMHierarchyLevel {
-
-};
+#define INVALID_DEPTH (-1.f)

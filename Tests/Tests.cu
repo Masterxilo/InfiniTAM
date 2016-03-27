@@ -1,4 +1,5 @@
-#include "HashMap.h"
+
+#include "Scene.h" // defines: #include "HashMap.h"
 #include <stdio.h>
 
 template<typename T>
@@ -170,8 +171,52 @@ void testCholesky() {
 
 }
 
+KERNEL addSceneVB(Scene* scene) {
+    assert(scene);
+    scene->requestVoxelBlockAllocation(VoxelBlockPos(0, 0, 0));
+    scene->requestVoxelBlockAllocation(VoxelBlockPos(1,2,3));
+}
+
+GPU_ONLY void allExist(Scene* scene, Vector3i base) {
+    for (int i = 0; i < SDF_BLOCK_SIZE; i++)
+        for (int j = 0; j < SDF_BLOCK_SIZE; j++)
+            for (int k = 0; k < SDF_BLOCK_SIZE; k++) {
+                ITMVoxel* v = scene->getVoxel(base + Vector3i(i, j, k));
+                assert(v != NULL);
+            }
+}
+KERNEL findSceneVoxel(Scene* scene) {
+    allExist(scene, Vector3i(0,0,0));
+    allExist(scene, Vector3i(SDF_BLOCK_SIZE, 2*SDF_BLOCK_SIZE, 3*SDF_BLOCK_SIZE));
+
+    assert(scene->getVoxel(Vector3i(-1, 0, 0)) == NULL);
+}
+
+KERNEL checkS(Scene* scene) {
+    assert(Scene::getCurrentScene() == scene);
+}
+
+void testScene() {
+    Scene::setCurrentScene(0);
+    assert(Scene::getCurrentScene() == 0);
+
+    Scene* s = new Scene(); 
+    LAUNCH_KERNEL(addSceneVB, 1, 1, s);
+    s->performAllocations();
+    LAUNCH_KERNEL(findSceneVoxel, 1, 1, s);
+
+    Scene::setCurrentScene(s);
+    LAUNCH_KERNEL(checkS, 1, 1, s);
+
+    Scene::setCurrentScene(0);
+    LAUNCH_KERNEL(checkS, 1, 1, 0);
+
+    delete s;
+}
+
 // TODO take the tests apart, clean state inbetween
 void tests() {
+    testScene();
     testCholesky();
     testZ3Hasher();
     testNHasher();

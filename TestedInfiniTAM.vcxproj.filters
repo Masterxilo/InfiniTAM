@@ -154,6 +154,7 @@
       <Filter>Tests\Framework</Filter>
     </ClInclude>
     <ClInclude Include="LightingModel.h" />
+    <ClInclude Include="Scene.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />
@@ -195,6 +196,7 @@
     </CudaCompile>
     <CudaCompile Include="LightingEstimation.cu" />
     <CudaCompile Include="GeometryRefinement.cu" />
+    <CudaCompile Include="Scene.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

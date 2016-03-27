@@ -5,6 +5,9 @@
 
 #include <cuda_runtime.h>
 #include <math.h>
+
+
+/// Classes extending this must be head allocated
 struct Managed {
     void *operator new(size_t len){
         void *ptr;

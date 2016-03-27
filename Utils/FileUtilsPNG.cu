@@ -1,7 +1,4 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #include "FileUtils.h"
-
 #include <stdio.h>
 #include <fstream>
 using namespace std;
@@ -14,10 +11,10 @@ namespace png {
     {
         unsigned int xsize, ysize;
         unsigned char* data;
-        lodepng_decode24_file(&data, &xsize, &ysize, fileName);
+#define failed(lodepng_error) (lodepng_error != 0)
+        if (failed(lodepng_decode24_file(&data, &xsize, &ysize, fileName))) return false;
 
-        Vector2i newSize(xsize, ysize);
-        image->ChangeDims(newSize);
+        image->ChangeDims(Vector2i(xsize, ysize));
         Vector4u *dataPtr = image->GetData(MEMORYDEVICE_CPU);
 
         for (int i = 0; i < image->noDims.x*image->noDims.y; ++i)
@@ -36,11 +33,10 @@ namespace png {
     {
         unsigned int xsize, ysize;
         short* data;
-        lodepng_decode_file((unsigned char**)&data, &xsize, &ysize, fileName, LCT_GREY, 16);
+        if (failed(lodepng_decode_file((unsigned char**)&data, &xsize, &ysize, fileName, LCT_GREY, 16)))
+            return false;
 
-
-        Vector2i newSize(xsize, ysize);
-        image->ChangeDims(newSize);
+        image->ChangeDims(Vector2i(xsize, ysize));
 
         memcpy(image->GetData(MEMORYDEVICE_CPU),
             data,

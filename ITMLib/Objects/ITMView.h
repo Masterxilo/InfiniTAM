@@ -38,29 +38,22 @@ namespace ITMLib
 			/// RGB colour image.
 			ITMUChar4Image *rgb; 
 
-			/// Float valued depth image, if available according to @ref inputImageType.
+			/// Float valued depth image converted from disparity image, 
+            /// if available according to @ref inputImageType.
 			ITMFloatImage *depth;
-
-			/// surface normal of depth image
-            /// allocated when needed
-			ITMFloat4Image *depthNormal;
 
 			ITMView(const ITMRGBDCalib *calibration, Vector2i imgSize_rgb, Vector2i imgSize_d, bool useGPU)
 			{
 				this->calib = new ITMRGBDCalib(*calibration);
 				this->rgb = new ITMUChar4Image(imgSize_rgb, true, useGPU);
 				this->depth = new ITMFloatImage(imgSize_d, true, useGPU);
-				this->depthNormal = NULL;
 			}
 
 			virtual ~ITMView(void)
 			{
 				delete calib;
-
 				delete rgb;
 				delete depth;
-
-				if (depthNormal != NULL) delete depthNormal;
 			}
 		};
 	}

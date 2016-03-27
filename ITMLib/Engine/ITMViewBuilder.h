@@ -21,29 +21,18 @@ namespace ITMLib
 		class ITMViewBuilder
 		{
 		protected:
-			const ITMRGBDCalib *calib;
-            /// rawDepthImage
-			ITMShortImage *shortImage;
-			ITMFloatImage *floatImage;
+            const ITMRGBDCalib * const calib;
+            ITMShortImage *rawDepthImage;
 
         public:
-			void ConvertDisparityToDepth(ITMFloatImage *depth_out, const ITMShortImage *disp_in, const ITMIntrinsics *depthIntrinsics,
-				Vector2f disparityCalibParams);
-
 			void UpdateView(ITMView **view, ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage);
 
 
-			ITMViewBuilder(const ITMRGBDCalib *calib)
-			{
-				this->calib = calib;
-				this->shortImage = NULL;
-				this->floatImage = NULL;
-			}
+            ITMViewBuilder(const ITMRGBDCalib *calib) : calib(calib), rawDepthImage(0) {}
 
 			virtual ~ITMViewBuilder()
 			{
-				if (this->shortImage != NULL) delete this->shortImage;
-				if (this->floatImage != NULL) delete this->floatImage;
+                if (this->rawDepthImage != NULL) delete this->rawDepthImage;
 			}
 		};
 	}

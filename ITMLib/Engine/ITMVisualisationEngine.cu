@@ -478,7 +478,7 @@ inline dim3 getGridSize(Vector2i taskSize, dim3 blockSize) { return getGridSize(
 
 //device implementations
 
-__global__ void projectAndSplitBlocks_device(
+KERNEL projectAndSplitBlocks_device(
     const ITMHashEntry * const hashEntries,
     const ITMVoxelBlock * const localVBA,
     const Matrix4f pose_M,
@@ -516,7 +516,7 @@ __global__ void projectAndSplitBlocks_device(
     CreateRenderingBlocks(renderingBlocks, out_offset, upperLeft, lowerRight, zRange);
 }
 
-__global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBlock *renderingBlocks,
+KERNEL fillBlocks_device(const uint *noTotalBlocks, const RenderingBlock *renderingBlocks,
     Vector2i imgSize,
     Vector2f *minmaxData //!< [out]
     )
@@ -536,7 +536,7 @@ __global__ void fillBlocks_device(const uint *noTotalBlocks, const RenderingBloc
     atomicMin(&pixel.x, b.zRange.x); atomicMax(&pixel.y, b.zRange.y);
 }
 
-__global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock *voxelData, const typename ITMVoxelBlockHash::IndexData *voxelIndex,
+KERNEL genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock *voxelData, const typename ITMVoxelBlockHash::IndexData *voxelIndex,
     Vector2i imgSize, Matrix4f invM, Vector4f invProjParams, float oneOverVoxelSize, const Vector2f *minmaximg, float mu)
 {
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
@@ -549,7 +549,7 @@ __global__ void genericRaycast_device(Vector4f *out_ptsRay, const ITMVoxelBlock 
     castRay(out_ptsRay[locId], x, y, voxelData, voxelIndex, invM, invProjParams, oneOverVoxelSize, mu, minmaximg[locId2]);
 }
 
-__global__ void renderICP_device(Vector4f *pointsMap, Vector4f *normalsMap, const Vector4f *pointsRay,
+KERNEL renderICP_device(Vector4f *pointsMap, Vector4f *normalsMap, const Vector4f *pointsRay,
     float voxelSize, Vector2i imgSize, Vector3f lightSource)
 {
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);
@@ -565,7 +565,7 @@ renderColourFromNormal_device, processPixelNormal
 renderColour_device, processPixelColour
 */
 #define RENDER_PROCESS_PIXEL(RENDERFUN, PROCESSPIXELFUN) \
-__global__ void RENDERFUN ## _device(Vector4u *outRendering, const Vector4f *ptsRay, const ITMVoxelBlock *voxelData,\
+KERNEL RENDERFUN ## _device(Vector4u *outRendering, const Vector4f *ptsRay, const ITMVoxelBlock *voxelData,\
     const typename ITMVoxelBlockHash::IndexData *voxelIndex, Vector2i imgSize, Vector3f lightSource) { \
     int x = (threadIdx.x + blockIdx.x * blockDim.x), y = (threadIdx.y + blockIdx.y * blockDim.y);\
     if (x >= imgSize.x || y >= imgSize.y) return;\

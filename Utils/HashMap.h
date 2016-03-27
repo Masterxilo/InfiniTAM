@@ -1,3 +1,4 @@
+#pragma once 
 #include "CUDADefines.h"
 #include "ITMMath.h"
 #include "MemoryBlock.h"
@@ -206,15 +207,23 @@ public:
 
         cudaMallocManaged(&lowestFreeSequenceNumber, sizeof(uint));
         cudaMallocManaged(&lowestFreeExcessListEntry, sizeof(uint));
+
         cudaDeviceSynchronize();
         *lowestFreeSequenceNumber = *lowestFreeExcessListEntry = 1;
     }
 
-    /*
+    virtual ~HashMap() {
+        cudaFree(needsAllocation);
+        cudaFree(naKey);
+        cudaFree(hashMap_then_excessList);
+        cudaFree(lowestFreeSequenceNumber);
+        cudaFree(lowestFreeExcessListEntry);
+    }
+    
     uint getLowestFreeSequenceNumber() {
     return *lowestFreeSequenceNumber;
     }
-
+/*
     uint countAllocatedEntries() {
     return getLowestFreeSequenceNumber() - 1;
     }

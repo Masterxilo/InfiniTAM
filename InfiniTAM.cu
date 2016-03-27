@@ -49,8 +49,8 @@ void redirectStd();
 #include <iostream>
 #include <iostream>
 using namespace std;
-// Files\Calibrations\Kinect2\calib.txt
-// Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/%2504i.ppm Files/Scenes/Teddy/Frames/%2504i.pgm
+// Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/color%25i.png Files/Scenes/Teddy/Frames/depth%25i.png
+// Files\Scenes\fountain\calib.txt Files/Scenes/fountain/Frames/color%25i.png Files/Scenes/fountain/Frames/depth%25i.png
 int main(int argc, char** argv) {
 
     redirectStd();

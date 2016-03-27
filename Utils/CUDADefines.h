@@ -33,9 +33,23 @@
 #define CPU_AND_GPU  // alternatively: __host__ __device__, note that this is different for functions using dynamic parallelism!
 #endif
 
+/*
+// For talking to global __device__ variables by name:
+#ifdef __CUDACC__ 
+#define SYMBOL(xx) xx
+#else
+#define SYMBOL(xx) ((const void*)xx) // hack to calm intellisense, is actually wrong
+#endif
+// E.g.
+// __device__ int d_x;
+// int h_x; cudaMemcpyFromSymbol(&h_x, SYMBOL(d_x), sizeof(h_x));
+// int h_x = ..; cudaMemcpyToSymbol(SYMBOL(d_x), &h_x, sizeof(h_x));
+*/
+
+
 #ifndef __CUDACC__
 // hack to make intellisense shut up
-#define LAUNCH_KERNEL(...) ((void)0)
+#define LAUNCH_KERNEL(kernelFunction, gridDim, blockDim, arguments, ...) ((void)0)
 
 #else
 #if UNIT_TESTING
@@ -53,7 +67,7 @@ cudaSafeCall(cudaDeviceSynchronize());\
 cudaSafeCall(cudaGetLastError());\
 kernelFunction << <gridDim, blockDim >> >(__VA_ARGS__);\
 cudaSafeCall(cudaGetLastError());\
-cudaSafeCall(cudaDeviceSynchronize()); /*TODO you do not want this in release code/it alters the execution order 
+cudaSafeCall(cudaDeviceSynchronize()); /*TODO you do not want this in release/debug code: this greatly alters the execution order and async logic/efficiency (async is never guaranteed anyways though)...
 but it catches kernel errors (early)*/\
 }
 #endif

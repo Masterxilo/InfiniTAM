@@ -275,7 +275,7 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
 }
 
 template<TrackerIterationType iterationType>
-__global__ void depthTrackerOneLevel_g_rt_device(ITMDepthTracker_KernelParameters para)
+KERNEL depthTrackerOneLevel_g_rt_device(ITMDepthTracker_KernelParameters para)
 {
     depthTrackerOneLevel_g_rt_device_main<iterationType>(para.accu, para.depth, para.approxInvPose, para.pointsMap, para.normalsMap, para.sceneIntrinsics, para.sceneImageSize, para.scenePose, para.viewIntrinsics, para.viewImageSize, para.distThresh);
 }
@@ -314,9 +314,8 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
     args.viewIntrinsics = viewIntrinsics;
     args.viewImageSize = viewImageSize;
     args.distThresh = currentTrackingLevel->distanceThreshold;
-
 #define iteration(it) \
-			it: depthTrackerOneLevel_g_rt_device<it> << <gridSize, blockSize >> >(args);
+			it: LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device<it>, gridSize, blockSize, args);
 
     switch (iterationType()) {
         case iteration(TRACKER_ITERATION_ROTATION);
@@ -343,6 +342,7 @@ ITMDepthTracker::ITMDepthTracker(
     // Tracking strategy:
     const int noHierarchyLevels = 5;
     const float distThreshStep = distThresh / noHierarchyLevels;
+    // starting with highest resolution (lowest level, last to be executed)
     trackingLevels.push_back(TrackingLevel(2, TRACKER_ITERATION_BOTH, distThresh - distThreshStep * 4, depthImgSize));
     trackingLevels.push_back(TrackingLevel(4, TRACKER_ITERATION_BOTH, distThresh - distThreshStep * 3, depthImgSize / 2));
     trackingLevels.push_back(TrackingLevel(6, TRACKER_ITERATION_ROTATION, distThresh - distThreshStep * 2, depthImgSize / 4));

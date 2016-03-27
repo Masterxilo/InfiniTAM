@@ -53,11 +53,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
+    <IncludePath>.;Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
     <LibraryPath>freeglut\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">
-    <IncludePath>$(VCInstallDir)UnitTest\include;Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(VCInstallDir)UnitTest\include;.;Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(VCInstallDir)UnitTest\lib;freeglut\lib\x64;$(LibraryPath)</LibraryPath>
     <OutDir>$(SolutionDir)</OutDir>
   </PropertyGroup>
@@ -77,6 +77,8 @@
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
       <GenerateLineInfo>true</GenerateLineInfo>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">
@@ -91,6 +93,8 @@
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -108,6 +112,8 @@
     </Link>
     <CudaCompile>
       <CodeGeneration>compute_50,sm_50</CodeGeneration>
+      <GenerateRelocatableDeviceCode>true</GenerateRelocatableDeviceCode>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -140,6 +146,7 @@
     <ClInclude Include="ITMLib\Utils\ITMLibSettings.h" />
     <ClInclude Include="ITMLib\Utils\ITMMath.h" />
     <ClInclude Include="LightingModel.h" />
+    <ClInclude Include="Scene.h" />
     <ClInclude Include="Utils\HashMap.h" />
     <ClInclude Include="Utils\MyAssert.h" />
     <ClInclude Include="Utils\Cholesky.h" />
@@ -172,7 +179,10 @@
     <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu">
       <Keep Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</Keep>
     </CudaCompile>
-    <CudaCompile Include="Tests\Tests.cu" />
+    <CudaCompile Include="Scene.cu" />
+    <CudaCompile Include="Tests\Tests.cu">
+      <GenerateRelocatableDeviceCode Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</GenerateRelocatableDeviceCode>
+    </CudaCompile>
     <CudaCompile Include="Tests\TestUtils.cu" />
     <CudaCompile Include="Utils\FileUtilsPNG.cu" />
   </ItemGroup>

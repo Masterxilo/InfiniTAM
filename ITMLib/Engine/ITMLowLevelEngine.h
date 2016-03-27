@@ -113,7 +113,7 @@ CPU_AND_GPU inline void gradientY(DEVICEPTR(Vector4s) *grad, int x, int y, const
 // device functions
 #define FILTER(FILTERNAME)\
 template<bool withHoles, typename T>\
-static __global__ void FILTERNAME ## _device(T *imageData_out, Vector2i newDims, const T *imageData_in, Vector2i oldDims) {\
+static KERNEL FILTERNAME ## _device(T *imageData_out, Vector2i newDims, const T *imageData_in, Vector2i oldDims) {\
     int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;\
     if (x > newDims.x - 1 || y > newDims.y - 1) return;\
     FILTERNAME<withHoles>(imageData_out, x, y, newDims, imageData_in, oldDims);\
@@ -122,7 +122,7 @@ static __global__ void FILTERNAME ## _device(T *imageData_out, Vector2i newDims,
 FILTER(filterSubsample)
 
 #define gradient__device(X_or_Y) \
-static __global__ void gradient## X_or_Y ##_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize) { \
+static KERNEL gradient## X_or_Y ##_device(Vector4s *grad, const Vector4u *image, Vector2i imgSize) { \
     int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;\
     if (x < 2 || x > imgSize.x - 2 || y < 2 || y > imgSize.y - 2) return;\
     gradient ## X_or_Y (grad, x, y, image, imgSize);\

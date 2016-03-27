@@ -273,7 +273,7 @@ CPU_AND_GPU inline void integrateVoxel(int x, int y, int z,
 }
 
 // device functions
-__global__ void integrateIntoScene_device(
+KERNEL integrateIntoScene_device(
     ITMVoxelBlock *localVBA, //!< [out]
 
     const ITMHashEntry * const hashTable,
@@ -295,7 +295,7 @@ __global__ void integrateIntoScene_device(
         M_d, projParams_d, M_rgb, projParams_rgb, mu, maxW, depth, depthImgSize, rgb, rgbImgSize);
 }
 
-__global__ void buildHashAllocAndVisibleType_device(
+KERNEL buildHashAllocAndVisibleType_device(
     uchar *entriesAllocType, //!< [out]
     Vector4s *blockCoords,//!< [out]
     const float *depth,
@@ -311,7 +311,7 @@ __global__ void buildHashAllocAndVisibleType_device(
 }
 
 
-__global__ void allocateVoxelBlocksList_device(
+KERNEL allocateVoxelBlocksList_device(
     typename ITMLocalVBA::VoxelAllocationList * const voxelAllocationList,
     ITMVoxelBlockHash::ExcessAllocationList * const excessAllocationList,
     ITMHashEntry *hashTable,
@@ -348,7 +348,7 @@ ITMSceneReconstructionEngine::~ITMSceneReconstructionEngine(void)
 }
 
 /// thread blocks 0:numBlocks-1, threads 0:SDF_BLOCK_SIZE3-1
-__global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
+KERNEL resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
     voxelBlocks_ptr[blockIdx.x].blockVoxels[threadIdx.x] = ITMVoxel();
 
     if (threadIdx.x == 0) voxelBlocks_ptr[blockIdx.x].pos = INVALID_VOXEL_BLOCK_POS;

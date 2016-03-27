@@ -9,6 +9,7 @@
 namespace png {
     // Image must exist but can have any size. Loads rgb only.                  
     bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName);
-    // Image must exist but can have any size.                          
+    // Image must exist but can have any size.  
+    /// \returns whether we succeeded
     bool ReadImageFromFile(ITMShortImage *image, const char *fileName);
 }
