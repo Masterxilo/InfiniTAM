@@ -5,6 +5,7 @@
 #include "ITMLib.h"
 #include "ITMLibSettings.h"
 #include "ITMLowLevelEngine.h"
+#include "Scene.h"
 
 /** \mainpage
     This is the API reference documentation for InfiniTAM. For a general
@@ -65,6 +66,7 @@ namespace ITMLib
 			ITMTrackingState *trackingState;
 
 			ITMScene* scene;
+            Scene* sscene;
             /// Describes the tracked camera position and possibly a frame rendered from that position
 			ITMRenderState *renderState_live;
 

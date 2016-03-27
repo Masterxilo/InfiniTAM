@@ -196,6 +196,25 @@ KERNEL checkS(Scene* scene) {
     assert(Scene::getCurrentScene() == scene);
 }
 
+__managed__ int counter = 0;
+struct DoForEach {
+    static GPU_ONLY void process(ITMVoxelBlock* vb) {
+        assert(vb);
+        assert(vb->pos == VoxelBlockPos(0, 0, 0) ||
+            vb->pos == VoxelBlockPos(1,2,3)); 
+        atomicAdd(&counter, 1);
+    }
+};
+
+
+KERNEL modifyS() {
+    Scene::getCurrentSceneVoxel(Vector3i(0, 0, 1))->setSDF(1.0);
+}
+
+KERNEL checkModifyS() {
+    assert(Scene::getCurrentSceneVoxel(Vector3i(0, 0, 1))->getSDF() == 1.0);
+}
+
 void testScene() {
     Scene::setCurrentScene(0);
     assert(Scene::getCurrentScene() == 0);
@@ -208,8 +227,17 @@ void testScene() {
     Scene::setCurrentScene(s);
     LAUNCH_KERNEL(checkS, 1, 1, s);
 
+    // modify current scene
+    LAUNCH_KERNEL(modifyS, 1, 1);
+    LAUNCH_KERNEL(checkModifyS, 1, 1);
+
     Scene::setCurrentScene(0);
     LAUNCH_KERNEL(checkS, 1, 1, 0);
+
+    // do for each
+    counter = 0;
+    s->doForEachAllocatedBlock<DoForEach>();
+    assert(counter == 2);
 
     delete s;
 }

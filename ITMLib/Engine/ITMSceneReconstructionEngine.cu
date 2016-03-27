@@ -157,7 +157,7 @@ CPU_AND_GPU inline void buildHashAllocAndVisibleTypePP(
         blockPos = TO_SHORT_FLOOR3(point);
 
         //compute index in hash table
-        hashIdx = hashIndex(blockPos);
+        //hashIdx = hashIndex(blockPos); // TODO replace with new code
 
         //check if hash table contains entry (block has already been allocated)
         bool isFound = false;
@@ -455,6 +455,7 @@ void ITMSceneReconstructionEngine::IntegrateIntoScene(ITMScene *scene, const ITM
 
     integrateIntoScene_device<< <gridSize, cudaBlockSize >> >(
         localVBA, hashTable, 
-        rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+        rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb,
+        projParams_d, projParams_rgb, voxelSize, mu, maxW);
 }
 

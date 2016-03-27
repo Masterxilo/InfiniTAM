@@ -8,12 +8,19 @@ CPU_AND_GPU Scene* Scene::getCurrentScene() {
     return currentScene;
 }
 
+__managed__ ITMVoxelBlock* currentLocalVBA = 0;
+__device__ void Scene::AllocateVB::allocate(VoxelBlockPos pos, int sequenceId) {
+    assert(currentLocalVBA);
+
+    currentLocalVBA[sequenceId].pos = pos;
+}
+
 void Scene::setCurrentScene(Scene* s) {
     currentScene = s;
 }
 
 Scene::Scene() {
-    voxelBlockHash = new HashMap<Z3Hasher>(SDF_LOCAL_BLOCK_NUM);
+    voxelBlockHash = new HashMap<Z3Hasher, AllocateVB>(SDF_EXCESS_LIST_SIZE);
     cudaSafeCall(cudaMalloc(&localVBA, sizeof(ITMVoxelBlock) *SDF_LOCAL_BLOCK_NUM));
 }
 
@@ -23,6 +30,7 @@ Scene::~Scene() {
 }
 
 void Scene::performAllocations() {
+    currentLocalVBA = localVBA;
     voxelBlockHash->performAllocations();
 }
 

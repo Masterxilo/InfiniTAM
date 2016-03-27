@@ -33,7 +33,7 @@ projection of all eight corners in image space and store the minimum
 and maximum Z coordinates of the block in the camera coordinate
 system
 */
-CPU_AND_GPU inline bool ProjectSingleBlock(
+GPU_ONLY inline bool ProjectSingleBlock(
     const THREADPTR(Vector3s) & blockPos,
     const THREADPTR(Matrix4f) & pose,
     const THREADPTR(Vector4f) & intrinsics,
@@ -94,7 +94,7 @@ into (renderingBlockSizeX by renderingBlockSizeY) pixel (or less) RenderingBlock
 Store the resulting blocks into renderingBlockList,
 incrementing the current position 'offset' in this list.
 */
-CPU_AND_GPU inline void CreateRenderingBlocks(
+GPU_ONLY inline void CreateRenderingBlocks(
     DEVICEPTR(RenderingBlock) *renderingBlockList, //!< [out]
     int offset, //!< [out]
 
@@ -127,7 +127,7 @@ CPU_AND_GPU inline void CreateRenderingBlocks(
 
 /// \param x,y [in] camera space pixel determining ray direction
 /// \returns whether any intersection was found
-CPU_AND_GPU inline bool castRay(
+GPU_ONLY inline bool castRay(
     DEVICEPTR(Vector4f) &pt_out, //!< [out] the intersection point. w is 1 for a valid point, 0 for no intersection; in voxel-fractional-world-coordinates
 
     const int x, const int y,
@@ -223,7 +223,7 @@ CPU_AND_GPU inline bool castRay(
 
 /// Compute normal in the distance field via the gradient.
 /// c.f. computeSingleNormalFromSDF
-CPU_AND_GPU inline void computeNormalAndAngle(
+GPU_ONLY inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out
     const THREADPTR(Vector3f) & point,
     const CONSTPTR(ITMVoxelBlock) *voxelBlockData,
@@ -250,7 +250,7 @@ there are only 4 uninterpolated read operations followed by a cross-product.
 \returns normal_out[idx].w = sigmaZ_out[idx] = -1 on error where idx = x + y * imgDims.x
 */
 template <bool useSmoothing>
-CPU_AND_GPU inline void computeNormalAndAngle(
+GPU_ONLY inline void computeNormalAndAngle(
     THREADPTR(bool) & foundPoint, //!< in,out. Set to false when the normal cannot be computed
     const THREADPTR(int) &x, const THREADPTR(int) &y,
     const CONSTPTR(Vector4f) *pointsRay,
@@ -324,27 +324,27 @@ const THREADPTR(float) & angle
 
 // PIXEL SHADERS
 // " Finally a coloured or shaded rendering of the surface is trivially computed, as desired for the visualisation."
-CPU_AND_GPU inline void drawPixelGrey(DRAWFUNCTIONPARAMS)
+GPU_ONLY inline void drawPixelGrey(DRAWFUNCTIONPARAMS)
 {
     float outRes = (0.8f * angle + 0.2f) * 255.0f;
     dest = Vector4u((uchar)outRes);
 }
 
-CPU_AND_GPU inline void drawPixelNormal(DRAWFUNCTIONPARAMS)
+GPU_ONLY inline void drawPixelNormal(DRAWFUNCTIONPARAMS)
 {
     dest.r = (uchar)((0.3f + (-normal_obj.r + 1.0f)*0.35f)*255.0f);
     dest.g = (uchar)((0.3f + (-normal_obj.g + 1.0f)*0.35f)*255.0f);
     dest.b = (uchar)((0.3f + (-normal_obj.b + 1.0f)*0.35f)*255.0f);
 }
 
-CPU_AND_GPU inline void drawPixelColour(DRAWFUNCTIONPARAMS)
+GPU_ONLY inline void drawPixelColour(DRAWFUNCTIONPARAMS)
 {
     Vector3f clr = readFromSDF_color4u_interpolated(voxelBlockData, indexData, point);
     dest = Vector4u(TO_UCHAR3(clr), 255); 
 }
 
 #define PROCESS_AND_DRAW_PIXEL(PROCESSFUNCTION, DRAWFUNCTION) \
-CPU_AND_GPU inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
+GPU_ONLY inline void PROCESSFUNCTION(DEVICEPTR(Vector4u) &outRendering, const CONSTPTR(Vector3f) & point,\
     bool foundPoint, const CONSTPTR(ITMVoxelBlock) *voxelData, const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,\
 	Vector3f lightSource) {\
 	Vector3f outNormal;\
@@ -359,7 +359,7 @@ PROCESS_AND_DRAW_PIXEL(processPixelGrey, drawPixelGrey)
 PROCESS_AND_DRAW_PIXEL(processPixelNormal, drawPixelNormal)
 
 
-CPU_AND_GPU inline void processPixelICPPost(
+GPU_ONLY inline void processPixelICPPost(
 const float angle,
 const Vector3f outNormal,
 DEVICEPTR(Vector4f) &pointsMap, //<! [out] trackingState->pointCloud->locations (world space conversion of point)
@@ -385,7 +385,7 @@ Uses image space normals.
 */
 /// \param useSmoothing whether to compute normals by forward differences two pixels away (true) or just one pixel away (false)
 template<bool useSmoothing>
-CPU_AND_GPU inline void processPixelICP(
+GPU_ONLY inline void processPixelICP(
     DEVICEPTR(Vector4f) *const pointsMap, //!< [out] receives output points in world coordinates
     DEVICEPTR(Vector4f) *const normalsMap,
 

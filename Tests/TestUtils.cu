@@ -107,7 +107,8 @@ bool assertImpl(bool f, const char* const expr, const char* const file, int line
 
 #include "CUDADefines.h"
 
-
+#define xyz(p) p.x, p.y, p.z
+dim3 _lastLaunch_gridDim, _lastLaunch_blockDim;
 /// \returns true if err is cudaSuccess
 /// Fills errmsg in UNIT_TESTING build.
 bool cudaSafeCallImpl(cudaError err, const char * const expr, const char * const file, const int line)
@@ -125,6 +126,13 @@ bool cudaSafeCallImpl(cudaError err, const char * const expr, const char * const
         expr,
         e);
 
+    if (err == cudaError::cudaErrorInvalidConfiguration) {
+        printf("configuration was (%d,%d,%d), (%d,%d,%d)\n",
+            xyz(_lastLaunch_gridDim),
+            xyz(_lastLaunch_blockDim)
+            );
+    }
+
     puts(s);
     OutputDebugStringA(s);
     logger(s);
@@ -134,6 +142,7 @@ bool cudaSafeCallImpl(cudaError err, const char * const expr, const char * const
 #if UNIT_TESTING
 
 #else
+
 
 
 /// Catch remaining cuda errors on shutdown

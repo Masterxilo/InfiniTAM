@@ -5,12 +5,16 @@
 #include "ITMCUDAUtils.h"
 
 // Forward declarations
-template<typename Hasher> class HashMap;
-template<typename Hasher>
-KERNEL performAllocationKernel(typename HashMap<Hasher>* hashMap);
+template<typename Hasher, typename AllocCallback> class HashMap;
+template<typename Hasher, typename AllocCallback>
+KERNEL performAllocationKernel(typename HashMap<Hasher, AllocCallback>* hashMap);
 
 #define hprintf(...) //printf(__VA_ARGS__) // enable for verbose radio debug messages
 
+struct VoidSequenceIdAllocationCallback {
+    template<typename T>
+    static __device__ void allocate(T, int sequenceId) {}
+};
 /**
 Implements a
 
@@ -31,7 +35,9 @@ especially when it is expected that the same entry is accessed multiple times fr
 TODO Can we provide this functionality from here? Maybe force the creation of some object including a cache to access this.
 */
 /* Implementation: See HashMap.png */
-template<typename Hasher //!< must have static __device__ function uint Hasher::hash(const KeyType&) which generates values from 0 to Hasher::BUCKET_NUM-1 
+template<
+    typename Hasher, //!< must have static __device__ function uint Hasher::hash(const KeyType&) which generates values from 0 to Hasher::BUCKET_NUM-1 
+    typename SequenceIdAllocationCallback = VoidSequenceIdAllocationCallback //!< must have static __device__ void  allocate(KeyType k, int sequenceId) function
 >
 class HashMap : public Managed {
 public:
@@ -40,7 +46,7 @@ public:
 private:
     static const uint BUCKET_NUM = Hasher::BUCKET_NUM;
     const uint EXCESS_NUM;
-    CPU_AND_GPU const uint NUMBER_TOTAL_ENTRIES() const {
+    CPU_AND_GPU uint NUMBER_TOTAL_ENTRIES() const {
         return (BUCKET_NUM + EXCESS_NUM);
     }
 
@@ -75,6 +81,9 @@ private:
             assert(sequenceId > 0);
             this->key = key;
             this->sequenceId = sequenceId;
+
+            SequenceIdAllocationCallback::allocate(key, sequenceId);
+
             hprintf("allocated %d\n", sequenceId);
         }
 
@@ -154,7 +163,7 @@ private:
         hashEntry.allocate(key, atomicAdd(lowestFreeSequenceNumber, 1));
     }
 
-    friend KERNEL performAllocationKernel<Hasher>(typename HashMap<Hasher>* hashMap);
+    friend KERNEL performAllocationKernel<Hasher, SequenceIdAllocationCallback>(typename HashMap<Hasher, SequenceIdAllocationCallback>* hashMap);
 
     GPU_ONLY void performAllocation(const uint hashMap_then_excessList_entry) {
         if (hashMap_then_excessList_entry >= NUMBER_TOTAL_ENTRIES()) return;
@@ -285,8 +294,8 @@ public:
     }
 };
 
-template<typename Hasher>
-KERNEL performAllocationKernel(typename HashMap<Hasher>* hashMap) {
+template<typename Hasher, typename AllocCallback>
+KERNEL performAllocationKernel(typename HashMap<Hasher, AllocCallback>* hashMap) {
     assert(blockDim.x == THREADS_PER_BLOCK && blockDim.y == 1 && blockDim.z == 1);
     assert(
         gridDim.x*blockDim.x >= hashMap->NUMBER_TOTAL_ENTRIES() && // all entries covered

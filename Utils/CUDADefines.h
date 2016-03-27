@@ -47,6 +47,8 @@
 */
 
 
+extern dim3 _lastLaunch_gridDim, _lastLaunch_blockDim;
+
 #ifndef __CUDACC__
 // hack to make intellisense shut up
 #define LAUNCH_KERNEL(kernelFunction, gridDim, blockDim, arguments, ...) ((void)0)
@@ -56,6 +58,7 @@
 
 #define LAUNCH_KERNEL(kernelFunction, gridDim, blockDim, ...) {\
 cudaSafeCall(cudaGetLastError());\
+_lastLaunch_gridDim = dim3(gridDim); _lastLaunch_blockDim = dim3(blockDim);\
 kernelFunction << <gridDim, blockDim >> >(__VA_ARGS__);\
 cudaSafeCall(cudaGetLastError());\
 cudaSafeCall(cudaDeviceSynchronize());\
@@ -65,6 +68,7 @@ cudaSafeCall(cudaDeviceSynchronize());\
 
 #define LAUNCH_KERNEL(kernelFunction, gridDim, blockDim, ...) {\
 cudaSafeCall(cudaGetLastError());\
+_lastLaunch_gridDim = dim3(gridDim); _lastLaunch_blockDim = dim3(blockDim);\
 kernelFunction << <gridDim, blockDim >> >(__VA_ARGS__);\
 cudaSafeCall(cudaGetLastError());\
 cudaSafeCall(cudaDeviceSynchronize()); /*TODO you do not want this in release/debug code: this greatly alters the execution order and async logic/efficiency (async is never guaranteed anyways though)...

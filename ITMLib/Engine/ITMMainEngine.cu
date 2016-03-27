@@ -9,6 +9,7 @@ ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib 
 	this->settings = settings;
 
 	scene = new ITMScene(&(settings->sceneParams));
+    sscene = new Scene();
 
 	lowLevelEngine = new ITMLowLevelEngine();
 	viewBuilder = new ITMViewBuilder(calib);
