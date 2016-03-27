@@ -5,7 +5,6 @@
 
 #include "Utils/ITMLibDefines.h"
 
-#include "Objects/ITMScene.h"
 #include "Objects/ITMView.h"
 
 #include "Engine/ITMLowLevelEngine.h"

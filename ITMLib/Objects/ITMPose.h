@@ -12,7 +12,9 @@ namespace ITMLib
 	{
 		/** \brief
 		    Represents a camera pose with rotation and translation
-		    parameters
+		    parameters.
+
+            world-to-camera transform
 		*/
 		class ITMPose
 		{
@@ -40,7 +42,7 @@ namespace ITMLib
 				};
 			} params;
 
-			/** The pose as a 4x4 transformation matrix ("modelview
+			/** The pose as a 4x4 transformation matrix (world-to-camera transform, modelview
 			    matrix).
 			*/
 			Matrix4f M;

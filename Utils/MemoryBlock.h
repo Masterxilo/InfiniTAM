@@ -146,7 +146,7 @@ namespace ORUtils
 			Free();
             this->_dataSize = dataSize;
 			if (allocate_CPU) data_cpu = new T[dataSize];
-			if (allocate_CUDA) cudaSafeCall(cudaMalloc((void**)&data_cuda, dataSize * sizeof(T)));
+			if (allocate_CUDA) cudaSafeCall(cudaMalloc(&data_cuda, dataSize * sizeof(T)));
 		}
 
 		void Free()

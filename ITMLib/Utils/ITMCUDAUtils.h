@@ -130,6 +130,8 @@ __global__ void memsetKernelLarge_device(T *devPtr, const T val, size_t nwords)
 	devPtr[offset] = val;
 }
 
+/// Sets nwords many val in devPtr
+/// Note that this gives the amount of elements, not of bytes
 template<typename T>
 inline void memsetKernel(T *devPtr, const T val, size_t nwords)
 {

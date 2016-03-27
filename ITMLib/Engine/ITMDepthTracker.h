@@ -38,8 +38,6 @@ namespace ITMLib
 
             ITMDepthTracker(
                 Vector2i depthImgSize,
-                float distThresh,
-                float terminationThreshold,
                 const ITMLowLevelEngine *lowLevelEngine);
             virtual ~ITMDepthTracker(void);
 
@@ -75,8 +73,6 @@ namespace ITMLib
 			const ITMLowLevelEngine *lowLevelEngine;
             /// Passed on last call to TrackCamera
             const ITMView *view;
-
-			const float terminationThreshold;
 
             /// Solves hessian.step = nabla
             /// \param delta output array of 6 floats 

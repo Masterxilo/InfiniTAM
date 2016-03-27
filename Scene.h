@@ -5,7 +5,7 @@
 
 // see doForEachAllocatedVoxel for T
 template<typename T>
-KERNEL doForEachAllocatedBlock(
+KERNEL doForEachAllocatedVoxel(
     ITMVoxelBlock* localVBA,
     int nextFreeSequenceId) {
     int index = blockIdx.x;
@@ -14,6 +14,18 @@ KERNEL doForEachAllocatedBlock(
     ITMVoxelBlock* vb = &localVBA[index];
     Vector3i localPos(threadIdx.x, threadIdx.y, threadIdx.z);
     T::process(vb, &vb->blockVoxels[threadIdx.x], localPos);
+}
+
+// see doForEachAllocatedVoxel for T
+template<typename T>
+KERNEL doForEachAllocatedVoxelBlock(
+    ITMVoxelBlock* localVBA,
+    int nextFreeSequenceId) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index <= 0 || index >= nextFreeSequenceId) return;
+
+    ITMVoxelBlock* vb = &localVBA[index];
+    T::process(vb);
 }
 
 
@@ -30,6 +42,11 @@ public:
     Scene();
     virtual ~Scene();
 
+    /*
+    void reset() {
+        // TODO implement
+        printf("Scene::reset not implemented\n");
+    }*/
 
     /// T must have an operator(ITMVoxelBlock*, ITMVoxel*, Vector3i localPos)
     /// where localPos will run from 0,0,0 to (SDF_BLOCK_SIZE-1)^3
@@ -37,7 +54,7 @@ public:
     template<typename T>
     void doForEachAllocatedVoxel() {
         LAUNCH_KERNEL(
-            ::doForEachAllocatedBlock<T>, 
+            ::doForEachAllocatedVoxel<T>,
             SDF_LOCAL_BLOCK_NUM,
             dim3(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE),
             localVBA,
@@ -45,10 +62,21 @@ public:
             );
     }
 
-    // Scene is mostly fixed. // TODO prefer using a scoping construct that lives together with the call stack!
-    // Having it globally accessible heavily reduces having
-    // to pass parameters.
-    static CPU_AND_GPU Scene* getCurrentScene();
+    /// T must have an operator(ITMVoxelBlock*)
+    template<typename T>
+    void doForEachAllocatedVoxelBlock() {
+
+        dim3 blockSize(256);
+        dim3 gridSize((int)ceil((float)SDF_LOCAL_BLOCK_NUM / (float)blockSize.x));
+        LAUNCH_KERNEL(
+            ::doForEachAllocatedVoxelBlock<T>,
+            gridSize,
+            blockSize,
+            localVBA,
+            voxelBlockHash->getLowestFreeSequenceNumber()
+            );
+    }
+
     static GPU_ONLY ITMVoxel* getCurrentSceneVoxel(Vector3i pos) {
         return getCurrentScene()->getVoxel(pos);
     }
@@ -56,8 +84,10 @@ public:
         return getCurrentScene()->requestVoxelBlockAllocation(pos);
     }
 
+    static void Scene::performCurrentSceneAllocations() {
+        getCurrentScene()->performAllocations();
+    }
 
-    static void setCurrentScene(Scene* s);
 
     /** !private! */
     struct Z3Hasher {
@@ -75,7 +105,31 @@ public:
     struct AllocateVB {
         static __device__ void allocate(VoxelBlockPos pos, int sequenceId);
     };
+
+    // Scene is mostly fixed. // TODO prefer using a scoping construct that lives together with the call stack!
+    // Having it globally accessible heavily reduces having
+    // to pass parameters.
+    static CPU_AND_GPU Scene* getCurrentScene();
+
+    /// Change current scene for the current block/scope
+    class CurrentSceneScope {
+    public:
+        CurrentSceneScope(Scene* const newCurrentScene) : 
+            oldCurrentScene(Scene::getCurrentScene()) {
+            Scene::setCurrentScene(newCurrentScene);
+        }
+        ~CurrentSceneScope() {
+            Scene::setCurrentScene(oldCurrentScene);
+        }
+
+    private:
+        Scene* const oldCurrentScene;
+    };
+#define CURRENT_SCENE_SCOPE(s) Scene::CurrentSceneScope currentSceneScope(s);
 private:
+
+    static void setCurrentScene(Scene* s);
+
     GPU_ONLY DEVICEPTR(ITMVoxelBlock*) getVoxelBlock(VoxelBlockPos pos);
     DEVICEPTR(ITMVoxelBlock*) localVBA;
 

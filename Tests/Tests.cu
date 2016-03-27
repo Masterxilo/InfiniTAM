@@ -220,7 +220,6 @@ KERNEL checkModifyS() {
 }
 
 void testScene() {
-    Scene::setCurrentScene(0);
     assert(Scene::getCurrentScene() == 0);
 
     Scene* s = new Scene(); 
@@ -228,15 +227,30 @@ void testScene() {
     s->performAllocations();
     LAUNCH_KERNEL(findSceneVoxel, 1, 1, s);
 
-    Scene::setCurrentScene(s);
-    LAUNCH_KERNEL(checkS, 1, 1, s);
+    // current scene starts out at 0
+    LAUNCH_KERNEL(checkS, 1, 1, 0);
+
+    // change current scene
+    {
+        LAUNCH_KERNEL(checkS, 1, 1, 0); // still 0 before scope begins
+
+        CURRENT_SCENE_SCOPE(s);
+        LAUNCH_KERNEL(checkS, 1, 1, s);
+        // Nest
+        {
+            CURRENT_SCENE_SCOPE(0);
+            LAUNCH_KERNEL(checkS, 1, 1, 0);
+        }
+        LAUNCH_KERNEL(checkS, 1, 1, s);
+    }
+    LAUNCH_KERNEL(checkS, 1, 1, 0); // 0 again
 
     // modify current scene
-    LAUNCH_KERNEL(modifyS, 1, 1);
-    LAUNCH_KERNEL(checkModifyS, 1, 1);
-
-    Scene::setCurrentScene(0);
-    LAUNCH_KERNEL(checkS, 1, 1, 0);
+    {
+        CURRENT_SCENE_SCOPE(s);
+        LAUNCH_KERNEL(modifyS, 1, 1);
+        LAUNCH_KERNEL(checkModifyS, 1, 1);
+    }
 
     // do for each
     counter = 0;

@@ -2,35 +2,36 @@
 
 #pragma once
 
-#include "ITMSceneParams.h"
-
-namespace ITMLib
-{
-	namespace Objects
-	{
-		class ITMLibSettings
-		{
-		public:
-
-			/// For ITMDepthTracker: ICP distance threshold
-			float depthTrackerICPThreshold;
-
-			/// For ITMDepthTracker: ICP iteration termination threshold
-			float depthTrackerTerminationThreshold;
-
-			/// Further, scene specific parameters such as voxel size
-			ITMLib::Objects::ITMSceneParams sceneParams;
-
-            ITMLibSettings::ITMLibSettings(void)
-                : sceneParams(0.02f, 100, 0.005f, 0.2f, 3.0f)
-            {
-                /// depth threashold for the ICP tracker
-                depthTrackerICPThreshold = 0.1f * 0.1f;
-
-                /// For ITMDepthTracker: ICP iteration termination threshold
-                depthTrackerTerminationThreshold = 1e-3f;
-            }
-
-		};
-	}
-}
+/// depth threashold for the ICP tracker
+/// For ITMDepthTracker: ICP distance threshold
+#define depthTrackerICPThreshold (0.1f * 0.1f)
+/// For ITMDepthTracker: ICP iteration termination threshold
+#define depthTrackerTerminationThreshold 1e-3f
+/** @} */
+/** \brief
+Encodes the width of the band of the truncated
+signed distance transform that is actually stored
+in the volume. This is again usually specified in
+meters. The resulting width in voxels is @ref mu
+divided by @ref voxelSize.
+*/
+#define mu 0.02f
+/** \brief
+Up to @ref maxW observations per voxel are averaged.
+Beyond that a sliding average is computed.
+*/
+#define maxW 100
+/// Size of a voxel, usually given in meters.
+/// In world space coordinates. (
+#define voxelSize 0.005f
+#define oneOverVoxelSize (1.0f / voxelSize)
+/** @{ */
+/** \brief
+Fallback parameters: consider only parts of the
+scene from @p viewFrustum_min in front of the camera
+to a distance of @p viewFrustum_max. Usually the
+actual depth range should be determined
+automatically by a ITMLib::Engine::ITMVisualisationEngine.
+*/
+#define viewFrustum_min 0.2f
+#define viewFrustum_max 3.0f

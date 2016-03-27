@@ -2,7 +2,7 @@
 
 //__device__ Scene* currentScene;
 //__host__
-__managed__ Scene* currentScene;
+__managed__ Scene* currentScene = 0; // TODO use __const__ memory, not changeable from gpu!
 
 CPU_AND_GPU Scene* Scene::getCurrentScene() {
     return currentScene;
@@ -12,10 +12,13 @@ __managed__ ITMVoxelBlock* currentLocalVBA = 0;
 __device__ void Scene::AllocateVB::allocate(VoxelBlockPos pos, int sequenceId) {
     assert(currentLocalVBA);
 
+    // Initialize pos and reset data
     currentLocalVBA[sequenceId].pos = pos;
+    currentLocalVBA[sequenceId].resetVoxels();
 }
 
 void Scene::setCurrentScene(Scene* s) {
+    cudaDeviceSynchronize(); // want to write managed currentScene 
     currentScene = s;
 }
 

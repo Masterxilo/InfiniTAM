@@ -20,8 +20,7 @@ CPU_AND_GPU inline int pixelLocId(int x, int y, const THREADPTR(Vector2i) &imgSi
 
 CPU_AND_GPU inline void updateVoxelColorInformation(
     DEVICEPTR(ITMVoxel) & voxel,
-    Vector3f oldC, int oldW, Vector3f newC, int newW,
-    int maxW)
+    Vector3f oldC, int oldW, Vector3f newC, int newW)
 {
     weightedCombine(oldC, oldW, newC, newW);
 
@@ -33,8 +32,7 @@ CPU_AND_GPU inline void updateVoxelColorInformation(
 
 CPU_AND_GPU inline void updateVoxelDepthInformation(
     DEVICEPTR(ITMVoxel) & voxel,
-    float oldF, int oldW, float newF, int newW,
-    int maxW)
+    float oldF, int oldW, float newF, int newW)
 {
     weightedCombine(oldF, oldW, newF, newW);
 

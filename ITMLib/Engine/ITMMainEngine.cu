@@ -4,29 +4,23 @@
 
 using namespace ITMLib::Engine;
 
-ITMMainEngine::ITMMainEngine(const ITMLibSettings *settings, const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
+ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
 {
-	this->settings = settings;
-
-	scene = new ITMScene(&(settings->sceneParams));
-    sscene = new Scene();
+    scene = new Scene();
 
 	lowLevelEngine = new ITMLowLevelEngine();
 	viewBuilder = new ITMViewBuilder(calib);
-	visualisationEngine = new ITMVisualisationEngine(scene);
+	visualisationEngine = new ITMVisualisationEngine();
 
     Vector2i trackedImageSize = imgSize_d;
 
 	renderState_live = visualisationEngine->CreateRenderState(trackedImageSize);
 	renderState_freeview = NULL; //will be created by the visualisation engine on demand
 
-    sceneRecoEngine = new ITMSceneReconstructionEngine();
     ResetScene();
 
     tracker = new ITMDepthTracker(
         trackedImageSize,
-        settings->depthTrackerICPThreshold,
-        settings->depthTrackerTerminationThreshold,
         lowLevelEngine
         );
     trackingState = tracker->BuildTrackingState();
@@ -44,8 +38,6 @@ ITMMainEngine::~ITMMainEngine()
 
 	delete scene;
 
-    delete sceneRecoEngine;
-
 	delete tracker;
 
 	delete lowLevelEngine;
@@ -59,6 +51,8 @@ ITMMainEngine::~ITMMainEngine()
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
 {
+    CURRENT_SCENE_SCOPE(scene);
+
 	// prepare image and turn it into a depth image
 	viewBuilder->UpdateView(&view, rgbImage, rawDepthImage);
 
@@ -66,11 +60,11 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
     tracker->TrackCamera(trackingState, view);
 
 	// fusion
-    sceneRecoEngine->ProcessFrame(view, trackingState, scene);
+    ITMSceneReconstructionEngine_ProcessFrame(view, trackingState);
 
     // raycast scene from current viewpoint 
     // to create point cloud for tracking
-    visualisationEngine->CreateICPMaps(&view->calib->intrinsics_d, trackingState, renderState_live);
+    visualisationEngine->CreateICPMaps(trackingState, &view->calib->intrinsics_d, renderState_live);
 }
 
 void ITMMainEngine::GetImage(
@@ -113,6 +107,7 @@ void ITMMainEngine::GetImage(
 
         assert(renderState_freeview->raycastResult->noDims == out->noDims);
 
+        CURRENT_SCENE_SCOPE(scene);
 		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, out, type);
         out->UpdateHostFromDevice();
 		break;

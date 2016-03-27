@@ -3,8 +3,6 @@
 #pragma once
 
 #include "ITMLibDefines.h"
-
-#include "ITMScene.h"
 #include "ITMView.h"
 #include "ITMTrackingState.h"
 #include "ITMRenderState.h"
@@ -37,26 +35,19 @@ namespace ITMLib
         class ITMVisualisationEngine
         {
         private:
-
-
             RenderingBlock *renderingBlockList_device;
-            uint *noTotalBlocks_device;
+
             /** Given scene, pose and intrinsics, create an estimate
             of the minimum and maximum depths at each pixel of
             an image.
 
             Called by rendering methods (CreateICPMaps, RenderImage).
-
-            Creates the list of RenderingBlocks
             */
-            void CreateExpectedDepths(
+            void CreateExpectedDepths();
+            void Common(
                 const ITMPose *pose,
                 const ITMIntrinsics *intrinsics,
-                ITMRenderState *renderState //!< [out] initializes renderingRangeImage
-                ) const;
-
-            const ITMScene * const scene;
-
+                ITMRenderState *renderState);
 
 		public:
 			enum RenderImageType
@@ -66,31 +57,32 @@ namespace ITMLib
 				RENDER_COLOUR_FROM_NORMAL
 			};
 
-            explicit ITMVisualisationEngine(ITMScene *scene);
+            explicit ITMVisualisationEngine();
             virtual ~ITMVisualisationEngine(void);
 
             /// Heatmap style color gradient for depth
             static void DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src);
 
-            /** Creates a render state, containing rendering info
-            for the scene.
+            /** Creates a render state, 
             */
             ITMRenderState* CreateRenderState(const Vector2i & imgSize) const;
             
 			/** This will render an image using raycasting. */
-            void RenderImage(const ITMPose *pose, const ITMIntrinsics *intrinsics,
+            void RenderImage(
+                const ITMPose *pose,
+                const ITMIntrinsics *intrinsics,
                 ITMRenderState *renderState, //!< [in, out] builds renderingRangeImage for one-time use
                 ITMUChar4Image *outputImage,
-                RenderImageType type = RENDER_SHADED_GREYSCALE) const;
+                RenderImageType type = RENDER_SHADED_GREYSCALE);
 
 			/** Create an image of reference points and normals as
 			required by the ITMLib::Engine::ITMDepthTracker classes.
 			*/
             void CreateICPMaps(
-                const ITMIntrinsics * const intrinsics_d,
                 ITMTrackingState * const trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
-                ITMRenderState *const renderStateTemp //!< [in, out] builds renderingRangeImage for one-time use
-                ) const;
+                const ITMIntrinsics * const intrinsics_d,
+                ITMRenderState *const renderState //!< [in, out] builds renderingRangeImage for one-time use
+                );
 
 		};
 	}

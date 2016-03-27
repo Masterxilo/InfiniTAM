@@ -26,7 +26,7 @@ namespace ITMLib
 
             /// c.f. depthTo3D
             /// might be a bit faster, no division required later, just multiplication
-            Vector4f getInverseProjParams() {
+            Vector4f getInverseProjParams() const {
                 Vector4f projParams = projectionParamsSimple.all;
                 Vector4f invProjParams = projParams;
                 invProjParams.x = 1.0f / invProjParams.x;

@@ -102,12 +102,6 @@
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMScene.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMSceneParams.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
@@ -197,6 +191,7 @@
     <CudaCompile Include="LightingEstimation.cu" />
     <CudaCompile Include="GeometryRefinement.cu" />
     <CudaCompile Include="Scene.cu" />
+    <CudaCompile Include="DepthToUChar4.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

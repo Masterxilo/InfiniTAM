@@ -4,6 +4,7 @@
 
 #include "PlatformIndependence.h"
 #include "ITMMath.h"
+#include "cudadefines.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -132,7 +133,7 @@ public:
         return clr.toFloat() / intensity();
     }
 
-    CPU_AND_GPU ITMVoxel()
+    GPU_ONLY ITMVoxel()
 	{
         setSDF_initialValue();
 		w_depth = 0;
@@ -142,9 +143,13 @@ public:
 };
 
 struct ITMVoxelBlock {
-    /// Mutable as this voxel block might represent any part of space
+    /// pos is Mutable, 
+    /// because this voxel block might represent any part of space
     VoxelBlockPos pos;
     ITMVoxel blockVoxels[SDF_BLOCK_SIZE3];
+    GPU_ONLY void resetVoxels() {
+        for (auto& i : blockVoxels) i = ITMVoxel();
+    }
 };
 
 /// The tracker iteration type used to define the tracking iteration regime

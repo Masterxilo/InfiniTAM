@@ -91,9 +91,8 @@ int main(int argc, char** argv) {
 	}
     
 
-	ITMLibSettings *internalSettings = new ITMLibSettings();
 	ITMMainEngine *mainEngine = 
-        new ITMMainEngine(internalSettings, &imageSource->calib, imageSource->getRGBImageSize(), imageSource->getDepthImageSize());
+        new ITMMainEngine(&imageSource->calib, imageSource->getRGBImageSize(), imageSource->getDepthImageSize());
 
     
 	UIEngine::Instance()->Initialise(argc, argv, imageSource, mainEngine, 
@@ -114,7 +113,6 @@ int main(int argc, char** argv) {
 	UIEngine::Instance()->Shutdown();
 
 	delete mainEngine;
-	delete internalSettings;
 	delete imageSource;
 	return 0;
 }

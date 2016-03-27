@@ -5,7 +5,6 @@
 #include "ITMLibDefines.h"
 
 #include "ITMPose.h"
-#include "ITMScene.h"
 
 namespace ITMLib
 {
@@ -31,18 +30,20 @@ namespace ITMLib
             public:
                 /// The pose used to generate the point cloud.
                 ITMPose *pose_pointCloud;
-                uint noTotalPoints;
 
                 ORUtils::Image<Vector4f> *locations,
                     *normals
                     ;
 
-                explicit ITMPointCloud(Vector2i imgSize)
+                explicit ITMPointCloud(Vector2i imgSize) : locations(0), normals(0)
                 {
-                    this->noTotalPoints = 0;
-
                     locations = new ORUtils::Image<Vector4f>(imgSize, MEMORYDEVICE_CUDA);
+                    assert((void*)locations != (void*)0xcdcdcdcd00000000);
+                    assert((void*)locations != (void*)0xcdcdcdcdcdcdcdcd);
+                    assert(locations);
                     normals = new ORUtils::Image<Vector4f>(imgSize, MEMORYDEVICE_CUDA);
+                    assert(normals);
+
                     this->pose_pointCloud = new ITMPose();
                 }
 

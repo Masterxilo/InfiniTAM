@@ -14,8 +14,7 @@ namespace ITMLib
 	namespace Objects
 	{
 		/** \brief
-			Stores the render state used by the SceneReconstruction
-			and Visualisation engines.
+			Stores the render state used by the Visualisation engine.
 			*/
 		class ITMRenderState
         {

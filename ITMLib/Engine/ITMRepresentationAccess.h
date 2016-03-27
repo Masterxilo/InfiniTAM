@@ -1,5 +1,5 @@
 /// \file Implements sparse voxel data structure
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
+/// All of these access the current scene
 
 #pragma once
 
@@ -10,16 +10,13 @@
 
 /// === ITMBlockhash methods (readVoxel) ===
 GPU_ONLY inline ITMVoxel readVoxel(
-    const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(ITMHashEntry) * const voxelIndex,
 	const THREADPTR(Vector3i) & point,
-    THREADPTR(bool) &isFound,
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
+    THREADPTR(bool) &isFound)
 {
     ITMVoxel* v = Scene::getCurrentSceneVoxel(point);
     if (!v) {
         isFound = false;
-        return;
+        return ITMVoxel();
     }
     isFound = true;
     return *v;
@@ -28,13 +25,10 @@ GPU_ONLY inline ITMVoxel readVoxel(
 
 /// === Generic methods (readSDF) ===
 GPU_ONLY inline float readFromSDF_float_uninterpolated(
-    const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
-    THREADPTR(bool) &isFound,
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
+    THREADPTR(bool) &isFound)
 {
-    ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound, cache);
+    ITMVoxel res = readVoxel(TO_INT_ROUND3(point), isFound);
     return res.getSDF();
 }
 
@@ -42,32 +36,31 @@ GPU_ONLY inline float readFromSDF_float_uninterpolated(
     /* Coeff are the sub-block coordinates, used for interpolation*/\
     Vector3f coeff; Vector3i pos; TO_INT_FLOOR3(pos, coeff, point);
 
+#define lookup(dx,dy,dz) readVoxel(pos + Vector3i(dx,dy,dz), isFound).getSDF()
+
 GPU_ONLY inline float readFromSDF_float_interpolated(
-    const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexData) *voxelIndex,
     Vector3f point, //!< in voxel-fractional-world-coordinates (such that one voxel has size 1)
-    THREADPTR(bool) &isFound, 
-    THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
+    THREADPTR(bool) &isFound)
 {
 	float res1, res2, v1, v2;
     COMPUTE_COEFF_POS_FROM_POINT();
 
     // z = 0 layer -> res1
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 0), isFound, cache).getSDF();
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 0), isFound, cache).getSDF();
+	v1 = lookup(0, 0, 0);
+	v2 = lookup(1, 0, 0);
 	res1 = (1.0f - coeff.x) * v1 + coeff.x * v2;
 
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 0), isFound, cache).getSDF();
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 0), isFound, cache).getSDF();
+	v1 = lookup(0, 1, 0);
+	v2 = lookup(1, 1, 0);
 	res1 = (1.0f - coeff.y) * res1 + coeff.y * ((1.0f - coeff.x) * v1 + coeff.x * v2);
 
     // z = 1 layer -> res2
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 1), isFound, cache).getSDF();
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 1), isFound, cache).getSDF();
+	v1 = lookup(0, 0, 1);
+	v2 = lookup(1, 0, 1);
 	res2 = (1.0f - coeff.x) * v1 + coeff.x * v2;
 
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 1), isFound, cache).getSDF();
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 1), isFound, cache).getSDF();
+	v1 = lookup(0, 1, 1);
+	v2 = lookup(1, 1, 1);
 	res2 = (1.0f - coeff.y) * res2 + coeff.y * ((1.0f - coeff.x) * v1 + coeff.x * v2);
 
 	isFound = true;
@@ -76,10 +69,8 @@ GPU_ONLY inline float readFromSDF_float_interpolated(
 
 /// Assumes voxels store color in some type convertible to Vector3f (e.g. Vector3u)
 GPU_ONLY inline Vector3f readFromSDF_color4u_interpolated(
-    const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex, 
-    const THREADPTR(Vector3f) & point, //!< in voxel-fractional world coordinates, comes e.g. from raycastResult
-    THREADPTR(typename ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
+    const THREADPTR(Vector3f) & point //!< in voxel-fractional world coordinates, comes e.g. from raycastResult
+    )
 {
     ITMVoxel resn; 
     Vector3f ret = 0.0f; 
@@ -88,7 +79,7 @@ GPU_ONLY inline Vector3f readFromSDF_color4u_interpolated(
     COMPUTE_COEFF_POS_FROM_POINT()
 
 #define access(dx,dy,dz) \
-    resn = readVoxel(voxelData, voxelIndex, pos + Vector3i(dx, dy, dz), isFound, cache);\
+    resn = readVoxel(pos + Vector3i(dx, dy, dz), isFound);\
     ret += \
     (dx ? coeff.x : 1.0f - coeff.x) *\
     (dy ? coeff.y : 1.0f - coeff.y) *\
@@ -107,12 +98,8 @@ GPU_ONLY inline Vector3f readFromSDF_color4u_interpolated(
     return ret;
 }
 
-#define lookup(dx,dy,dz) readVoxel(voxelData, voxelIndex, pos + Vector3i(dx,dy,dz), isFound).getSDF()
 
 GPU_ONLY inline Vector3f computeSingleNormalFromSDFByForwardDifference(
-    const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,
-
     const THREADPTR(Vector3i) &pos, //!< [in] global voxel position
     bool& isFound //!< [out] whether all values needed existed;
     ) {
@@ -128,12 +115,10 @@ GPU_ONLY inline Vector3f computeSingleNormalFromSDFByForwardDifference(
     return n.normalised(); // TODO in a distance field, normalization should not be necesary. But this is not a true distance field.
 }
 
-/// Compute SDF normal 
+/// Compute SDF normal by interpolated symmetric differences
 /// Used in processPixelGrey
 // Note: this gets the localVBA list, not just a *single* voxel block.
 GPU_ONLY inline Vector3f computeSingleNormalFromSDF(
-    const CONSTPTR(ITMVoxelBlock) * const voxelData,
-    const CONSTPTR(typename ITMVoxelBlockHash::IndexData) *voxelIndex,
     const THREADPTR(Vector3f) &point)
 {
 

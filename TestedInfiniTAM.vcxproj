@@ -136,8 +136,6 @@
     <ClInclude Include="ITMLib\Objects\ITMPose.h" />
     <ClInclude Include="ITMLib\Objects\ITMRenderState.h" />
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
-    <ClInclude Include="ITMLib\Objects\ITMScene.h" />
-    <ClInclude Include="ITMLib\Objects\ITMSceneParams.h" />
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h" />
     <ClInclude Include="ITMLib\Objects\ITMView.h" />
     <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h" />
@@ -162,6 +160,7 @@
     <ClInclude Include="Utils\Vector.h" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="DepthToUChar4.cu" />
     <CudaCompile Include="Engine\ImageSourceEngine.cu" />
     <CudaCompile Include="Engine\UIEngine.cu" />
     <CudaCompile Include="GeometryRefinement.cu">

@@ -332,22 +332,19 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
 
 ITMDepthTracker::ITMDepthTracker(
     Vector2i depthImgSize,
-    float distThresh,
-    float terminationThreshold,
-    const ITMLowLevelEngine *lowLevelEngine) :
-    terminationThreshold(terminationThreshold)
+    const ITMLowLevelEngine *lowLevelEngine) 
 {
     this->lowLevelEngine = lowLevelEngine;
 
     // Tracking strategy:
     const int noHierarchyLevels = 5;
-    const float distThreshStep = distThresh / noHierarchyLevels;
+    const float distThreshStep = depthTrackerICPThreshold / noHierarchyLevels;
     // starting with highest resolution (lowest level, last to be executed)
-    trackingLevels.push_back(TrackingLevel(2, TRACKER_ITERATION_BOTH, distThresh - distThreshStep * 4, depthImgSize));
-    trackingLevels.push_back(TrackingLevel(4, TRACKER_ITERATION_BOTH, distThresh - distThreshStep * 3, depthImgSize / 2));
-    trackingLevels.push_back(TrackingLevel(6, TRACKER_ITERATION_ROTATION, distThresh - distThreshStep * 2, depthImgSize / 4));
-    trackingLevels.push_back(TrackingLevel(8, TRACKER_ITERATION_ROTATION, distThresh - distThreshStep, depthImgSize / 8));
-    trackingLevels.push_back(TrackingLevel(10, TRACKER_ITERATION_ROTATION, distThresh, depthImgSize / 16));
+    trackingLevels.push_back(TrackingLevel(2, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 4, depthImgSize));
+    trackingLevels.push_back(TrackingLevel(4, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 3, depthImgSize / 2));
+    trackingLevels.push_back(TrackingLevel(6, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep * 2, depthImgSize / 4));
+    trackingLevels.push_back(TrackingLevel(8, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep, depthImgSize / 8));
+    trackingLevels.push_back(TrackingLevel(10, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold, depthImgSize / 16));
     assert(trackingLevels.size() == noHierarchyLevels);
 
     cudaSafeCall(cudaMallocManaged((void**)&accu, sizeof(AccuCell)));
@@ -383,7 +380,7 @@ bool ITMDepthTracker::HasConverged(float *step) const
     for (int i = 0; i < 6; i++) stepLength += step[i] * step[i];
 
     // heuristic? Why /6?
-    if (sqrt(stepLength) / 6 < terminationThreshold) return true; //converged
+    if (sqrt(stepLength) / 6 < depthTrackerTerminationThreshold) return true; //converged
 
     return false;
 }

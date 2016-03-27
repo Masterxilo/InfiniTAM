@@ -44,7 +44,6 @@ namespace InfiniTAM
 			std::vector<UIColourMode> colourModes;
 			int currentColourMode;
 
-			ITMLibSettings internalSettings;
 			ImageSourceEngine *imageSource;
 			ITMMainEngine *mainEngine;
 
