@@ -139,6 +139,7 @@
     <ClInclude Include="ITMLib\Utils\ITMLibDefines.h" />
     <ClInclude Include="ITMLib\Utils\ITMLibSettings.h" />
     <ClInclude Include="ITMLib\Utils\ITMMath.h" />
+    <ClInclude Include="LightingModel.h" />
     <ClInclude Include="Utils\HashMap.h" />
     <ClInclude Include="Utils\MyAssert.h" />
     <ClInclude Include="Utils\Cholesky.h" />
@@ -146,12 +147,9 @@
     <ClInclude Include="Utils\cudaSafeCall.h" />
     <ClInclude Include="Utils\FileUtils.h" />
     <ClInclude Include="Utils\Image.h" />
-    <ClInclude Include="Utils\LexicalCast.h" />
     <ClInclude Include="Utils\MathUtils.h" />
     <ClInclude Include="Utils\Matrix.h" />
     <ClInclude Include="Utils\MemoryBlock.h" />
-    <ClInclude Include="Utils\MemoryBlockPersister.h" />
-    <ClInclude Include="Utils\MetalContext.h" />
     <ClInclude Include="Utils\NVTimer.h" />
     <ClInclude Include="Utils\PlatformIndependence.h" />
     <ClInclude Include="Utils\Vector.h" />
@@ -159,6 +157,11 @@
   <ItemGroup>
     <CudaCompile Include="Engine\ImageSourceEngine.cu" />
     <CudaCompile Include="Engine\UIEngine.cu" />
+    <CudaCompile Include="GeometryRefinement.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
     <CudaCompile Include="InfiniTAM.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu" />
@@ -171,12 +174,11 @@
     </CudaCompile>
     <CudaCompile Include="Tests\Tests.cu" />
     <CudaCompile Include="Tests\TestUtils.cu" />
-    <CudaCompile Include="Utils\FileUtils.cu" />
     <CudaCompile Include="Utils\FileUtilsPNG.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp" />
-    <CudaCompile Include="Source.cu">
+    <CudaCompile Include="LightingEstimation.cu">
       <FileType>CppCode</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>

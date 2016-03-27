@@ -3,7 +3,6 @@
 #pragma once
 
 #include <cstdio>
-#include <stdexcept>
 
 #if defined(__CUDACC__) && defined(__CUDA_ARCH__)
 #define CPU_AND_GPU __device__	// for CUDA device code
@@ -11,20 +10,12 @@
 #define CPU_AND_GPU 
 #endif
 
-#if defined(__METALC__) // for METAL device code
-#define THREADPTR(x) thread x
-#define DEVICEPTR(x) device x
-#define THREADGRPPTR(x) threadgroup x
-#define CONSTPTR(x) constant x
-#else
+// Documenting types of pointers/references
+// pointer is valid only for one thread
 #define THREADPTR(x) x
+// pointer can be dereferenced on gpu
 #define DEVICEPTR(x) x
+// __shared__ memory
 #define THREADGROUPPTR(x) x
+// __const__ memory
 #define CONSTPTR(x) x
-#endif
-
-#ifdef ANDROID
-#define DIEWITHEXCEPTION(x) { fprintf(stderr, "%s\n", x); exit(-1); }
-#else
-#define DIEWITHEXCEPTION(x) throw std::runtime_error(x)
-#endif

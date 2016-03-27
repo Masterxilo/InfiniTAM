@@ -46,7 +46,7 @@ CPU_AND_GPU inline float computeUpdatedVoxelDepthInfo(
 
     // compute updated SDF value and reliability (number of observations)
     /// D(X), w(X)
-    oldF = ITMVoxel::SDF_valueToFloat(voxel.sdf);
+    oldF = voxel.getSDF();
     oldW = voxel.w_depth;
 
     // newF, normalized for -1 to 1

@@ -21,9 +21,16 @@ namespace InfiniTAM
 
             enum MainLoopAction
             {
-                PROCESS_PAUSED, PROCESS_FRAME, PROCESS_VIDEO, EXIT, SAVE_TO_DISK
+                PROCESS_PAUSED, PROCESS_FRAME, PROCESS_VIDEO, EXIT
             }mainLoopAction;
         private:
+
+            void setFreeviewFromLive() {
+                freeviewPose.SetFrom(mainEngine->GetTrackingState()->pose_d);
+                assert(mainEngine->GetView() != NULL);
+                freeviewIntrinsics = mainEngine->GetView()->calib->intrinsics_d;
+                windows[0].outImage->ChangeDims(mainEngine->GetView()->depth->noDims);
+            }
 			static UIEngine* instance;
 
 

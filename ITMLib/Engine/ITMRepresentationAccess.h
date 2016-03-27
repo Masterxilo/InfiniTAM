@@ -132,7 +132,7 @@ CPU_AND_GPU inline float readFromSDF_float_uninterpolated(
     THREADPTR(ITMLib::Objects::ITMVoxelBlockHash::IndexCache) & cache = ITMVoxelBlockHash::IndexCache())
 {
     ITMVoxel res = readVoxel(voxelData, voxelIndex, Vector3i((int)ROUND(point.x), (int)ROUND(point.y), (int)ROUND(point.z)), isFound, cache);
-    return ITMVoxel::SDF_valueToFloat(res.sdf);
+    return res.getSDF();
 }
 
 #define COMPUTE_COEFF_POS_FROM_POINT() \
@@ -150,25 +150,25 @@ CPU_AND_GPU inline float readFromSDF_float_interpolated(
     COMPUTE_COEFF_POS_FROM_POINT();
 
     // z = 0 layer -> res1
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 0), isFound, cache).sdf;
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 0), isFound, cache).sdf;
+	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 0), isFound, cache).getSDF();
+	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 0), isFound, cache).getSDF();
 	res1 = (1.0f - coeff.x) * v1 + coeff.x * v2;
 
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 0), isFound, cache).sdf;
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 0), isFound, cache).sdf;
+	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 0), isFound, cache).getSDF();
+	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 0), isFound, cache).getSDF();
 	res1 = (1.0f - coeff.y) * res1 + coeff.y * ((1.0f - coeff.x) * v1 + coeff.x * v2);
 
     // z = 1 layer -> res2
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 1), isFound, cache).sdf;
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 1), isFound, cache).sdf;
+	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 0, 1), isFound, cache).getSDF();
+	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 0, 1), isFound, cache).getSDF();
 	res2 = (1.0f - coeff.x) * v1 + coeff.x * v2;
 
-	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 1), isFound, cache).sdf;
-	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 1), isFound, cache).sdf;
+	v1 = readVoxel(voxelData, voxelIndex, pos + Vector3i(0, 1, 1), isFound, cache).getSDF();
+	v2 = readVoxel(voxelData, voxelIndex, pos + Vector3i(1, 1, 1), isFound, cache).getSDF();
 	res2 = (1.0f - coeff.y) * res2 + coeff.y * ((1.0f - coeff.x) * v1 + coeff.x * v2);
 
 	isFound = true;
-    return ITMVoxel::SDF_valueToFloat((1.0f - coeff.z) * res1 + coeff.z * res2);
+    return (1.0f - coeff.z) * res1 + coeff.z * res2;
 }
 
 /// Assumes voxels store color in some type convertible to Vector3f (e.g. Vector3u)
@@ -204,7 +204,7 @@ CPU_AND_GPU inline Vector3f readFromSDF_color4u_interpolated(
     return ret;
 }
 
-#define lookup(dx,dy,dz) readVoxel(voxelData, voxelIndex, pos + Vector3i(dx,dy,dz), isFound).sdf
+#define lookup(dx,dy,dz) readVoxel(voxelData, voxelIndex, pos + Vector3i(dx,dy,dz), isFound).getSDF()
 
 CPU_AND_GPU inline Vector3f computeSingleNormalFromSDFByForwardDifference(
     const CONSTPTR(ITMVoxelBlock) * const voxelData,
@@ -313,7 +313,7 @@ CPU_AND_GPU inline Vector3f computeSingleNormalFromSDF(
 	     tmp.z * ncoeff.y *  coeff.z +
 	     tmp.w *  coeff.y *  coeff.z;
 
-    ret.x = ITMVoxel::SDF_valueToFloat(
+    ret.x = (
         p1 * ncoeff.x + p2 * coeff.x // v2
         - 
         v1);
@@ -346,7 +346,7 @@ CPU_AND_GPU inline Vector3f computeSingleNormalFromSDF(
 	     tmp.z * ncoeff.x *  coeff.z +
 	     tmp.w *  coeff.x *  coeff.z;
 
-    ret.y = ITMVoxel::SDF_valueToFloat(p1 * ncoeff.y + p2 * coeff.y - v1);
+    ret.y = (p1 * ncoeff.y + p2 * coeff.y - v1);
 
 	// gradient z
 	p1 = front.x * ncoeff.x * ncoeff.y +
@@ -376,7 +376,7 @@ CPU_AND_GPU inline Vector3f computeSingleNormalFromSDF(
 	     tmp.z * ncoeff.x *  coeff.y +
 	     tmp.w *  coeff.x *  coeff.y;
 
-    ret.z = ITMVoxel::SDF_valueToFloat(p1 * ncoeff.z + p2 * coeff.z - v1);
+    ret.z = (p1 * ncoeff.z + p2 * coeff.z - v1);
 #undef lookup
 	return ret;
 }

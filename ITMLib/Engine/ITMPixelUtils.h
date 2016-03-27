@@ -40,7 +40,7 @@ CPU_AND_GPU inline void updateVoxelDepthInformation(
 
     // write back
     /// D(X) <-  (4)
-    voxel.sdf = ITMVoxel::SDF_floatToValue(newF);
+    voxel.setSDF(newF);
     voxel.w_depth = (uchar)newW;
 }
 #undef weightedCombine

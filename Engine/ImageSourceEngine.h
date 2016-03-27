@@ -36,12 +36,16 @@ namespace InfiniTAM
 			void loadIntoCache();
 			int cachedFrameNo;
 			int currentFrameNo;
+
 		public:
 
 			ImageFileReader(const char *calibFilename, const char *rgbImageMask, const char *depthImageMask);
 			~ImageFileReader();
 
+            /// \returns whether currentFrameNo exists (and is loaded into cache)
 			bool hasMoreImages(void);
+
+            // Returns the current frame and advances the frame counter for next time.
             /// images must exist on cpu and be of correct dimensions
 			void getImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth);
 			Vector2i getDepthImageSize(void);

@@ -62,22 +62,7 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
         uiEngine->mainLoopAction = UIEngine::EXIT;
         break;
     case 'f':
-        if (uiEngine->freeviewActive)
-        {
-            uiEngine->windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
-            uiEngine->freeviewActive = false;
-        }
-        else
-        {
-            uiEngine->windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED;
-
-            uiEngine->freeviewPose.SetFrom(uiEngine->mainEngine->GetTrackingState()->pose_d);
-            if (uiEngine->mainEngine->GetView() != NULL) {
-                uiEngine->freeviewIntrinsics = uiEngine->mainEngine->GetView()->calib->intrinsics_d;
-                uiEngine->windows[0].outImage->ChangeDims(uiEngine->mainEngine->GetView()->depth->noDims);
-            }
-            uiEngine->freeviewActive = true;
-        }
+        uiEngine->freeviewActive = !uiEngine->freeviewActive;
         uiEngine->needsRefresh = true;
         break;
     case 'c':
@@ -89,16 +74,16 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
     default:
         break;
     }
-
-    if (uiEngine->freeviewActive) {
-        uiEngine->windows[0].outImageType = uiEngine->colourModes[uiEngine->currentColourMode].type;
-    }
+   
+    uiEngine->windows[0].outImageType = uiEngine->colourModes[uiEngine->currentColourMode].type;
 }
 
 void UIEngine::glutDisplayFunction()
 {
 	UIEngine *uiEngine = UIEngine::Instance();
     uiEngine->needsRefresh = false;
+
+    if (!uiEngine->mainEngine->GetView()) return;
 
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3f(1.0f, 1.0f, 1.0f);
@@ -115,6 +100,11 @@ void UIEngine::glutDisplayFunction()
 		{
 			glEnable(GL_TEXTURE_2D);
 
+            if (!uiEngine->freeviewActive) {
+                // Restore viewpoint to live when freeview is not active
+                uiEngine->setFreeviewFromLive();
+            }
+
             for (auto& window : uiEngine->windows) {
                 if (window.outImageType == ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN) continue;
 
@@ -123,7 +113,8 @@ void UIEngine::glutDisplayFunction()
                 uiEngine->mainEngine->GetImage(
                     window.outImage,
                     window.outImageType,
-                    &uiEngine->freeviewPose, &uiEngine->freeviewIntrinsics);
+                    &uiEngine->freeviewPose,
+                    &uiEngine->freeviewIntrinsics);
 
                 Vector4f winReg = window.winReg;
 
@@ -323,7 +314,7 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
     windows[1].winReg = Vector4f(0.665f, h2, 1.0f, 1.0f);   // Side sub window 0
     windows[2].winReg = Vector4f(0.665f, h1, 1.0f, h2);     // Side sub window 2
 
-    windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST;
+    windows[0].outImageType = ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED;
     windows[1].outImageType = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH;
     windows[2].outImageType = ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_RGB;
 

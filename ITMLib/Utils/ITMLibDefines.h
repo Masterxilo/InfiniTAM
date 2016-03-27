@@ -94,31 +94,47 @@ struct ITMHashEntry
 /** \brief
     Stores the information of a single voxel in the volume
 */
-struct ITMVoxel
-{    /** Value of the truncated signed distance transformation. */
-#ifdef USE_FLOAT_SDF_STORAGE
-    CPU_AND_GPU static float SDF_initialValue() { return 1.0f; }
-    CPU_AND_GPU static float SDF_valueToFloat(float x) { return x; }
-    CPU_AND_GPU static float SDF_floatToValue(float x) { return x; }
-    float sdf;
-#else
-	CPU_AND_GPU static short SDF_initialValue() { return 32767; }
-	CPU_AND_GPU static float SDF_valueToFloat(float x) { return (float)(x) / 32767.0f; }
-	CPU_AND_GPU static short SDF_floatToValue(float x) { return (short)((x) * 32767.0f); }
-    short sdf;
-#endif
+class ITMVoxel
+{   
+private:
+    // signed distance
+    short sdf;  // saving storage
+public:
+    /** Value of the truncated signed distance transformation, in [-1, 1] (scaled by truncation mu when storing) */
+	CPU_AND_GPU void setSDF_initialValue() { sdf = 32767; }
+    CPU_AND_GPU float getSDF() { return (float)(sdf) / 32767.0f; }
+    CPU_AND_GPU void setSDF(float x) { sdf = (short)((x)* 32767.0f); }
 
 	/** Number of fused observations that make up @p sdf. */
 	uchar w_depth;
 
-	/** RGB colour information stored for this voxel. */
-	Vector3u clr;
+	/** RGB colour information stored for this voxel, 0-255 per channel. */
+	Vector3u clr; // C(v) 
+
 	/** Number of observations that made up @p clr. */
 	uchar w_color;
 
+    //! unknowns of our objective
+    float luminanceAlbedo; // a(v)
+    //float refinedDistance; // D'(v)
+
+    // chromaticity and intensity are
+    // computed from C(v) on-the-fly
+
+    /// \f$\Gamma(v)\f$
+    float intensity() {
+        // TODO is this how luminance should be computed?
+        Vector3f color = clr.toFloat() / 255.f;
+        return (color.r + color.g + color.b) / 3.f;
+    }
+
+    Vector3f chromaticity() {
+        return clr.toFloat() / intensity();
+    }
+
     CPU_AND_GPU ITMVoxel()
 	{
-		sdf = SDF_initialValue();
+        setSDF_initialValue();
 		w_depth = 0;
 		clr = (uchar)0;
 		w_color = 0;

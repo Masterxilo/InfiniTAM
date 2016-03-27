@@ -36,12 +36,6 @@
     <ClInclude Include="Utils\MemoryBlock.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\MemoryBlockPersister.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\MetalContext.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="Utils\NVTimer.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -61,9 +55,6 @@
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="Utils\Image.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
-    <ClInclude Include="Utils\LexicalCast.h">
       <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="Utils\MathUtils.h">
@@ -162,12 +153,10 @@
     <ClInclude Include="Utils\cudaSafeCall.h">
       <Filter>Tests\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="LightingModel.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />
-    <CudaCompile Include="Utils\FileUtils.cu">
-      <Filter>Utils</Filter>
-    </CudaCompile>
     <CudaCompile Include="Utils\FileUtilsPNG.cu">
       <Filter>Utils</Filter>
     </CudaCompile>
@@ -204,7 +193,8 @@
     <CudaCompile Include="Tests\TestUtils.cu">
       <Filter>Tests\Framework</Filter>
     </CudaCompile>
-    <CudaCompile Include="Source.cu" />
+    <CudaCompile Include="LightingEstimation.cu" />
+    <CudaCompile Include="GeometryRefinement.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

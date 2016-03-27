@@ -6,33 +6,9 @@
 
 #include "../ITMLib/Utils/ITMLibDefines.h"
 
-// Image must exist but can have any size.
-
-#define imfun \
-void SaveImageToFile(const ITMUChar4Image* image, const char* fileName, bool flipVertical = false);    \
-void SaveImageToFile(const ITMShortImage* image, const char* fileName);                                \
-bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName);                                   \
-bool ReadImageFromFile(ITMShortImage *image, const char *fileName);
-
-// FileUtils.cu
-imfun
-
-// FileUtilsPNG.cu
 namespace png {
-    imfun
+    // Image must exist but can have any size. Loads rgb only.                  
+    bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName);
+    // Image must exist but can have any size.                          
+    bool ReadImageFromFile(ITMShortImage *image, const char *fileName);
 }
-
-template <typename T> inline void ReadFromBIN(T *data, int dataSize, const char *fileName)
-{
-	FILE *f = fopen(fileName, "rb");
-	fread(data, dataSize * sizeof(T), 1, f);
-	fclose(f);
-}
-
-template <typename T> inline void WriteToBIN(const T *data, int dataSize, const char *fileName)
-{
-	FILE *f = fopen(fileName, "wb");
-	fwrite(data, dataSize * sizeof(T), 1, f);
-	fclose(f);
-}
-

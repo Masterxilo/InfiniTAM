@@ -75,8 +75,8 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 void ITMMainEngine::GetImage(
     ITMUChar4Image * const out,
     const GetImageType getImageType, 
-    const ITMPose * const pose, //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
-    const ITMIntrinsics * const intrinsics  //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
+    const ITMPose * const pose, 
+    const ITMIntrinsics * const intrinsics 
     )
 {
     assert(out->isAllocated_CPU() && out->isAllocated_CUDA());
@@ -97,8 +97,6 @@ void ITMMainEngine::GetImage(
         ITMVisualisationEngine::DepthToUchar4(out, view->depth);
 		break;
 
-
-    case ITMMainEngine::InfiniTAM_IMAGE_SCENERAYCAST:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_VOLUME:
 	case ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL:
@@ -109,7 +107,9 @@ void ITMMainEngine::GetImage(
 		else if (getImageType == ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_COLOUR_FROM_NORMAL) 
             type = ITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
 
-		if (renderState_freeview == NULL) renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+		if (renderState_freeview == NULL)
+            renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+
         assert(renderState_freeview->raycastResult->noDims == out->noDims);
 
 		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, out, type);

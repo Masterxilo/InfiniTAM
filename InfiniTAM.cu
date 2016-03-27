@@ -89,44 +89,7 @@ int main(int argc, char** argv) {
 		std::cout << "failed to open any image stream" << std::endl;
 		return -1;
 	}
-    // check depth frame
-    ITMUChar4Image color(Vector2i(imageSource->getRGBImageSize()), true, false);
-    ITMShortImage depth(Vector2i(imageSource->getDepthImageSize()), true, false);
-        imageSource->getImages(&color, &depth);
-
-        ITMShortImage pngdepth(Vector2i(imageSource->getDepthImageSize()), true, false);
-        png::ReadImageFromFile(&pngdepth, "depth1.png");
-
-        // pixel by pixel comparison
-        short* depthd = depth.GetData(MEMORYDEVICE_CPU);
-        short* pngdepthd = pngdepth.GetData(MEMORYDEVICE_CPU);
-        int i;
-        for (i = 0; i < depth.dataSize; i++, depthd++, pngdepthd++) {
-            assert(*depthd == *pngdepthd);
-            cout << *depthd << "==" << *pngdepthd << endl;
-        }
-        assert(i == depth.dataSize);
-        return 0;
-    // save all images as .png
-      /*  
-    int i = 1;
-    ITMUChar4Image color(Vector2i(imageSource->getRGBImageSize()), true, false);
-    ITMShortImage depth(Vector2i(imageSource->getDepthImageSize()), true, false);
-    std::stringstream ss; std::string s;
-    while (imageSource->hasMoreImages()) {
-        imageSource->getImages(&color, &depth);
-
-        ss.str(""); ss << "color" << i << ".png";
-        png::SaveImageToFile(&color, (s = ss.str()).c_str());
-
-        ss.str(""); ss << "depth" << i << ".png";
-        png::SaveImageToFile(&depth, (s = ss.str()).c_str());
-        cout << "saved " << i << endl;
-        i++;
-    }
-    return 0;
-    */
-    //
+    
 
 	ITMLibSettings *internalSettings = new ITMLibSettings();
 	ITMMainEngine *mainEngine = 
