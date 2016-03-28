@@ -4,4 +4,7 @@
     <LocalDebuggerCommandArguments>Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/color%25i.png Files/Scenes/Teddy/Frames/depth%25i.png</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <PropertyGroup>
+    <ShowAllFiles>false</ShowAllFiles>
+  </PropertyGroup>
 </Project>

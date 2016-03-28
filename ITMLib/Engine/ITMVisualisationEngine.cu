@@ -146,14 +146,14 @@ CPU_AND_GPU inline bool castRay(
 
 
     // Starting point
-    pt_camera_f = depthTo3DInvProjParams(invProjParams, x, y, viewFrustum_minmax.x);
+    pt_camera_f = depthTo3DInvProjParams(invProjParams, x, y, VERY_CLOSE); // ignore rendering blocks/range image, do full raytrace
     // Lengths given in voxel-fractional-coordinates (such that one voxel has size 1)
     totalLength = length(TO_VECTOR3(pt_camera_f)) * oneOverVoxelSize;
     // in voxel-fractional-world-coordinates (such that one voxel has size 1)
     pt_block_s = TO_VECTOR3(invM * pt_camera_f) * oneOverVoxelSize;
 
     // End point
-    pt_camera_f = depthTo3DInvProjParams(invProjParams, x, y, viewFrustum_minmax.y);
+    pt_camera_f = depthTo3DInvProjParams(invProjParams, x, y, 5.f);
     const float totalLengthMax = length(TO_VECTOR3(pt_camera_f)) * oneOverVoxelSize;
     pt_block_e = TO_VECTOR3(invM * pt_camera_f) * oneOverVoxelSize;
 

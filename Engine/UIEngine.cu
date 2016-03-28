@@ -116,6 +116,9 @@ void UIEngine::glutDisplayFunction()
                     &uiEngine->freeviewPose,
                     &uiEngine->freeviewIntrinsics);
 
+                //png::SaveImageToFile(window.outImage, "out_restored.png");
+                //exit(0);
+
                 Vector4f winReg = window.winReg;
 
                 glBindTexture(GL_TEXTURE_2D, window.textureId);

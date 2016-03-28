@@ -30,10 +30,10 @@ namespace ITMLib
             class VoxelAllocationList : public Managed 
             {
             private:
+            public:
                 /// This index is considered free in the list
                 int lastFreeEntry;
 
-            public:
                 VoxelAllocationList() {
                     Reset();
                 }

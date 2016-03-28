@@ -284,11 +284,12 @@ __global__ void integrateIntoScene_device(
     const Vector4f projParams_rgb, const float voxelSize, const float mu, const int maxW)
 {
     // one thread block for each voxel block
-    ITMVoxelBlock * const localVoxelBlock = &(localVBA[blockIdx.x]); 
+    ITMVoxelBlock * const localVoxelBlock = &(localVBA[blockIdx.x]);
     if (localVoxelBlock->pos == INVALID_VOXEL_BLOCK_POS) return; 
 
     // one thread for each voxel
     const int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
+
     integrateVoxel(x, y, z,
         localVoxelBlock->pos.toInt() * SDF_BLOCK_SIZE,
         localVoxelBlock, voxelSize,
@@ -353,25 +354,47 @@ __global__ void resetVoxelBlocks(ITMVoxelBlock *voxelBlocks_ptr) {
 
     if (threadIdx.x == 0) voxelBlocks_ptr[blockIdx.x].pos = INVALID_VOXEL_BLOCK_POS;
 }
-
+#define FASTRESET // slower when cuda debugging
 void ITMSceneReconstructionEngine::ResetScene(ITMScene *scene)
 {
-    return;
     printf("ResetScene\n");
 
     // Reset sdf data of all voxels in all voxel blocks
     ITMVoxelBlock *voxelBlocks_ptr = scene->localVBA.GetVoxelBlocks();
-    resetVoxelBlocks << <SDF_LOCAL_BLOCK_NUM, SDF_BLOCK_SIZE3 >> >(voxelBlocks_ptr);
 
+#ifdef FASTRESET
+    resetVoxelBlocks << <SDF_LOCAL_BLOCK_NUM, SDF_BLOCK_SIZE3 >> >(voxelBlocks_ptr);
+#else
+    
+    ITMVoxelBlock vb;
+    vb.pos = INVALID_VOXEL_BLOCK_POS;
+    for (auto& i : vb.blockVoxels)
+        i = ITMVoxel();
+
+    for (int j = 0; j < SDF_LOCAL_BLOCK_NUM; j++)
+        cudaMemcpy(voxelBlocks_ptr+j,
+            &vb, sizeof(ITMVoxelBlock),cudaMemcpyHostToDevice
+        
+            );
+#endif
     // Reset voxel allocation list
     scene->localVBA.voxelAllocationList->Reset();
 
     // Reset hash entries
+#ifdef FASTRESET
     memsetKernel<ITMHashEntry>(
         scene->index.GetEntries(),
         ITMHashEntry::createIllegalEntry(),
         SDF_GLOBAL_BLOCK_NUM);
+#else
 
+    ITMHashEntry he = ITMHashEntry::createIllegalEntry();
+    for (int j = 0; j < SDF_GLOBAL_BLOCK_NUM; j++)
+        cudaMemcpy(scene->index.GetEntries() + j,
+        &he, sizeof(ITMHashEntry), cudaMemcpyHostToDevice
+
+        );
+#endif
     // Reset excess allocation list
     scene->index.excessAllocationList->Reset();
     printf("ResetScene done\n");
@@ -418,7 +441,7 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
 		scene->sceneParams->viewFrustum_min,
         scene->sceneParams->viewFrustum_max);
     // [[ dump block coords that should be allocated
-    {
+    if(0) {
         printf("allocate planned: ");
         uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
         Vector4s *blockCoords = (Vector4s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector4s));
@@ -450,6 +473,8 @@ void ITMSceneReconstructionEngine::AllocateSceneFromDepth(
         scene->localVBA.GetVoxelBlocks(),
         entriesAllocType_device, 
 		blockCoords_device);
+
+   
 }
 
 void ITMSceneReconstructionEngine::IntegrateIntoScene(ITMScene *scene, const ITMView *view,
@@ -474,12 +499,30 @@ void ITMSceneReconstructionEngine::IntegrateIntoScene(ITMScene *scene, const ITM
 	Vector4u *rgb = view->rgb->GetData(MEMORYDEVICE_CUDA);
     ITMVoxelBlock *localVBA = scene->localVBA.GetVoxelBlocks();
 	ITMHashEntry *hashTable = scene->index.GetEntries();
+    cudaSafeCall(cudaDeviceSynchronize()); // make sure lastFreeEntry is accessible (this is a managed memory structure - the memory might be locked)
 
 	dim3 cudaBlockSize(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE);
-    dim3 gridSize(SDF_LOCAL_BLOCK_NUM);
-
-    integrateIntoScene_device<< <gridSize, cudaBlockSize >> >(
+    dim3 gridSize(SDF_LOCAL_BLOCK_NUM); 
+    integrateIntoScene_device << <gridSize, cudaBlockSize >> >(
         localVBA, hashTable, 
         rgb, rgbImgSize, depth, depthImgSize, M_d, M_rgb, projParams_d, projParams_rgb, voxelSize, mu, maxW);
+
+    // 
+    //dumpIt << <1, 1 >> >(Scene::getCurrentScene()->localVBA);
+    if (0) for (int j = SDF_LOCAL_BLOCK_NUM-1; j >= 0; j--) {
+        ITMVoxelBlock b;
+        cudaMemcpy(&b, localVBA+j, sizeof(ITMVoxelBlock), cudaMemcpyDeviceToHost);
+
+        if (b.pos != VoxelBlockPos(-26, 15, 28))// - 38, 16, 42))
+            continue;
+        printf("j: %d\n", j);
+
+        printf("%d %d %d\n", b.pos.x, b.pos.y, b.pos.z);
+        int i = 0;
+        for (auto& v : b.blockVoxels) {
+            printf("sdf %i = %f\n", i++, v.getSDF());
+        }
+        exit(0);
+    }
 }
 

@@ -11,4 +11,8 @@ namespace png {
     bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName);
     // Image must exist but can have any size.                          
     bool ReadImageFromFile(ITMShortImage *image, const char *fileName);
+
+
+    void SaveImageToFile(const ITMUChar4Image* image, const char* fileName, bool flipVertical = false);
+    void SaveImageToFile(const ITMShortImage* image, const char* fileName);
 }
