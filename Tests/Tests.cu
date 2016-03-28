@@ -209,7 +209,14 @@ struct DoForEach {
         atomicAdd(&counter, 1);
     }
 };
-
+struct DoForEachBlock {
+    static GPU_ONLY void process(ITMVoxelBlock* vb) {
+        assert(vb);
+        assert(vb->pos == VoxelBlockPos(0, 0, 0) ||
+            vb->pos == VoxelBlockPos(1, 2, 3));
+        atomicAdd(&counter, 1);
+    }
+};
 
 KERNEL modifyS() {
     Scene::getCurrentSceneVoxel(Vector3i(0, 0, 1))->setSDF(1.0);
@@ -255,6 +262,11 @@ void testScene() {
     // do for each
     counter = 0;
     s->doForEachAllocatedVoxel<DoForEach>();
+    assert(counter == 2);
+
+
+    counter = 0;
+    s->doForEachAllocatedVoxelBlock<DoForEachBlock>();
     assert(counter == 2);
 
     delete s;

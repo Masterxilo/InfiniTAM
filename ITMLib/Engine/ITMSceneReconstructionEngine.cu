@@ -164,14 +164,21 @@ struct IntegrateVoxel {
 /// Loop over depth image pixels
 KERNEL buildHashAllocAndVisibleType_device() {
     const int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
-
+    //if (x != 13 || y != 7) return; // TODO HACK -- for testing only --
     if (x > imgSize_d.x - 1 || y > imgSize_d.y - 1) return;
 
     buildHashAllocAndVisibleTypePP(x, y);
 }
 
 // host methods
-
+KERNEL dumpIt(ITMVoxelBlock* localVBA) {
+    ITMVoxelBlock& b = localVBA[1];
+    printf("%d %d %d\n", b.pos.x, b.pos.y, b.pos.z);
+    int i = 0;
+    for (auto& v : b.blockVoxels) {
+        printf("sdf %i = %f\n", i++, v.getSDF());
+    }
+}
 /// Fusion stage of the system
 void ITMSceneReconstructionEngine_ProcessFrame(
     const ITMView * const view,
@@ -198,7 +205,7 @@ void ITMSceneReconstructionEngine_ProcessFrame(
     cudaDeviceSynchronize();
     ///
     // [[ dump block coords that should be allocated
-    {
+    if (0){
         printf("allocate planned: ");
         uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
         Vector3s *blockCoords = (Vector3s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector3s));
@@ -227,5 +234,21 @@ void ITMSceneReconstructionEngine_ProcessFrame(
 
     // camera data integration
     Scene::getCurrentScene()->doForEachAllocatedVoxel<IntegrateVoxel>();
+
+    cudaDeviceSynchronize();
+    //dumpIt << <1, 1 >> >(Scene::getCurrentScene()->localVBA);
+    ITMVoxelBlock b;
+    cudaMemcpy(&b, &Scene::getCurrentScene()->localVBA[1], sizeof(ITMVoxelBlock), cudaMemcpyDeviceToHost);
+    
+    printf("%d %d %d\n", b.pos.x, b.pos.y, b.pos.z);
+    int i = 0;
+    for (auto& v : b.blockVoxels) {
+        printf("sdf %i = %f\n", i++, v.getSDF());
+    }
+    
+    
+    cudaDeviceSynchronize();
+    ::fflush(NULL);
+    exit(0);
 }
 

@@ -19,7 +19,7 @@ CPU_AND_GPU inline float convertDisparityToDepth(
     //return disparity <= 0 ? INVALID_DEPTH : (disparity) / 1000.f;
     
     // for kinect, raw (e.g. Teddy)
-    float disparity_tmp = disparityCalibParams.x - (float)(disparity /3.f);
+    float disparity_tmp = disparityCalibParams.x - (float)(disparity);
     float depth;
 
     if (disparity_tmp == 0)
