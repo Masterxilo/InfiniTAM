@@ -78,13 +78,16 @@ public:
     }
 
     static GPU_ONLY ITMVoxel* getCurrentSceneVoxel(Vector3i pos) {
+        assert(getCurrentScene());
         return getCurrentScene()->getVoxel(pos);
     }
     static GPU_ONLY void requestCurrentSceneVoxelBlockAllocation(VoxelBlockPos pos) {
+        assert(getCurrentScene());
         return getCurrentScene()->requestVoxelBlockAllocation(pos);
     }
 
     static void Scene::performCurrentSceneAllocations() {
+        assert(getCurrentScene());
         getCurrentScene()->performAllocations();
     }
 

@@ -272,8 +272,129 @@ void testScene() {
     delete s;
 }
 
+#include "FileUtils.h"
+#include "itmcalibio.h"
+#include "itmlibdefines.h"
+#include "itmview.h"
+#include "ITMMath.h"
+#include "itmviewbuilder.h"
+
+#include <fstream>
+using namespace std;
+using namespace ITMLib;
+using namespace ITMLib::Objects;
+using namespace ITMLib::Engine;
+
+extern void ITMSceneReconstructionEngine_ProcessFrame_pre(
+    const ITMView * const view,
+    Matrix4f M_d,
+    Matrix4f invM_d
+    );
+
+void approxEqual(float a, float b) {
+    assert(abs(a-b) < 0.00001);
+}
+
+void testAllocRequests() {
+    ITMUChar4Image rgb(Vector2i(1,1), true, false);
+    png::ReadImageFromFile(&rgb, "Tests\\TestAllocRequests\\color1.png");
+    ITMShortImage depth(Vector2i(1, 1), true, false);
+    png::ReadImageFromFile(&depth, "Tests\\TestAllocRequests\\depth1.png");
+    ITMRGBDCalib calib;
+    readRGBDCalib("Tests\\TestAllocRequests\\calib.txt", calib);
+    ITMViewBuilder viewBuilder(&calib);
+    ITMView* view = 0;
+    viewBuilder.UpdateView(&view, &rgb, &depth);
+    assert(view->depth->noDims == Vector2i(640, 480));
+    assert(view->rgb->noDims == Vector2i(640, 480));
+    assert(view->calib->intrinsics_d.getInverseProjParams() ==
+        Vector4f(0.00174304086	,
+        0.00174096529	,
+        346.471008	,
+        249.031006	));
+    
+    Matrix4f M_d;
+    M_d.m00=0.848863006	;
+    M_d.m01=0.441635638	;
+    M_d.m02=- 0.290498704	;
+    M_d.m03=0.000000000	;
+    M_d.m10=- 0.290498704	;
+    M_d.m11=0.848863065	;
+    M_d.m12=0.441635549	;
+    M_d.m13=0.000000000	;
+    M_d.m20=0.441635638	;
+    M_d.m21=- 0.290498614	;
+    M_d.m22=0.848863065	;
+    M_d.m23=0.000000000	;
+    M_d.m30=- 0.144862041	;
+    M_d.m31=- 0.144861951	;
+    M_d.m32=- 0.144861966	;
+    M_d.m33 = 1.00000000;
+
+    Matrix4f invM_d; M_d.inv(invM_d);
+    approxEqual(invM_d.m00,	0.848863125	); // exactly equal should do
+    approxEqual(invM_d.m01, - 0.290498734	);
+    approxEqual(invM_d.m02,	0.441635668	);
+    approxEqual(invM_d.m03,	0.000000000	);
+    approxEqual(invM_d.m10,	0.441635668	);
+    approxEqual(invM_d.m11,	0.848863184	);
+    approxEqual(invM_d.m12, - 0.290498614	);
+    approxEqual(invM_d.m13,	0.000000000	);
+    approxEqual(invM_d.m20, - 0.290498734	);
+    approxEqual(invM_d.m21,	0.441635609	);
+    approxEqual(invM_d.m22,	0.848863184	);
+    approxEqual(invM_d.m23,	0.000000000	);
+    approxEqual(invM_d.m30,	0.144862026	);
+    approxEqual(invM_d.m31,	0.144861937	);
+    approxEqual(invM_d.m32,	0.144862041	);
+    approxEqual(invM_d.m33,	1.00000012	);
+
+    Scene* scene = new Scene();
+    CURRENT_SCENE_SCOPE(scene);
+
+
+    // test ITMSceneReconstructionEngine_ProcessFrame_pre
+    ITMSceneReconstructionEngine_ProcessFrame_pre(
+        view, M_d, invM_d
+        );
+
+    cudaDeviceSynchronize();
+
+    // test content of requests "allocate planned"
+    uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
+    Vector3s *blockCoords = (Vector3s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector3s));
+
+    cudaMemcpy(entriesAllocType,
+        Scene::getCurrentScene()->voxelBlockHash->needsAllocation,
+        SDF_GLOBAL_BLOCK_NUM,
+        cudaMemcpyDeviceToHost);
+
+    cudaMemcpy(blockCoords,
+        Scene::getCurrentScene()->voxelBlockHash->naKey,
+        SDF_GLOBAL_BLOCK_NUM * sizeof(VoxelBlockPos),
+        cudaMemcpyDeviceToHost);
+
+    ifstream expectedRequests("Tests\\TestAllocRequests\\expectedRequests.txt");
+    for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
+        if (entriesAllocType[targetIdx] == 0) continue;
+        VoxelBlockPos expectedBlockCoord;
+        expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
+        assert(expectedBlockCoord == blockCoords[targetIdx]);
+    }
+    // Must have seen all requests
+    int _;
+    expectedRequests >> _;
+    assert(expectedRequests.fail());
+
+    delete scene;
+    delete view;
+}
+
+
+
 // TODO take the tests apart, clean state inbetween
 void tests() {
+    testAllocRequests();
     testScene();
     testCholesky();
     testZ3Hasher();

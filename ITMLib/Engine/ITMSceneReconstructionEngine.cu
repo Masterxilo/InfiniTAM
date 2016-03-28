@@ -179,16 +179,19 @@ KERNEL dumpIt(ITMVoxelBlock* localVBA) {
         printf("sdf %i = %f\n", i++, v.getSDF());
     }
 }
-/// Fusion stage of the system
-void ITMSceneReconstructionEngine_ProcessFrame(
+
+// Allocation request and setup of global variables part
+void ITMSceneReconstructionEngine_ProcessFrame_pre(
     const ITMView * const view,
-    const ITMTrackingState * const trackingState)
-{
+    Matrix4f M_d,
+    Matrix4f invM_d
+    ) {
     assert(Scene::getCurrentScene());
+
     imgSize_d = view->depth->noDims;
     imgSize_rgb = view->rgb->noDims;
-    M_d = trackingState->pose_d->GetM();
-    invM_d = trackingState->pose_d->GetInvM();
+    ::M_d = M_d;
+    ::invM_d = invM_d;
     M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
     projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
     projParams_rgb = view->calib->intrinsics_rgb.projectionParamsSimple.all;
@@ -202,10 +205,21 @@ void ITMSceneReconstructionEngine_ProcessFrame(
 
     LAUNCH_KERNEL(buildHashAllocAndVisibleType_device, gridSizeHV, cudaBlockSizeHV);
 
-    cudaDeviceSynchronize();
+}
+/// Fusion stage of the system
+void ITMSceneReconstructionEngine_ProcessFrame(
+    const ITMView * const view,
+    const ITMTrackingState * const trackingState)
+{
+    ITMSceneReconstructionEngine_ProcessFrame_pre(
+        view,
+        trackingState->pose_d->GetM(),
+        trackingState->pose_d->GetInvM()
+        );
+
     ///
     // [[ dump block coords that should be allocated
-    if (0){
+    {
         printf("allocate planned: ");
         uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
         Vector3s *blockCoords = (Vector3s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector3s));
@@ -225,7 +239,6 @@ void ITMSceneReconstructionEngine_ProcessFrame(
             if (entriesAllocType[targetIdx] == 0) continue;
             printf("(%d %d %d)\n", blockCoords[targetIdx].x, blockCoords[targetIdx].y, blockCoords[targetIdx].z);
         }
-        while (1);
         exit(0);
     }
     // ]]
