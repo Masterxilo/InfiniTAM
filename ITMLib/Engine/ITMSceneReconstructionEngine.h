@@ -17,5 +17,4 @@ using namespace ITMLib::Objects;
 		*/
         void ITMSceneReconstructionEngine_ProcessFrame(
                 const ITMView * const view,
-                const ITMTrackingState * const trackingState
-                );
+                Matrix4f M_d);

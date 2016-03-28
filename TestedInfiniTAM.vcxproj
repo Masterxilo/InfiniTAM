@@ -138,8 +138,8 @@
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h" />
     <ClInclude Include="ITMLib\Objects\ITMView.h" />
-    <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h" />
     <ClInclude Include="ITMLib\Utils\ITMCalibIO.h" />
+    <ClInclude Include="ITMLib\Utils\ITMCUDAUtils.h" />
     <ClInclude Include="ITMLib\Utils\ITMLibDefines.h" />
     <ClInclude Include="ITMLib\Utils\ITMLibSettings.h" />
     <ClInclude Include="ITMLib\Utils\ITMMath.h" />

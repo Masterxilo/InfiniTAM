@@ -3,6 +3,7 @@
 #include "cudadefines.h"
 #include "hashmap.h"
 
+#define threadIdx_xyz threadIdx.x, threadIdx.y, threadIdx.z
 // see doForEachAllocatedVoxel for T
 template<typename T>
 KERNEL doForEachAllocatedVoxel(
@@ -12,8 +13,8 @@ KERNEL doForEachAllocatedVoxel(
     if (index <= 0 || index >= nextFreeSequenceId) return;
 
     ITMVoxelBlock* vb = &localVBA[index];
-    Vector3i localPos(threadIdx.x, threadIdx.y, threadIdx.z);
-    T::process(vb, &vb->blockVoxels[threadIdx.x], localPos);
+    Vector3i localPos(threadIdx_xyz);
+    T::process(vb, vb->getVoxel(localPos), localPos);
 }
 
 // see doForEachAllocatedVoxel for T

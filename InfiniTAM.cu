@@ -53,7 +53,7 @@ using namespace std;
 // Files\Scenes\fountain\calib.txt Files/Scenes/fountain/Frames/color%25i.png Files/Scenes/fountain/Frames/depth%25i.png
 int main(int argc, char** argv) {
 
-    redirectStd();
+    //redirectStd();
     tests();
     atexit(pause);
 	const char *arg1 = "";
@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     //if (usingImages) 
     {
         // start reconstruction
-        UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_VIDEO;
+        UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_FRAME;// PROCESS_VIDEO;
     }
    
     // Start recording anything that happens

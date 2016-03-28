@@ -14,13 +14,13 @@
     newW = MIN(newW, maxW);
 
 /// Linearized pixel index
-CPU_AND_GPU inline int pixelLocId(int x, int y, const THREADPTR(Vector2i) &imgSize) {
+CPU_AND_GPU inline int pixelLocId(const int x, const int y, const THREADPTR(Vector2i) &imgSize) {
     return x + y * imgSize.x;
 }
 
 CPU_AND_GPU inline void updateVoxelColorInformation(
     DEVICEPTR(ITMVoxel) & voxel,
-    Vector3f oldC, int oldW, Vector3f newC, int newW)
+    const Vector3f oldC, const int oldW, Vector3f newC, int newW)
 {
     weightedCombine(oldC, oldW, newC, newW);
 
@@ -32,7 +32,7 @@ CPU_AND_GPU inline void updateVoxelColorInformation(
 
 CPU_AND_GPU inline void updateVoxelDepthInformation(
     DEVICEPTR(ITMVoxel) & voxel,
-    float oldF, int oldW, float newF, int newW)
+    const float oldF, const int oldW, float newF, int newW)
 {
     weightedCombine(oldF, oldW, newF, newW);
 
@@ -42,6 +42,66 @@ CPU_AND_GPU inline void updateVoxelDepthInformation(
     voxel.w_depth = (uchar)newW;
 }
 #undef weightedCombine
+
+
+// === forEachPixel ===
+template<typename T, typename F>
+static KERNEL forEachPixel_device(T* image, Vector2i imgSize) {
+    const int
+        x = threadIdx.x + blockIdx.x * blockDim.x,
+        y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x > imgSize.x - 1 || y > imgSize.y - 1) return;
+    const int locId = pixelLocId(x, y, imgSize);
+
+    F::process(image[locId], x, y, locId);
+}
+
+#define forEachPixel_process(T) GPU_ONLY static void process(T& pixel, const int x, const int y, const int locId)
+/** apply
+F::process(T& pixel, int x, int y, int locId)
+to each pixel in the image */
+template<typename T, typename F>
+static void forEachPixel(T* image, Vector2i imgSize) {
+    const dim3 blockSize(16, 16);
+    //LAUNCH_KERNEL(
+    forEachPixel_device<T, F> << <
+        getGridSize(dim3(imgSize.x, imgSize.y), blockSize),
+        blockSize >> > (
+        image, imgSize);
+    //);
+}
+
+
+// === forEachPixelNoImage ===
+template<typename F>
+static KERNEL forEachPixelNoImage_device(Vector2i imgSize) {
+    const int
+        x = threadIdx.x + blockIdx.x * blockDim.x,
+        y = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (x > imgSize.x - 1 || y > imgSize.y - 1) return;
+    const int locId = pixelLocId(x, y, imgSize);
+
+    F::process(x, y, locId);
+}
+
+#define forEachPixelNoImage_process() GPU_ONLY static void process(const int x, const int y, const int locId)
+/** apply
+F::process(int x, int y, int locId)
+to each pixel in the image */
+template<typename F>
+static void forEachPixelNoImage(Vector2i imgSize) {
+    const dim3 blockSize(16, 16);
+    //LAUNCH_KERNEL(
+    forEachPixelNoImage_device<F> << <
+        getGridSize(dim3(imgSize.x, imgSize.y), blockSize),
+        blockSize >> >
+        (imgSize);
+    //);
+}
+//
+
 
 /// Computes a position in camera space given a 2d image coordinate and a depth.
 /// \f$ z K^{-1}u\f$

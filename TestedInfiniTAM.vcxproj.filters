@@ -108,9 +108,6 @@
     <ClInclude Include="ITMLib\Objects\ITMView.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMVoxelBlockHash.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
@@ -149,6 +146,9 @@
     </ClInclude>
     <ClInclude Include="LightingModel.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="ITMLib\Utils\ITMCUDAUtils.h">
+      <Filter>ITMLib\Utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />

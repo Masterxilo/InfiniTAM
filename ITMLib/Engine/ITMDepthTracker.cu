@@ -466,7 +466,7 @@ void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView
         // before we know whether they actually decrease the energy.
         // When they did not in fact, we will revert to this value that was known to have less energy 
         // than all previous estimates.
-        ITMPose least_energy_T_k_g_estimate(*(trackingState->pose_d));
+        ITMPose least_energy_T_k_g_estimate(*T_k_g_estimate);
 
         // Track least energy we measured so far to see whether we improved
         float f_old = 1e20f;

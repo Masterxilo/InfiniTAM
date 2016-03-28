@@ -196,16 +196,43 @@ KERNEL checkS(Scene* scene) {
     assert(Scene::getCurrentScene() == scene);
 }
 
+struct WriteEach {
+    static GPU_ONLY void process(ITMVoxelBlock* vb, ITMVoxel* v, Vector3i localPos) {
+        v->setSDF((
+            localPos.x + 
+            localPos.y * SDF_BLOCK_SIZE + 
+            localPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE
+            )/1024.f);
+    }
+};
+
 __managed__ int counter = 0;
+__managed__ bool visited[SDF_BLOCK_SIZE][SDF_BLOCK_SIZE][SDF_BLOCK_SIZE] = {0};
 struct DoForEach {
-    static GPU_ONLY void process(ITMVoxelBlock* vb, ITMVoxel*, Vector3i localPos) {
+    static GPU_ONLY void process(ITMVoxelBlock* vb, ITMVoxel* v, Vector3i localPos) {
         assert(localPos.x >= 0 && localPos.y >= 0 && localPos.z >= 0);
         assert(localPos.x  < SDF_BLOCK_SIZE && localPos.y < SDF_BLOCK_SIZE && localPos.z < SDF_BLOCK_SIZE);
-        if (localPos != Vector3i(0, 0, 0)) return;
 
         assert(vb);
         assert(vb->pos == VoxelBlockPos(0, 0, 0) ||
             vb->pos == VoxelBlockPos(1,2,3)); 
+
+        visited[localPos.x][localPos.y][localPos.z] = 1;
+
+        printf("%f .. %f\n", v->getSDF(),
+            (
+            localPos.x +
+            localPos.y * SDF_BLOCK_SIZE +
+            localPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE
+            ) / 1024.f);
+        assert(abs(
+            v->getSDF() -
+            (
+            localPos.x +
+            localPos.y * SDF_BLOCK_SIZE +
+            localPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE
+            ) / 1024.f) < 0.001 // not perfectly accurate
+            );
         atomicAdd(&counter, 1);
     }
 };
@@ -260,16 +287,45 @@ void testScene() {
     }
 
     // do for each
-    counter = 0;
-    s->doForEachAllocatedVoxel<DoForEach>();
-    assert(counter == 2);
 
+    s->doForEachAllocatedVoxel<WriteEach>();
+
+    counter = 0;
+    for (int x = 0; x < SDF_BLOCK_SIZE; x++)
+        for (int y = 0; y < SDF_BLOCK_SIZE; y++)
+            for (int z = 0; z < SDF_BLOCK_SIZE; z++)
+                assert(!visited[x][y][z]);
+    s->doForEachAllocatedVoxel<DoForEach>();
+    cudaDeviceSynchronize();
+    assert(counter == 2 * SDF_BLOCK_SIZE3);
+    for (int x = 0; x < SDF_BLOCK_SIZE; x++)
+        for (int y = 0; y < SDF_BLOCK_SIZE; y++)
+            for (int z = 0; z < SDF_BLOCK_SIZE; z++)
+                assert(visited[x][y][z]);
 
     counter = 0;
     s->doForEachAllocatedVoxelBlock<DoForEachBlock>();
     assert(counter == 2);
 
     delete s;
+}
+
+#define W 5
+#define H 7
+#include "ITMPixelUtils.h"
+struct DoForEachPixel {
+    forEachPixelNoImage_process() {
+        assert(x >= 0 && x < W);
+        assert(y >= 0 && y < H);
+        atomicAdd(&counter, 1);
+    }
+};
+
+void testForEachPixelNoImage() {
+    counter = 0;
+    forEachPixelNoImage<DoForEachPixel>(Vector2i(W, H));
+    cudaDeviceSynchronize();
+    assert(counter == W * H);
 }
 
 #include "FileUtils.h"
@@ -280,6 +336,8 @@ void testScene() {
 #include "itmviewbuilder.h"
 
 #include <fstream>
+#include <vector>
+#include <algorithm>
 using namespace std;
 using namespace ITMLib;
 using namespace ITMLib::Objects;
@@ -287,15 +345,57 @@ using namespace ITMLib::Engine;
 
 extern void ITMSceneReconstructionEngine_ProcessFrame_pre(
     const ITMView * const view,
-    Matrix4f M_d,
-    Matrix4f invM_d
+    Matrix4f M_d
     );
 
 void approxEqual(float a, float b) {
     assert(abs(a-b) < 0.00001);
 }
 
-void testAllocRequests() {
+void testAllocRequests(Matrix4f M_d, 
+    const char* expectedRequestsFilename, 
+    const char* missedExpectedRequestsFile,
+    const char* possibleExtra = 0) {
+    // [[
+    std::vector<VoxelBlockPos> allExpectedRequests;
+    {
+        ifstream expectedRequests(expectedRequestsFilename);
+        assert(expectedRequests.is_open());
+        while (1) {
+            VoxelBlockPos expectedBlockCoord;
+            expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
+            if (expectedRequests.fail()) break;
+            allExpectedRequests.push_back(expectedBlockCoord);
+        }
+    }
+
+    std::vector<VoxelBlockPos> allMissedExpectedRequests;
+    {
+        ifstream expectedRequests(missedExpectedRequestsFile);
+        assert(expectedRequests.is_open());
+        while (1) {
+            VoxelBlockPos expectedBlockCoord;
+            expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
+            if (expectedRequests.fail()) break;
+            allMissedExpectedRequests.push_back(expectedBlockCoord);
+        }
+    }
+
+    // Some requests might be lost entirely sometimes
+    std::vector<VoxelBlockPos> extra;
+    if (possibleExtra)
+    {
+        ifstream expectedRequests(possibleExtra);
+        assert(expectedRequests.is_open());
+        while (1) {
+            VoxelBlockPos expectedBlockCoord;
+            expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
+            if (expectedRequests.fail()) break;
+            extra.push_back(expectedBlockCoord);
+        }
+    }
+
+    // ]]
     ITMUChar4Image rgb(Vector2i(1,1), true, false);
     png::ReadImageFromFile(&rgb, "Tests\\TestAllocRequests\\color1.png");
     ITMShortImage depth(Vector2i(1, 1), true, false);
@@ -312,42 +412,6 @@ void testAllocRequests() {
         0.00174096529	,
         346.471008	,
         249.031006	));
-    
-    Matrix4f M_d;
-    M_d.m00=0.848863006	;
-    M_d.m01=0.441635638	;
-    M_d.m02=- 0.290498704	;
-    M_d.m03=0.000000000	;
-    M_d.m10=- 0.290498704	;
-    M_d.m11=0.848863065	;
-    M_d.m12=0.441635549	;
-    M_d.m13=0.000000000	;
-    M_d.m20=0.441635638	;
-    M_d.m21=- 0.290498614	;
-    M_d.m22=0.848863065	;
-    M_d.m23=0.000000000	;
-    M_d.m30=- 0.144862041	;
-    M_d.m31=- 0.144861951	;
-    M_d.m32=- 0.144861966	;
-    M_d.m33 = 1.00000000;
-
-    Matrix4f invM_d; M_d.inv(invM_d);
-    approxEqual(invM_d.m00,	0.848863125	); // exactly equal should do
-    approxEqual(invM_d.m01, - 0.290498734	);
-    approxEqual(invM_d.m02,	0.441635668	);
-    approxEqual(invM_d.m03,	0.000000000	);
-    approxEqual(invM_d.m10,	0.441635668	);
-    approxEqual(invM_d.m11,	0.848863184	);
-    approxEqual(invM_d.m12, - 0.290498614	);
-    approxEqual(invM_d.m13,	0.000000000	);
-    approxEqual(invM_d.m20, - 0.290498734	);
-    approxEqual(invM_d.m21,	0.441635609	);
-    approxEqual(invM_d.m22,	0.848863184	);
-    approxEqual(invM_d.m23,	0.000000000	);
-    approxEqual(invM_d.m30,	0.144862026	);
-    approxEqual(invM_d.m31,	0.144861937	);
-    approxEqual(invM_d.m32,	0.144862041	);
-    approxEqual(invM_d.m33,	1.00000012	);
 
     Scene* scene = new Scene();
     CURRENT_SCENE_SCOPE(scene);
@@ -355,7 +419,7 @@ void testAllocRequests() {
 
     // test ITMSceneReconstructionEngine_ProcessFrame_pre
     ITMSceneReconstructionEngine_ProcessFrame_pre(
-        view, M_d, invM_d
+        view, M_d
         );
 
     cudaDeviceSynchronize();
@@ -373,30 +437,177 @@ void testAllocRequests() {
         Scene::getCurrentScene()->voxelBlockHash->naKey,
         SDF_GLOBAL_BLOCK_NUM * sizeof(VoxelBlockPos),
         cudaMemcpyDeviceToHost);
-
-    ifstream expectedRequests("Tests\\TestAllocRequests\\expectedRequests.txt");
-    for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
-        if (entriesAllocType[targetIdx] == 0) continue;
+    {
+        ifstream expectedRequests(expectedRequestsFilename);
+        assert(expectedRequests.is_open());
         VoxelBlockPos expectedBlockCoord;
-        expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
-        assert(expectedBlockCoord == blockCoords[targetIdx]);
+        bool read = true;
+        for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
+            if (entriesAllocType[targetIdx] == 0) continue;
+            
+            if (read)
+                expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
+            read = true;
+            assert(!expectedRequests.fail());
+
+            if (expectedBlockCoord != blockCoords[targetIdx]) {
+                // If the expectedBlockCoord is not in this file, it must be in the missed requests - 
+                // it is not deterministic which blocks will be allocated first and which on the second run
+                auto i = find(allMissedExpectedRequests.begin(), allMissedExpectedRequests.end(),
+                    blockCoords[targetIdx]);
+                if (i == allMissedExpectedRequests.end()) {
+                    auto i = find(
+                        extra.begin(),
+                        extra.end(),
+                        blockCoords[targetIdx]);
+                    read = false;
+                    assert(i != extra.end());
+                }
+            }
+
+            continue;
+        }
+        // Must have seen all requests
+        int _;
+        expectedRequests >> _;
+        assert(expectedRequests.fail());
     }
-    // Must have seen all requests
-    int _;
-    expectedRequests >> _;
-    assert(expectedRequests.fail());
+
+    // do allocations
+    Scene::performCurrentSceneAllocations();
+
+    cudaDeviceSynchronize();
+    // --- again!
+    // test ITMSceneReconstructionEngine_ProcessFrame_pre
+    ITMSceneReconstructionEngine_ProcessFrame_pre(
+        view, M_d
+        );
+
+    cudaDeviceSynchronize();
+
+    // test content of requests "allocate planned"
+    cudaMemcpy(entriesAllocType,
+        Scene::getCurrentScene()->voxelBlockHash->needsAllocation,
+        SDF_GLOBAL_BLOCK_NUM,
+        cudaMemcpyDeviceToHost);
+
+    cudaMemcpy(blockCoords,
+        Scene::getCurrentScene()->voxelBlockHash->naKey,
+        SDF_GLOBAL_BLOCK_NUM * sizeof(VoxelBlockPos),
+        cudaMemcpyDeviceToHost);
+
+    {
+        ifstream expectedRequests(missedExpectedRequestsFile);
+        assert(expectedRequests.is_open());
+        for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
+            if (entriesAllocType[targetIdx] == 0) continue;
+            VoxelBlockPos expectedBlockCoord;
+            expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
+
+            if (expectedBlockCoord != blockCoords[targetIdx]) {
+                // If the expectedBlockCoord is not in this file, it must be in the missed requests - 
+                // it is not deterministic which blocks will be allocated first and which on the second run
+                auto i = find(allExpectedRequests.begin(), allExpectedRequests.end(),
+                    blockCoords[targetIdx]);
+                if (i == allExpectedRequests.end()) {
+                    auto i = find(
+                        extra.begin(),
+                        extra.end(),
+                        blockCoords[targetIdx]);
+                    assert(i != extra.end());
+                }
+            }
+
+        }
+        // Must have seen all requests
+        int _;
+        expectedRequests >> _;
+        assert(expectedRequests.fail());
+    }
 
     delete scene;
     delete view;
 }
 
+/// Must exist on cpu
+void assertImageSame(ITMUChar4Image* a_, ITMUChar4Image* b_) {
+    Vector4u* a = a_->GetData(MEMORYDEVICE_CPU);
+    Vector4u* b = b_->GetData(MEMORYDEVICE_CPU);
+    int s = a_->dataSize;
+    while (s--) {
+        assert(*a == *b);
+        a++;
+        b++;
+    }
+}
 
+void renderBlack() {
+    Scene* s = new Scene();
+
+    //->GetData(MEMORYDEVICE_CPU);
+
+    delete s;
+}
 
 // TODO take the tests apart, clean state inbetween
 void tests() {
-    testAllocRequests();
+    testForEachPixelNoImage();
+
+
+    // With the alignment generated by the (buggy?) original Track Camera on the first frame,
+    // no conflicts occur
+    Matrix4f M_d;
+    M_d.m00 = 0.848863006;
+    M_d.m01 = 0.441635638;
+    M_d.m02 = -0.290498704;
+    M_d.m03 = 0.000000000;
+    M_d.m10 = -0.290498704;
+    M_d.m11 = 0.848863065;
+    M_d.m12 = 0.441635549;
+    M_d.m13 = 0.000000000;
+    M_d.m20 = 0.441635638;
+    M_d.m21 = -0.290498614;
+    M_d.m22 = 0.848863065;
+    M_d.m23 = 0.000000000;
+    M_d.m30 = -0.144862041;
+    M_d.m31 = -0.144861951;
+    M_d.m32 = -0.144861966;
+    M_d.m33 = 1.00000000;
+
+    Matrix4f invM_d; M_d.inv(invM_d);
+    approxEqual(invM_d.m00, 0.848863125); // exactly equal should do
+    approxEqual(invM_d.m01, -0.290498734);
+    approxEqual(invM_d.m02, 0.441635668);
+    approxEqual(invM_d.m03, 0.000000000);
+    approxEqual(invM_d.m10, 0.441635668);
+    approxEqual(invM_d.m11, 0.848863184);
+    approxEqual(invM_d.m12, -0.290498614);
+    approxEqual(invM_d.m13, 0.000000000);
+    approxEqual(invM_d.m20, -0.290498734);
+    approxEqual(invM_d.m21, 0.441635609);
+    approxEqual(invM_d.m22, 0.848863184);
+    approxEqual(invM_d.m23, 0.000000000);
+    approxEqual(invM_d.m30, 0.144862026);
+    approxEqual(invM_d.m31, 0.144861937);
+    approxEqual(invM_d.m32, 0.144862041);
+    approxEqual(invM_d.m33, 1.00000012);
+    testAllocRequests(M_d, "Tests\\TestAllocRequests\\expectedRequests.txt"
+        , "Tests\\TestAllocRequests\\expectedMissedRequests.txt");
+
+    // With identity matrix, we have some conflicts that are only resolved on a second allocation pass
+    testAllocRequests(Matrix4f(
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,0,1), "Tests\\TestAllocRequests\\expectedRequests2.txt"
+        , "Tests\\TestAllocRequests\\expectedMissedRequests2.txt"
+        , "Tests\\TestAllocRequests\\possibleExtraRequests2.txt"
+        );
+
     testScene();
+
     testCholesky();
+
     testZ3Hasher();
     testNHasher();
     testZeroHasher();

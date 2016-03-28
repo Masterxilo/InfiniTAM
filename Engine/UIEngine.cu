@@ -296,7 +296,11 @@ void UIEngine::glutMouseWheelFunction(int button, int dir, int x, int y)
 void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSource, ITMMainEngine *mainEngine,
 	const char *outFolder)
 {
-	this->freeviewActive = false;
+    this->freeviewActive = true;
+    freeviewPose.SetT(Vector3f(0,0,voxelSize*100)); // move everything away 
+    // note that the pose is camera to world. Thus camera will be at -... seen from the world
+
+
 	this->intergrationActive = true;
 	this->currentColourMode = 0;
 	this->colourModes.push_back(UIColourMode("shaded greyscale", ITMMainEngine::InfiniTAM_IMAGE_FREECAMERA_SHADED));

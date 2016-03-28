@@ -12,9 +12,7 @@ __managed__ ITMVoxelBlock* currentLocalVBA = 0;
 __device__ void Scene::AllocateVB::allocate(VoxelBlockPos pos, int sequenceId) {
     assert(currentLocalVBA);
 
-    // Initialize pos and reset data
-    currentLocalVBA[sequenceId].pos = pos;
-    currentLocalVBA[sequenceId].resetVoxels();
+    currentLocalVBA[sequenceId].reinit(pos);
 }
 
 void Scene::setCurrentScene(Scene* s) {
@@ -37,31 +35,27 @@ void Scene::performAllocations() {
     voxelBlockHash->performAllocations();
 }
 
-static GPU_ONLY inline void pointToVoxelBlockPos(
-    const THREADPTR(Vector3i) & point, //!< [in] in voxel coordinates
-    THREADPTR(VoxelBlockPos) &blockPos, //!< [out] In voxel-block coordinates, floor(voxel coordinate / SDF_BLOCK_SIZE)
-    THREADPTR(int) &voxelLocalId //!< [out] index into the found voxel block to find the voxel
+static GPU_ONLY inline VoxelBlockPos pointToVoxelBlockPos(
+    const THREADPTR(Vector3i) & point //!< [in] in voxel coordinates
     ) {
     // "The 3D voxel block location is obtained by dividing the voxel coordinates with the block size along each axis."
-
+    VoxelBlockPos blockPos;
     // if SDF_BLOCK_SIZE == 8, then -3 should go to block -1, so we need to adjust negative values 
     // (C's quotient-remainder division gives -3/8 == 0)
     blockPos.x = ((point.x < 0) ? point.x - SDF_BLOCK_SIZE + 1 : point.x) / SDF_BLOCK_SIZE;
     blockPos.y = ((point.y < 0) ? point.y - SDF_BLOCK_SIZE + 1 : point.y) / SDF_BLOCK_SIZE;
     blockPos.z = ((point.z < 0) ? point.z - SDF_BLOCK_SIZE + 1 : point.z) / SDF_BLOCK_SIZE;
-
-    Vector3i locPos = point - blockPos.toInt() * SDF_BLOCK_SIZE; // localized coordinate
-    voxelLocalId = locPos.x + locPos.y * SDF_BLOCK_SIZE + locPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE;
+    return blockPos;
 }
 
-GPU_ONLY ITMVoxel* Scene::getVoxel(Vector3i pos) {
-    VoxelBlockPos blockPos;
-    int voxelLocalId;
-    pointToVoxelBlockPos(pos, blockPos, voxelLocalId);
+GPU_ONLY ITMVoxel* Scene::getVoxel(Vector3i point) {
+    VoxelBlockPos blockPos = pointToVoxelBlockPos(point);
 
     ITMVoxelBlock* b = getVoxelBlock(blockPos);
     if (b == NULL) return NULL;
-    return &b->blockVoxels[voxelLocalId];
+
+    Vector3i localPos = point - blockPos.toInt() * SDF_BLOCK_SIZE; // localized coordinate
+    return b->getVoxel(localPos);
 }
 
 /// Returns NULL if the voxel block is not allocated

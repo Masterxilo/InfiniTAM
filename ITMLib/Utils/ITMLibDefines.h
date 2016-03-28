@@ -89,8 +89,6 @@ struct ITMHashEntry
     }
 };
 
-#include "ITMVoxelBlockHash.h"
-
 // #define USE_FLOAT_SDF_STORAGE // uses 4 instead of 2 bytes
 /** \brief
     Stores the information of a single voxel in the volume
@@ -104,7 +102,10 @@ public:
     /** Value of the truncated signed distance transformation, in [-1, 1] (scaled by truncation mu when storing) */
 	CPU_AND_GPU void setSDF_initialValue() { sdf = 32767; }
     CPU_AND_GPU float getSDF() { return (float)(sdf) / 32767.0f; }
-    CPU_AND_GPU void setSDF(float x) { sdf = (short)((x)* 32767.0f); }
+    CPU_AND_GPU void setSDF(float x) {
+        assert(x >= -1 && x <= 1);
+        sdf = (short)((x)* 32767.0f);
+    }
 
 	/** Number of fused observations that make up @p sdf. */
 	uchar w_depth;
@@ -143,13 +144,40 @@ public:
 };
 
 struct ITMVoxelBlock {
-    /// pos is Mutable, 
-    /// because this voxel block might represent any part of space
-    VoxelBlockPos pos;
-    ITMVoxel blockVoxels[SDF_BLOCK_SIZE3];
     GPU_ONLY void resetVoxels() {
         for (auto& i : blockVoxels) i = ITMVoxel();
     }
+    /// compute voxelLocalId to access blockVoxels
+    GPU_ONLY ITMVoxel* getVoxel(Vector3i localPos) {
+        assert(localPos.x >= 0 && localPos.x < SDF_BLOCK_SIZE);
+        assert(localPos.y >= 0 && localPos.y < SDF_BLOCK_SIZE);
+        assert(localPos.z >= 0 && localPos.z < SDF_BLOCK_SIZE);
+
+        return &blockVoxels[
+            localPos.x + localPos.y * SDF_BLOCK_SIZE + localPos.z * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE
+        ];
+    }
+
+    GPU_ONLY VoxelBlockPos getPos() const {
+        return pos_;
+    }
+
+    __declspec(property(get = getPos)) VoxelBlockPos pos;
+
+    /// Initialize pos and reset data
+    GPU_ONLY void reinit(VoxelBlockPos pos) {
+        pos_ = pos;
+
+        // resetVoxels
+        for (auto& i : blockVoxels) i = ITMVoxel();
+    }
+
+private:
+    /// pos is Mutable, 
+    /// because this voxel block might represent any part of space
+    VoxelBlockPos pos_;
+
+    ITMVoxel blockVoxels[SDF_BLOCK_SIZE3];
 };
 
 /// The tracker iteration type used to define the tracking iteration regime

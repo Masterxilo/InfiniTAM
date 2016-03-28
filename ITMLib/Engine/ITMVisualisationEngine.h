@@ -35,15 +35,6 @@ namespace ITMLib
         class ITMVisualisationEngine
         {
         private:
-            RenderingBlock *renderingBlockList_device;
-
-            /** Given scene, pose and intrinsics, create an estimate
-            of the minimum and maximum depths at each pixel of
-            an image.
-
-            Called by rendering methods (CreateICPMaps, RenderImage).
-            */
-            void CreateExpectedDepths();
             void Common(
                 const ITMPose *pose,
                 const ITMIntrinsics *intrinsics,
@@ -57,9 +48,6 @@ namespace ITMLib
 				RENDER_COLOUR_FROM_NORMAL
 			};
 
-            explicit ITMVisualisationEngine();
-            virtual ~ITMVisualisationEngine(void);
-
             /// Heatmap style color gradient for depth
             static void DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src);
 
@@ -71,7 +59,7 @@ namespace ITMLib
             void RenderImage(
                 const ITMPose *pose,
                 const ITMIntrinsics *intrinsics,
-                ITMRenderState *renderState, //!< [in, out] builds renderingRangeImage for one-time use
+                ITMRenderState *renderState, //!< [out] builds raycastResult
                 ITMUChar4Image *outputImage,
                 RenderImageType type = RENDER_SHADED_GREYSCALE);
 
@@ -81,7 +69,7 @@ namespace ITMLib
             void CreateICPMaps(
                 ITMTrackingState * const trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
                 const ITMIntrinsics * const intrinsics_d,
-                ITMRenderState *const renderState //!< [in, out] builds renderingRangeImage for one-time use
+                ITMRenderState *const renderState //!< [out] builds raycastResult
                 );
 
 		};

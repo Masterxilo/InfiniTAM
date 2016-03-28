@@ -6,6 +6,15 @@
 #include <cuda_runtime.h>
 #include <math.h>
 
+inline dim3 getGridSize(dim3 taskSize, dim3 blockSize)
+{
+    return dim3((taskSize.x + blockSize.x - 1) / blockSize.x, (taskSize.y + blockSize.y - 1) / blockSize.y, (taskSize.z + blockSize.z - 1) / blockSize.z);
+}
+
+inline dim3 getGridSize(Vector2i taskSize, dim3 blockSize)
+{
+    return getGridSize(dim3(taskSize.x, taskSize.y), blockSize);
+}
 
 /// Classes extending this must be head allocated
 struct Managed {

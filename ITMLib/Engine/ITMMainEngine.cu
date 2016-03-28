@@ -4,9 +4,50 @@
 
 using namespace ITMLib::Engine;
 
+KERNEL buildASceneA() {
+    Scene::requestCurrentSceneVoxelBlockAllocation(
+        VoxelBlockPos(blockIdx.x,
+        blockIdx.y,
+        blockIdx.z));
+}
+
+struct EachV {
+    static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
+
+        float z = (threadIdx.z) * voxelSize;
+        assert(v);
+        float eta = (SDF_BLOCK_SIZE / 2)*voxelSize - z;
+        v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
+
+    }
+};
+
+KERNEL buildASceneB() {
+    ITMVoxel* v = Scene::getCurrentSceneVoxel(
+        Vector3i(blockIdx.x,
+        blockIdx.y,
+        blockIdx.z) * SDF_BLOCK_SIZE
+        +
+        Vector3i(threadIdx.x,
+        threadIdx.y,
+        threadIdx.z));
+    float z = (blockIdx.z *  SDF_BLOCK_SIZE + threadIdx.z) * voxelSize;
+    assert(v);
+    float eta = (SDF_BLOCK_SIZE / 2)*voxelSize - z;
+    v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
+    // solid wall at z == (SDF_BLOCK_SIZE / 2), negative at greater z values
+    // notice that we normalize with mu and compute position in world space
+}
+
 ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
 {
     scene = new Scene();
+    CURRENT_SCENE_SCOPE(scene);
+    //buildASceneA << <dim3(10, 10, 1), 1 >> >();
+    cudaDeviceSynchronize();
+    Scene::performCurrentSceneAllocations();
+    //buildASceneB << <dim3(10, 10, 1), dim3(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE) >> >();
+    //Scene::getCurrentScene()->doForEachAllocatedVoxel<EachV>();
 
 	lowLevelEngine = new ITMLowLevelEngine();
 	viewBuilder = new ITMViewBuilder(calib);
@@ -57,10 +98,10 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 	viewBuilder->UpdateView(&view, rgbImage, rawDepthImage);
 
 	// tracking
-    tracker->TrackCamera(trackingState, view);
+    tracker->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
 
 	// fusion
-    ITMSceneReconstructionEngine_ProcessFrame(view, trackingState);
+    ITMSceneReconstructionEngine_ProcessFrame(view, trackingState->pose_d->GetM());
 
     // raycast scene from current viewpoint 
     // to create point cloud for tracking
