@@ -91,6 +91,9 @@ namespace ORUtils {
 		CPU_AND_GPU const T *getValues() const { return this->v; }
 		CPU_AND_GPU Vector2<T> &setValues(const T *rhs) { this->x = rhs[0]; this->y = rhs[1]; return *this; }
 
+        CPU_AND_GPU T area() {
+            return x * y;
+        }
 		// indexing operators
 		CPU_AND_GPU T &operator [](int i) { return this->v[i]; }
 		CPU_AND_GPU const T &operator [](int i) const { return this->v[i]; }
@@ -186,6 +189,7 @@ namespace ORUtils {
 		CPU_AND_GPU friend bool operator != (const Vector2<T> &lhs, const Vector2<T> &rhs) {
 			return (lhs.x != rhs.x) || (lhs.y != rhs.y);
 		}
+
 
 		friend std::ostream& operator<<(std::ostream& os, const Vector2<T>& dt){
 			os << dt.x << ", " << dt.y;

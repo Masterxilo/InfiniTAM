@@ -534,22 +534,31 @@ void testAllocRequests(Matrix4f M_d,
     delete scene;
     delete view;
 }
-
 /// Must exist on cpu
 template<typename T>
-void assertImageSame(Image<T>* a_, Image<T>* b_) {
+bool checkImageSame(Image<T>* a_, Image<T>* b_) {
     T* a = a_->GetData(MEMORYDEVICE_CPU);
     T* b = b_->GetData(MEMORYDEVICE_CPU);
+#define failifnot(x) if (!(x)) return false;
+    failifnot(a_->dataSize == b_->dataSize);
+    failifnot(a_->noDims == b_->noDims);
     int s = a_->dataSize;
     while (s--) {
         if (*a != *b) {
-            png::SaveImageToFile(a_, "assertImageSame_a.png");
-            png::SaveImageToFile(b_, "assertImageSame_b.png");
-            assert(false);
+            png::SaveImageToFile(a_, "checkImageSame_a.png");
+            png::SaveImageToFile(b_, "checkImageSame_b.png");
+            failifnot(false);
         }
         a++;
         b++;
     }
+    return true;
+}
+
+/// Must exist on cpu
+template<typename T>
+void assertImageSame(Image<T>* a_, Image<T>* b_) {
+    assert(checkImageSame(a_,b_));
 }
 ITMUChar4Image* load(const char* fn) {
 
@@ -557,6 +566,7 @@ ITMUChar4Image* load(const char* fn) {
     png::ReadImageFromFile(i, fn);
     return i;
 }
+
 void testImageSame() {
     auto i = load("Tests\\TestAllocRequests\\color1.png");
     assertImageSame(i,i);
@@ -696,9 +706,25 @@ void testAllocRequests2() {
         );
 }
 
+
+void testDump() {
+    auto i = load("Tests\\TestAllocRequests\\color1.png");
+    assert(dump::SaveImageToFile(i, "Tests\\TestAllocRequests\\color1.dump"));
+    auto j = new ITMUChar4Image(Vector2i(1, 1), true, false);
+    assert(dump::ReadImageFromFile(j, "Tests\\TestAllocRequests\\color1.dump"));
+    assertImageSame(i, j);
+    delete i;
+    delete j;
+}
+
 // TODO take the tests apart, clean state inbetween
 void tests() {
+    assert(!checkImageSame(load("Tests\\TestRender\\wall.png"), load("Tests\\TestRender\\black.png")));
+    assert(!dump::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1), true, false), "thisimagedoesnotexist"));
+    assert(!png::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1), true, false), "thisimagedoesnotexist"));
+    assert(!png::SaveImageToFile(new ITMUChar4Image(Vector2i(1, 1), true, false), "C:\\cannotSaveHere.png"));
     testImageSame();
+    testDump();
     testForEachPixelNoImage();
     testRenderBlack();
     testRenderWall();

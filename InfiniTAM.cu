@@ -42,7 +42,7 @@ using namespace std;
 int main(int argc, char** argv) {
 
     //redirectStd();
-    //tests(); // TODO enable again
+    tests(); // TODO enable again
     atexit(pause);
 
 	if (argc != 5) {
