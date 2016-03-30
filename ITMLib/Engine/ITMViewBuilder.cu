@@ -15,8 +15,8 @@ CPU_AND_GPU inline float convertDisparityToDepth(
     const float fx_depth)
 { 
     // http://qianyi.info/scenedata.html
-    // for fountain
-    //return disparity <= 0 ? INVALID_DEPTH : (disparity) / 1000.f;
+    // for fountain // TODO make configurable. Note that the tests expect kinect.
+    return disparity <= 0 ? INVALID_DEPTH : (disparity) / 1000.f;
     
     // for kinect, raw (e.g. Teddy)
     float disparity_tmp = disparityCalibParams.x - (float)(disparity);

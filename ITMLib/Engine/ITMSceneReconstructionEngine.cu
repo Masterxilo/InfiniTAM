@@ -216,6 +216,7 @@ void ITMSceneReconstructionEngine_ProcessFrame(
     Scene::performCurrentSceneAllocations();
 
     // camera data integration
+    cudaDeviceSynchronize();
     Scene::getCurrentScene()->doForEachAllocatedVoxel<IntegrateVoxel>();
 }
 

@@ -54,7 +54,7 @@ using namespace std;
 int main(int argc, char** argv) {
 
     //redirectStd();
-    tests();
+    //tests(); // TODO enable again
     atexit(pause);
 	const char *arg1 = "";
 	const char *arg2 = NULL;
@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
     //if (usingImages) 
     {
         // start reconstruction
-        UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_FRAME;// PROCESS_VIDEO;
+        UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_VIDEO;
     }
    
     // Start recording anything that happens

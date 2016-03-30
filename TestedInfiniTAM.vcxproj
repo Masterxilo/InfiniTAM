@@ -62,7 +62,7 @@
     <OutDir>$(SolutionDir)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
+    <IncludePath>.;Utils;ITMLib\Utils;ITMLib\Objects;ITMLib\Engine;ITMLib;lodepng;freeglut\include;$(IncludePath)</IncludePath>
     <LibraryPath>freeglut\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
