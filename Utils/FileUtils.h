@@ -41,4 +41,21 @@ namespace dump {
         return true;
     }
 
+    template<typename T>
+    inline bool ReadPODFromFile(T* o, const char* fileName) {
+        FILE* f = fopen(fileName, "rb");
+        if (!f) return false;
+        fread(o, sizeof(T), 1, f);
+        fclose(f);
+        return true;
+    }
+    template<typename T>
+    inline bool SavePODToFile(const T* image, const char* fileName) {
+        FILE* f = fopen(fileName, "wb");
+        if (!f) return false;
+        fwrite(o, sizeof(T), 1, f);
+        fclose(f);
+        return true;
+    }
+
 }

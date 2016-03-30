@@ -22,6 +22,7 @@ struct EachV {
     }
 };
 
+static ITMDepthTracker *dt;
 ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
 {
     scene = new Scene();
@@ -29,6 +30,7 @@ ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Ve
 	renderState_freeview = NULL; // will be created by the visualisation engine on demand
 
     trackingState = new ITMTrackingState(imgSize_d);
+    dt = new ITMDepthTracker(imgSize_d);
 
     view = new ITMView(calib, imgSize_rgb, imgSize_d); // will be allocated by the view builder
 }
@@ -52,8 +54,9 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
     view->Update(rgbImage, rawDepthImage);
 
 	// tracking
-    ITMDepthTracker::TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
-
+    //ITMDepthTracker::
+        dt->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
+        dump::Sa
 	// fusion
     ITMSceneReconstructionEngine_ProcessFrame(view, trackingState->pose_d->GetM());
 

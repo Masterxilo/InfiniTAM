@@ -715,6 +715,14 @@ void testDump() {
     assertImageSame(i, j);
     delete i;
     delete j;
+
+    Vector2i a(rand(), rand());
+    assert(dump::SavePODToFile(&a, "dump"));
+    Vector2i b;
+    assert(a != b);
+    assert(!dump::ReadPODFromFile(&b, "nonexistent_dump"));
+    assert(dump::ReadPODFromFile(&b, "dump"));
+    assert(a == b);
 }
 
 // TODO take the tests apart, clean state inbetween
