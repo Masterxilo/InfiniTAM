@@ -125,8 +125,6 @@
     <ClInclude Include="ITMLib\Engine\ITMPixelUtils.h" />
     <ClInclude Include="ITMLib\Engine\ITMRepresentationAccess.h" />
     <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h" />
-    <ClInclude Include="ITMLib\Engine\ITMTracker.h" />
-    <ClInclude Include="ITMLib\Engine\ITMViewBuilder.h" />
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h" />
     <ClInclude Include="ITMLib\ITMLib.h" />
     <ClInclude Include="ITMLib\Objects\ITMDisparityCalib.h" />
@@ -172,7 +170,7 @@
     <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu" />
-    <CudaCompile Include="ITMLib\Engine\ITMViewBuilder.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMView.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu" />
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu" />
     <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu">

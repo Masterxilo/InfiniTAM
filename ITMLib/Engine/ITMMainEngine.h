@@ -50,16 +50,6 @@ namespace ITMLib
 		class ITMMainEngine
 		{
 		private:
-
-			bool fusionActive, mainProcessingActive;
-
-			ITMLowLevelEngine *lowLevelEngine;
-			ITMVisualisationEngine *visualisationEngine;
-
-            ITMViewBuilder *viewBuilder;
-
-			ITMTracker *tracker;
-
 			ITMView *view;
 			ITMTrackingState *trackingState;
 
@@ -69,7 +59,6 @@ namespace ITMLib
 
             /// Describes a free camera position and frame rendered from that position
 			ITMRenderState *renderState_freeview;
-
 		public:
 
 			enum GetImageType
@@ -89,11 +78,6 @@ namespace ITMLib
 
 			/// Gives access to the current camera pose and additional tracking information
 			ITMTrackingState* GetTrackingState(void) { return trackingState; }
-
-            /// Gives access to the internal world representation
-            void ResetScene(void) {
-                printf("Scene::reset not implemented\n");
-            }
 
 			/// Process a frame with rgb and depth images and optionally a corresponding imu measurement.
             /// Key method.

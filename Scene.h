@@ -3,7 +3,6 @@
 #include "cudadefines.h"
 #include "hashmap.h"
 
-#define threadIdx_xyz threadIdx.x, threadIdx.y, threadIdx.z
 // see doForEachAllocatedVoxel for T
 template<typename T>
 KERNEL doForEachAllocatedVoxel(

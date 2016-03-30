@@ -6,10 +6,77 @@
 #include "Cholesky.h"
 #include "ITMLibDefines.h"
 #include "ITMPixelUtils.h"
-
+#include <vector>
 using namespace ITMLib::Engine;
+using namespace ITMLib::Objects;
 
-static __managed__ /*const*/ ITMDepthTracker::AccuCell accu;
+struct AccuCell : Managed {
+    int noValidPoints;
+    float f;
+    // ATb
+    float ATb[6];
+    // AT_A_tri, upper right triangular part of AT_A
+    float AT_A_tri[1 + 2 + 3 + 4 + 5 + 6];
+    void reset() {
+        memset(this, 0, sizeof(this));
+    }
+};
+
+struct TrackingLevel {
+    /// FilterSubsampleWithHoles result of one level higher
+    ITMFloatImage* depth;
+    /// Half of the intrinsics of one level higher
+    Vector4f intrinsics;
+
+    const float distanceThreshold;
+    const int numberOfIterations;
+    const TrackerIterationType iterationType;
+    TrackingLevel() : distanceThreshold(0), numberOfIterations(0), iterationType(TRACKER_ITERATION_BOTH){}
+
+    TrackingLevel(int numberOfIterations, TrackerIterationType iterationType, float distanceThreshold) :
+        numberOfIterations(numberOfIterations), iterationType(iterationType), distanceThreshold(distanceThreshold) {
+        depth = new ITMFloatImage(Vector2i(1,1),false, true); // will get correct size from filter subsample
+    }
+};
+// ViewHierarchy, 0 is highest resolution
+static std::vector<TrackingLevel> trackingLevels;
+struct ITMDepthTracker_
+{
+    ITMDepthTracker_() {
+        // Tracking strategy:
+        const int noHierarchyLevels = 5;
+        const float distThreshStep = depthTrackerICPThreshold / noHierarchyLevels;
+        // starting with highest resolution (lowest level, last to be executed)
+#define iterations
+        trackingLevels.push_back(TrackingLevel(2  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 4));
+        trackingLevels.push_back(TrackingLevel(4  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 3));
+        trackingLevels.push_back(TrackingLevel(6  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep * 2));
+        trackingLevels.push_back(TrackingLevel(8  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep));
+        trackingLevels.push_back(TrackingLevel(10 iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold));
+        assert(trackingLevels.size() == noHierarchyLevels);
+    }
+} _;
+
+static TrackingLevel* currentTrackingLevel;
+
+static TrackerIterationType iterationType() {
+    return currentTrackingLevel->iterationType;
+}
+static bool shortIteration() {
+    return (iterationType() == TRACKER_ITERATION_ROTATION) ||
+        (iterationType() == TRACKER_ITERATION_TRANSLATION);
+}
+
+static int noPara()  {
+    return shortIteration() ? 3 : 6;
+}
+
+static int noParaSQ()  {
+    return shortIteration() ? 3 + 2 + 1 : 6 + 5 + 4 + 3 + 2 + 1;
+}
+
+
+static __managed__ /*const*/ AccuCell accu;
 static __managed__ /*const*/ float *depth = 0;
 static __managed__ /*const*/ Matrix4f approxInvPose;//!< \f$T_{g,k}\f$ current estimate, approxInvPose
 static __managed__ /*const*/ Matrix4f scenePose; //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$, scenePose
@@ -262,17 +329,15 @@ KERNEL depthTrackerOneLevel_g_rt_device_main()
 
 // host methods
 
-ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate) {
+AccuCell ComputeGandH(Matrix4f T_g_k_estimate) {
     cudaDeviceSynchronize(); // prepare writing to __managed__
-    ::pointsMap = this->pointsMap->GetData(MEMORYDEVICE_CUDA);
-    ::normalsMap = this->normalsMap->GetData(MEMORYDEVICE_CUDA);
-    ::sceneIntrinsics = getViewIntrinsics();
-    ::sceneImageSize = this->pointsMap->noDims;
-    assert(sceneImageSize == this->normalsMap->noDims);
 
     ::depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
     ::viewIntrinsics = currentTrackingLevel->intrinsics;
     ::viewImageSize = currentTrackingLevel->depth->noDims;
+    ::accu.reset();
+    ::approxInvPose = T_g_k_estimate;
+    ::distThresh = currentTrackingLevel->distanceThreshold;
 
     dim3 blockSize(16, 16); // must equal REDUCE_BLOCK_SIZE
     assert(16 * 16 == REDUCE_BLOCK_SIZE);
@@ -282,10 +347,6 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
 
-    ::accu.reset();
-    ::approxInvPose = T_g_k_estimate;
-    ::scenePose = scenePose;
-    ::distThresh = currentTrackingLevel->distanceThreshold;
 
 #define iteration(it) \
 			it: LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device_main<it>, gridSize, blockSize);
@@ -303,25 +364,44 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
 
 
 
-ITMDepthTracker::ITMDepthTracker(
-    Vector2i depthImgSize,
-    const ITMLowLevelEngine *lowLevelEngine) 
-{
-    this->lowLevelEngine = lowLevelEngine;
+AccuCell ComputeGandH(Matrix4f T_g_k_estimate); /// evaluate error function at the current T_g_k_estimate, 
+/// compute sum_ATb and sum_AT_A, the system we need to solve to compute the
+/// next update step (note: this system is not yet solved and we don't know the new energy yet!)
+/// \returns noValidPoints
+int ComputeGandH(
+    float &f,
+    float *sum_ATb,
+    float *sum_AT_A,
+    Matrix4f T_g_k_estimate) {
+    AccuCell accu = ComputeGandH(T_g_k_estimate);
 
-    // Tracking strategy:
-    const int noHierarchyLevels = 5;
-    const float distThreshStep = depthTrackerICPThreshold / noHierarchyLevels;
-    // starting with highest resolution (lowest level, last to be executed)
-    trackingLevels.push_back(TrackingLevel(2, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 4, depthImgSize));
-    trackingLevels.push_back(TrackingLevel(4, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 3, depthImgSize / 2));
-    trackingLevels.push_back(TrackingLevel(6, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep * 2, depthImgSize / 4));
-    trackingLevels.push_back(TrackingLevel(8, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep, depthImgSize / 8));
-    trackingLevels.push_back(TrackingLevel(10, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold, depthImgSize / 16));
-    assert(trackingLevels.size() == noHierarchyLevels);
+    memcpy(sum_ATb, accu.ATb, sizeof(float) * noPara());
+
+    // output sum_AT_A, sum_ATb
+    // Construct full output (hessian) matrix from accumulated sum
+    // lower right triangular part
+    for (int r = 0, counter = 0; r < noPara(); r++)
+        for (int c = 0; c <= r; c++)
+            sum_AT_A[r * 6 + c] = accu.AT_A_tri[counter++]; // here, r is bigger than c 
+    // Symmetric part
+    for (int r = 0; r < noPara(); ++r)
+        for (int c = r + 1; c < noPara(); c++)
+            sum_AT_A[r * 6 + c] = sum_AT_A[c * 6 + r]; // here, c is bigger than r, that part was initialized above
+
+    // Output energy -- if we have very few points, output some high energy
+    f = (accu.noValidPoints > 100) ? sqrt(accu.f) / accu.noValidPoints : 1e5f;
+
+    return accu.noValidPoints;
 }
 
-void ITMDepthTracker::ComputeDelta(float *step, float *nabla, float *hessian) const
+
+/// Solves hessian.step = nabla
+/// \param delta output array of 6 floats 
+/// \param hessian 6x6
+/// \param delta 3 or 6
+/// \param nabla 3 or 6
+/// \param shortIteration whether there are only 3 parameters
+void ComputeDelta(float *step, float *nabla, float *hessian)
 {
     for (int i = 0; i < 6; i++) step[i] = 0;
 
@@ -339,7 +419,7 @@ void ITMDepthTracker::ComputeDelta(float *step, float *nabla, float *hessian) co
     }
 }
 
-bool ITMDepthTracker::HasConverged(float *step) const
+bool HasConverged(float *step)
 {
     // Compute ||step||_2^2
     float stepLength = 0.0f;
@@ -351,7 +431,7 @@ bool ITMDepthTracker::HasConverged(float *step) const
     return false;
 }
 
-Matrix4f ITMDepthTracker::ComputeTinc(const float *delta) const
+Matrix4f ComputeTinc(const float *delta)
 {
     // step is T_inc, expressed as a parameter vector 
     // (beta, gamma, alpha, tx,ty, tz)
@@ -387,149 +467,161 @@ Matrix4f ITMDepthTracker::ComputeTinc(const float *delta) const
 }
 
 /// \file c.f. newcombe_etal_ismar2011.pdf, Sensor Pose Estimation section
-void ITMDepthTracker::TrackCamera(ITMTrackingState *trackingState, const ITMView *view)
-{
-    /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
-    this->view = view;
 
-    pointsMap = trackingState->pointCloud->locations;
-    normalsMap = trackingState->pointCloud->normals;
-    scenePose = trackingState->pointCloud->pose_pointCloud->GetM();
+namespace ITMLib {
+    namespace Engine {
+        namespace ITMDepthTracker {
+            void TrackCamera(
+                ITMTrackingState *trackingState,
+                const ITMView *view)
+            {
+                /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
+                cudaDeviceSynchronize(); // prepare writing to __managed__
+                ::scenePose = trackingState->pointCloud->pose_pointCloud->GetM();
+                ::pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
+                ::normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
+                ::sceneIntrinsics = view->calib->intrinsics_d.projectionParamsSimple.all;
+                ::sceneImageSize = trackingState->pointCloud->locations->noDims;
+                assert(sceneImageSize == trackingState->pointCloud->normals->noDims);
 
-    /// Init image hierarchy levels
-    trackingLevels[0].depth = view->depth;
-    trackingLevels[0].intrinsics = getViewIntrinsics();
-    for (int i = 1; i < trackingLevels.size(); i++)
-    {
-        TrackingLevel* currentLevel = &trackingLevels[i];
-        TrackingLevel* previousLevel = &trackingLevels[i - 1];
+                /// Init image hierarchy levels
+                trackingLevels[0].depth = view->depth;
+                trackingLevels[0].intrinsics = sceneIntrinsics;
+                for (int i = 1; i < trackingLevels.size(); i++)
+                {
+                    TrackingLevel* currentLevel = &trackingLevels[i];
+                    TrackingLevel* previousLevel = &trackingLevels[i - 1];
 
-        lowLevelEngine->FilterSubsampleWithHoles(currentLevel->depth, previousLevel->depth);
+                    ITMLowLevelEngine::FilterSubsampleWithHoles(currentLevel->depth, previousLevel->depth);
 
-        currentLevel->intrinsics = previousLevel->intrinsics * 0.5f;
-    }
+                    currentLevel->intrinsics = previousLevel->intrinsics * 0.5f;
+                }
 
-    // Coarse to fine
-    for (int levelId = trackingLevels.size() - 1; levelId >= 0; levelId--)
-    {
-        currentTrackingLevel = &trackingLevels[levelId];
-        if (iterationType() == TRACKER_ITERATION_NONE) continue;
+                // Coarse to fine
+                for (int levelId = trackingLevels.size() - 1; levelId >= 0; levelId--)
+                {
+                    currentTrackingLevel = &trackingLevels[levelId];
+                    if (iterationType() == TRACKER_ITERATION_NONE) continue;
 
 #define T_k_g_estimate trackingState->pose_d
-        // T_g_k_estimate caches T_k_g_estimate->GetInvM()
-        Matrix4f T_g_k_estimate = T_k_g_estimate->GetInvM();
+                    // T_g_k_estimate caches T_k_g_estimate->GetInvM()
+                    Matrix4f T_g_k_estimate = T_k_g_estimate->GetInvM();
 
 #define set_T_k_g_estimate(x)\
         T_k_g_estimate->SetFrom(&x);
-        T_g_k_estimate = T_k_g_estimate->GetInvM();
+                    T_g_k_estimate = T_k_g_estimate->GetInvM();
 
 #define set_T_k_g_estimate_from_T_g_k_estimate(x) \
         T_k_g_estimate->SetInvM(x);\
 		T_k_g_estimate->Coerce(); /* and make sure we've got an SE3*/\
         T_g_k_estimate = T_k_g_estimate->GetInvM();
 
-        // We will 'accept' updates into trackingState->pose_d and T_g_k_estimate
-        // before we know whether they actually decrease the energy.
-        // When they did not in fact, we will revert to this value that was known to have less energy 
-        // than all previous estimates.
-        ITMPose least_energy_T_k_g_estimate(*T_k_g_estimate);
+                    // We will 'accept' updates into trackingState->pose_d and T_g_k_estimate
+                    // before we know whether they actually decrease the energy.
+                    // When they did not in fact, we will revert to this value that was known to have less energy 
+                    // than all previous estimates.
+                    ITMPose least_energy_T_k_g_estimate(*T_k_g_estimate);
 
-        // Track least energy we measured so far to see whether we improved
-        float f_old = 1e20f;
+                    // Track least energy we measured so far to see whether we improved
+                    float f_old = 1e20f;
 
-        // current levenberg-marquart style damping parameter, often called mu.
-        float lambda = 1.0;
+                    // current levenberg-marquart style damping parameter, often called mu.
+                    float lambda = 1.0;
 
-        // Iterate as required
-        for (int iterNo = 0; iterNo < currentTrackingLevel->numberOfIterations; iterNo++)
-        {
-            // [ this takes most time. 
-            // Computes f(x) as well as A^TA and A^Tb for next computation of delta_x as
-            // (A^TA + lambda * diag(A^TA)) delta_x = A^T b
-            // if f decreases, the delta is applied definitely, otherwise x is reset.
-            // So we do:
-            /*
-            x = x_best;
-            lambda = 1;
-            f_best = infinity
+                    // Iterate as required
+                    for (int iterNo = 0; iterNo < currentTrackingLevel->numberOfIterations; iterNo++)
+                    {
+                        // [ this takes most time. 
+                        // Computes f(x) as well as A^TA and A^Tb for next computation of delta_x as
+                        // (A^TA + lambda * diag(A^TA)) delta_x = A^T b
+                        // if f decreases, the delta is applied definitely, otherwise x is reset.
+                        // So we do:
+                        /*
+                        x = x_best;
+                        lambda = 1;
+                        f_best = infinity
 
-            repeat:
-            compute f_new, A^TA_new, A^T b_new
+                        repeat:
+                        compute f_new, A^TA_new, A^T b_new
 
-            if (f_new > f_best) {x = x_best; lambda *= 10;}
-            else {
-            x_best = x;
-            A^TA = A^TA_new
-            A^Tb = A^Tb_new
+                        if (f_new > f_best) {x = x_best; lambda *= 10;}
+                        else {
+                        x_best = x;
+                        A^TA = A^TA_new
+                        A^Tb = A^Tb_new
+                        }
+
+                        solve (A^TA + lambda * diag(A^TA)) delta_x = A^T b
+                        x += delta_x;
+
+                        */
+
+
+                        // evaluate error function at currently accepted
+                        // T_g_k_estimate
+                        // and compute information for next update
+                        float f_new;
+                        int noValidPoints;
+                        float new_sum_ATb[6];
+                        float new_sum_AT_A[6 * 6];
+                        noValidPoints = ComputeGandH(f_new, new_sum_ATb, new_sum_AT_A, T_g_k_estimate);
+                        // ]]
+
+                        float least_energy_sum_AT_A[6 * 6],
+                            damped_least_energy_sum_AT_A[6 * 6];
+                        float least_energy_sum_ATb[6];
+
+                        // check if energy actually *increased* with the last update
+                        // Note: This happens rarely, namely when the blind 
+                        // gauss-newton step actually leads to an *increase in energy
+                        // because the damping was too small
+                        if ((noValidPoints <= 0) || (f_new > f_old)) {
+                            // If so, revert pose and discard/ignore new_sum_AT_A, new_sum_ATb
+                            // TODO would it be worthwhile to not compute these when they are not going to be used?
+                            set_T_k_g_estimate(least_energy_T_k_g_estimate);
+                            // Increase damping, then solve normal equations again with old matrix (see below)
+                            lambda *= 10.0f;
+                        }
+                        else {
+                            f_old = f_new;
+                            least_energy_T_k_g_estimate.SetFrom(T_k_g_estimate);
+
+                            // Prepare to solve a new system
+
+                            // Preconditioning
+                            for (int i = 0; i < 6 * 6; ++i) least_energy_sum_AT_A[i] = new_sum_AT_A[i] / noValidPoints;
+                            for (int i = 0; i < 6; ++i) least_energy_sum_ATb[i] = new_sum_ATb[i] / noValidPoints;
+
+                            // Accept and decrease damping
+                            lambda /= 10.0f;
+                        }
+                        // Solve normal equations
+
+                        // Apply levenberg-marquart style damping (multiply diagonal of ATA by 1.0f + lambda)
+                        for (int i = 0; i < 6 * 6; ++i) damped_least_energy_sum_AT_A[i] = least_energy_sum_AT_A[i];
+                        for (int i = 0; i < 6; ++i) damped_least_energy_sum_AT_A[i + i * 6] *= 1.0f + lambda;
+
+                        // compute the update step parameter vector x
+                        float x[6];
+                        ComputeDelta(x,
+                            least_energy_sum_ATb,
+                            damped_least_energy_sum_AT_A);
+
+                        // Apply the corresponding Tinc
+                        set_T_k_g_estimate_from_T_g_k_estimate(
+                            /* T_g_k_estimate = */
+                            ComputeTinc(x) * T_g_k_estimate
+                            );
+
+                        // if step is small, assume it's going to decrease the error and finish
+                        if (HasConverged(x)) break;
+                    }
+                }
+
+                // Convert T_g_k (k to global) to T_k_g (global to k)
             }
 
-            solve (A^TA + lambda * diag(A^TA)) delta_x = A^T b
-            x += delta_x;
 
-            */
-
-
-            // evaluate error function at currently accepted
-            // T_g_k_estimate
-            // and compute information for next update
-            float f_new;
-            int noValidPoints;
-            float new_sum_ATb[6];
-            float new_sum_AT_A[6 * 6];
-            noValidPoints = this->ComputeGandH(f_new, new_sum_ATb, new_sum_AT_A, T_g_k_estimate);
-            // ]]
-
-            float least_energy_sum_AT_A[6 * 6],
-                damped_least_energy_sum_AT_A[6 * 6];
-            float least_energy_sum_ATb[6];
-
-            // check if energy actually *increased* with the last update
-            // Note: This happens rarely, namely when the blind 
-            // gauss-newton step actually leads to an *increase in energy
-            // because the damping was too small
-            if ((noValidPoints <= 0) || (f_new > f_old)) {
-                // If so, revert pose and discard/ignore new_sum_AT_A, new_sum_ATb
-                // TODO would it be worthwhile to not compute these when they are not going to be used?
-                set_T_k_g_estimate(least_energy_T_k_g_estimate);
-                // Increase damping, then solve normal equations again with old matrix (see below)
-                lambda *= 10.0f;
-            }
-            else {
-                f_old = f_new;
-                least_energy_T_k_g_estimate.SetFrom(T_k_g_estimate);
-
-                // Prepare to solve a new system
-
-                // Preconditioning
-                for (int i = 0; i < 6 * 6; ++i) least_energy_sum_AT_A[i] = new_sum_AT_A[i] / noValidPoints;
-                for (int i = 0; i < 6; ++i) least_energy_sum_ATb[i] = new_sum_ATb[i] / noValidPoints;
-
-                // Accept and decrease damping
-                lambda /= 10.0f;
-            }
-            // Solve normal equations
-
-            // Apply levenberg-marquart style damping (multiply diagonal of ATA by 1.0f + lambda)
-            for (int i = 0; i < 6 * 6; ++i) damped_least_energy_sum_AT_A[i] = least_energy_sum_AT_A[i];
-            for (int i = 0; i < 6; ++i) damped_least_energy_sum_AT_A[i + i * 6] *= 1.0f + lambda;
-
-            // compute the update step parameter vector x
-            float x[6];
-            ComputeDelta(x,
-                least_energy_sum_ATb,
-                damped_least_energy_sum_AT_A);
-
-            // Apply the corresponding Tinc
-            set_T_k_g_estimate_from_T_g_k_estimate(
-                /* T_g_k_estimate = */
-                ComputeTinc(x) * T_g_k_estimate
-                );
-
-            // if step is small, assume it's going to decrease the error and finish
-            if (HasConverged(x)) break;
         }
     }
-
-    // Convert T_g_k (k to global) to T_k_g (global to k)
 }
-

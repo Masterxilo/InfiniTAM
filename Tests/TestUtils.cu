@@ -107,7 +107,6 @@ bool assertImpl(bool f, const char* const expr, const char* const file, int line
 
 #include "CUDADefines.h"
 
-#define xyz(p) p.x, p.y, p.z
 dim3 _lastLaunch_gridDim, _lastLaunch_blockDim;
 /// \returns true if err is cudaSuccess
 /// Fills errmsg in UNIT_TESTING build.

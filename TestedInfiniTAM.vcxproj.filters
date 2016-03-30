@@ -105,9 +105,6 @@
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMView.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
@@ -129,12 +126,6 @@
     <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMTracker.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMViewBuilder.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
     <ClInclude Include="Utils\HashMap.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -148,6 +139,9 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="ITMLib\Utils\ITMCUDAUtils.h">
       <Filter>ITMLib\Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Objects\ITMView.h">
+      <Filter>ITMLib\Engine</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -176,9 +170,6 @@
     <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMViewBuilder.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
@@ -192,6 +183,9 @@
     <CudaCompile Include="GeometryRefinement.cu" />
     <CudaCompile Include="Scene.cu" />
     <CudaCompile Include="DepthToUChar4.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMView.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

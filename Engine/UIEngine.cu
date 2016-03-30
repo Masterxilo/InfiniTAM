@@ -36,8 +36,6 @@ const char* KEY_HELP_STR =
 "w - write mesh to disk \t "
 "o - save current images to disk\t "
 "r - reset data \t ";
-extern const char *calibFile;
-
 void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
 {
     UIEngine *uiEngine = UIEngine::Instance();
@@ -51,10 +49,6 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
     case 'b':
         printf("processing input source ...\n");
         uiEngine->mainLoopAction = UIEngine::PROCESS_VIDEO;
-        break;
-    case 'r':
-        printf("clearing data ...\n");
-        uiEngine->mainEngine->ResetScene();
         break;
     case 'e':
     case 27: // esc key

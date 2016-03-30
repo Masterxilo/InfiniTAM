@@ -2,86 +2,58 @@
 #include <stdio.h>
 #include <fstream>
 using namespace std;
+#include "image.h"
+using namespace ORUtils;
 
 #include "lodepng.h"
+// lodepng_*: "Return value: LodePNG error code (0 means no error)."
+#define failed(lodepng_error) (lodepng_error != 0)
 
 namespace png {
-    
-    bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName)
+    template<typename T, LodePNGColorType colorType, int bitdepth_per_channel>
+    static bool ReadImageFromFile_(Image<T>* image, const char* fileName)
     {
         unsigned int xsize, ysize;
-        unsigned char* data;
-#define failed(lodepng_error) (lodepng_error != 0)
-        if (failed(lodepng_decode24_file(&data, &xsize, &ysize, fileName))) return false;
-
-        image->ChangeDims(Vector2i(xsize, ysize));
-        Vector4u *dataPtr = image->GetData(MEMORYDEVICE_CPU);
-
-        for (int i = 0; i < image->noDims.x*image->noDims.y; ++i)
-        {
-            dataPtr[i].x = data[i * 3 + 0];
-            dataPtr[i].y = data[i * 3 + 1];
-            dataPtr[i].z = data[i * 3 + 2];
-            dataPtr[i].w = 255;
-        }
-        free(data);
-
-        return true;
-    }
-
-    bool ReadImageFromFile(ITMShortImage *image, const char *fileName)
-    {
-        unsigned int xsize, ysize;
-        short* data;
-        if (failed(lodepng_decode_file((unsigned char**)&data, &xsize, &ysize, fileName, LCT_GREY, 16)))
-            return false;
+        unsigned char* data = 0;
+        if (failed(lodepng_decode_file(&data, &xsize, &ysize, fileName,
+            colorType, bitdepth_per_channel))) return false;
 
         image->ChangeDims(Vector2i(xsize, ysize));
 
         memcpy(image->GetData(MEMORYDEVICE_CPU),
             data,
-            image->noDims.x*image->noDims.y * sizeof(short));
+            image->noDims.x*image->noDims.y * sizeof(T));
 
         free(data);
-
         return true;
     }
-
-    void SaveImageToFile(const ITMUChar4Image* image, const char* fileName, bool flipVertical)
+    template<typename T, LodePNGColorType colorType, int bitdepth_per_channel>
+    static bool SaveImageToFile_(const Image<T>* image, const char* fileName)
     {
-        unsigned char *data = new unsigned char[image->noDims.x*image->noDims.y * 3];
-
-        Vector2i noDims = image->noDims;
-
-        if (flipVertical)
-        {
-            for (int y = 0; y < noDims.y; y++) for (int x = 0; x < noDims.x; x++)
-            {
-                int locId_src, locId_dst;
-                locId_src = x + y * noDims.x;
-                locId_dst = x + (noDims.y - y - 1) * noDims.x;
-
-                data[locId_dst * 3 + 0] = image->GetData(MEMORYDEVICE_CPU)[locId_src].x;
-                data[locId_dst * 3 + 1] = image->GetData(MEMORYDEVICE_CPU)[locId_src].y;
-                data[locId_dst * 3 + 2] = image->GetData(MEMORYDEVICE_CPU)[locId_src].z;
-            }
-        }
-        else
-        {
-            for (int i = 0; i < noDims.x * noDims.y; ++i) {
-                data[i * 3 + 0] = image->GetData(MEMORYDEVICE_CPU)[i].x;
-                data[i * 3 + 1] = image->GetData(MEMORYDEVICE_CPU)[i].y;
-                data[i * 3 + 2] = image->GetData(MEMORYDEVICE_CPU)[i].z;
-            }
-        }
-
-        lodepng_encode24_file(fileName, data, noDims.x, noDims.y);
-
-        delete[] data;
+        return !failed(lodepng_encode_file(
+            fileName, 
+            (unsigned char*)image->GetData(MEMORYDEVICE_CPU),
+            image->noDims.x, image->noDims.y,
+            colorType, bitdepth_per_channel));
     }
 
-    void SaveImageToFile(const ITMShortImage* image, const char* fileName)
+    bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName)
     {
-        lodepng_encode_file(fileName, (unsigned char*)image->GetData(MEMORYDEVICE_CPU), image->noDims.x, image->noDims.y, LCT_GREY, 16);
+        return ReadImageFromFile_<Vector4u, LodePNGColorType::LCT_RGBA, 8>(image, fileName);
+    }
+
+    bool ReadImageFromFile(ITMShortImage* image, const char* fileName)
+    {
+        return ReadImageFromFile_<short, LodePNGColorType::LCT_GREY, 16>(image, fileName);
+    }
+
+    bool SaveImageToFile(const ITMUChar4Image* image, const char* fileName)
+    {
+        return SaveImageToFile_<Vector4u, LodePNGColorType::LCT_RGBA, 8>(image, fileName);
+    }
+
+    bool SaveImageToFile_(const ITMShortImage* image, const char* fileName)
+    {
+        return SaveImageToFile_<short, LodePNGColorType::LCT_GREY, 16>(image, fileName);
     }
 }

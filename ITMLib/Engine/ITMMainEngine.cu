@@ -4,7 +4,7 @@
 
 using namespace ITMLib::Engine;
 
-KERNEL buildASceneA() {
+static KERNEL buildASceneA() {
     Scene::requestCurrentSceneVoxelBlockAllocation(
         VoxelBlockPos(blockIdx.x,
         blockIdx.y,
@@ -22,54 +22,15 @@ struct EachV {
     }
 };
 
-KERNEL buildASceneB() {
-    ITMVoxel* v = Scene::getCurrentSceneVoxel(
-        Vector3i(blockIdx.x,
-        blockIdx.y,
-        blockIdx.z) * SDF_BLOCK_SIZE
-        +
-        Vector3i(threadIdx.x,
-        threadIdx.y,
-        threadIdx.z));
-    float z = (blockIdx.z *  SDF_BLOCK_SIZE + threadIdx.z) * voxelSize;
-    assert(v);
-    float eta = (SDF_BLOCK_SIZE / 2)*voxelSize - z;
-    v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
-    // solid wall at z == (SDF_BLOCK_SIZE / 2), negative at greater z values
-    // notice that we normalize with mu and compute position in world space
-}
-
 ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
 {
     scene = new Scene();
-    CURRENT_SCENE_SCOPE(scene);
-    //buildASceneA << <dim3(10, 10, 1), 1 >> >();
-    cudaDeviceSynchronize();
-    Scene::performCurrentSceneAllocations();
-    //buildASceneB << <dim3(10, 10, 1), dim3(SDF_BLOCK_SIZE, SDF_BLOCK_SIZE, SDF_BLOCK_SIZE) >> >();
-    //Scene::getCurrentScene()->doForEachAllocatedVoxel<EachV>();
+    renderState_live = new ITMRenderState(imgSize_d);
+	renderState_freeview = NULL; // will be created by the visualisation engine on demand
 
-	lowLevelEngine = new ITMLowLevelEngine();
-	viewBuilder = new ITMViewBuilder(calib);
-	visualisationEngine = new ITMVisualisationEngine();
+    trackingState = new ITMTrackingState(imgSize_d);
 
-    Vector2i trackedImageSize = imgSize_d;
-
-	renderState_live = visualisationEngine->CreateRenderState(trackedImageSize);
-	renderState_freeview = NULL; //will be created by the visualisation engine on demand
-
-    ResetScene();
-
-    tracker = new ITMDepthTracker(
-        trackedImageSize,
-        lowLevelEngine
-        );
-    trackingState = tracker->BuildTrackingState();
-
-	view = NULL; // will be allocated by the view builder
-
-	fusionActive = true;
-	mainProcessingActive = true;
+    view = new ITMView(calib, imgSize_rgb, imgSize_d); // will be allocated by the view builder
 }
 
 ITMMainEngine::~ITMMainEngine()
@@ -79,15 +40,8 @@ ITMMainEngine::~ITMMainEngine()
 
 	delete scene;
 
-	delete tracker;
-
-	delete lowLevelEngine;
-	delete viewBuilder;
-
 	delete trackingState;
-	if (view != NULL) delete view;
-
-	delete visualisationEngine;
+    delete view;
 }
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
@@ -95,19 +49,19 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
     CURRENT_SCENE_SCOPE(scene);
 
 	// prepare image and turn it into a depth image
-	viewBuilder->UpdateView(&view, rgbImage, rawDepthImage);
+    view->Update(rgbImage, rawDepthImage);
 
 	// tracking
-    tracker->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
+    ITMDepthTracker::TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
 
 	// fusion
     ITMSceneReconstructionEngine_ProcessFrame(view, trackingState->pose_d->GetM());
 
     // raycast scene from current viewpoint 
     // to create point cloud for tracking
-    visualisationEngine->CreateICPMaps(trackingState, &view->calib->intrinsics_d, renderState_live);
+    ITMVisualisationEngine::CreateICPMaps(trackingState, &view->calib->intrinsics_d, renderState_live);
 }
-
+#include "fileutils.h"
 void ITMMainEngine::GetImage(
     ITMUChar4Image * const out,
     const GetImageType getImageType, 
@@ -116,19 +70,19 @@ void ITMMainEngine::GetImage(
     )
 {
     assert(out->isAllocated_CPU() && out->isAllocated_CUDA());
-	if (view == NULL) return;
+	
 
 	out->Clear();
 
 	switch (getImageType)
 	{
 	case ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_RGB:
-		out->ChangeDims(view->rgb->noDims);
+        out->ChangeDims(view->rgb->noDims);
         out->SetFrom(view->rgb, ORUtils::MemoryBlock<Vector4u>::CUDA_TO_CPU);
         break;
 
 	case ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH:
-		out->ChangeDims(view->depth->noDims);
+        out->ChangeDims(view->depth->noDims);
         view->depth->UpdateHostFromDevice();
         ITMVisualisationEngine::DepthToUchar4(out, view->depth);
 		break;
@@ -144,13 +98,16 @@ void ITMMainEngine::GetImage(
             type = ITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL;
 
 		if (renderState_freeview == NULL)
-            renderState_freeview = visualisationEngine->CreateRenderState(out->noDims);
+            renderState_freeview = new ITMRenderState(out->noDims);
 
         assert(renderState_freeview->raycastResult->noDims == out->noDims);
 
         CURRENT_SCENE_SCOPE(scene);
-		visualisationEngine->RenderImage(pose, intrinsics, renderState_freeview, out, type);
+		ITMVisualisationEngine::RenderImage(pose, intrinsics, renderState_freeview, out, type);
         out->UpdateHostFromDevice();
+
+        png::SaveImageToFile(out, "out.png");
+
 		break;
 	}
 	case ITMMainEngine::InfiniTAM_IMAGE_UNKNOWN:

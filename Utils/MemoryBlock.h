@@ -101,18 +101,19 @@ namespace ORUtils
 
 		/** Transfer data from CPU to GPU, if possible. */
 		void UpdateDeviceFromHost() const {
-			if (isAllocated_CUDA() && isAllocated_CPU())
-				cudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSize * sizeof(T), cudaMemcpyHostToDevice));
+            assert(isAllocated_CUDA() && isAllocated_CPU());
+		    cudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSize * sizeof(T), cudaMemcpyHostToDevice));
 		}
 		/** Transfer data from GPU to CPU, if possible. */
 		void UpdateHostFromDevice() const {
-            if (isAllocated_CUDA() && isAllocated_CPU())
-				cudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSize * sizeof(T), cudaMemcpyDeviceToHost));
+            assert(isAllocated_CUDA() && isAllocated_CPU());
+			cudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSize * sizeof(T), cudaMemcpyDeviceToHost));
 		}
 
 		/** Copy data */
 		void SetFrom(const MemoryBlock<T> *source, MemoryCopyDirection memoryCopyDirection)
 		{
+            assert(dataSize == source->dataSize);
 			switch (memoryCopyDirection)
 			{
 			case CPU_TO_CPU:
@@ -143,10 +144,17 @@ namespace ORUtils
 		{
             assert(dataSize);
             assert(allocate_CPU || allocate_CUDA);
-			Free();
+            Free();
+            assert(!isAllocated_CPU() && !isAllocated_CUDA());
             this->_dataSize = dataSize;
-			if (allocate_CPU) data_cpu = new T[dataSize];
-			if (allocate_CUDA) cudaSafeCall(cudaMalloc(&data_cuda, dataSize * sizeof(T)));
+            if (allocate_CPU) {
+                data_cpu = new T[dataSize];
+                assert(isAllocated_CPU());
+            }
+            if (allocate_CUDA) {
+                cudaSafeCall(cudaMalloc(&data_cuda, dataSize * sizeof(T)));
+                assert(isAllocated_CUDA());
+            }
 		}
 
 		void Free()
@@ -154,11 +162,13 @@ namespace ORUtils
 			if (isAllocated_CPU()) {
                 delete[] data_cpu;
                 data_cpu = 0;
+                assert(!isAllocated_CPU());
 			}
 
 			if (isAllocated_CUDA()) {
                 cudaSafeCall(cudaFree(data_cuda));
                 data_cuda = 0;
+                assert(!isAllocated_CUDA());
 			}
 		}
 	};

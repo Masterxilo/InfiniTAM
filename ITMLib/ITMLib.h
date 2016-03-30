@@ -15,7 +15,6 @@
 
 #include "Engine/ITMVisualisationEngine.h"
 
-#include "Engine/ITMViewBuilder.h"
 
 #include "Engine/ITMMainEngine.h"
 

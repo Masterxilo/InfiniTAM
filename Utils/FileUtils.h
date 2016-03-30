@@ -6,14 +6,14 @@
 
 #include "../ITMLib/Utils/ITMLibDefines.h"
 
+/// \returns true iff operation succeeded
 namespace png {
-    // Image must exist but can have any size. Loads rgb only.                  
+    // image must exist but can have any size. Loads rgb only.                  
     bool ReadImageFromFile(ITMUChar4Image* image, const char* fileName);
-    // Image must exist but can have any size.  
-    /// \returns whether we succeeded
+    // image must exist but can have any size.  
     bool ReadImageFromFile(ITMShortImage *image, const char *fileName);
 
 
-    void SaveImageToFile(const ITMUChar4Image* image, const char* fileName, bool flipVertical = false);
-    void SaveImageToFile(const ITMShortImage* image, const char* fileName);
+    bool SaveImageToFile(const ITMUChar4Image* image, const char* fileName);
+    bool SaveImageToFile(const ITMShortImage* image, const char* fileName);
 }

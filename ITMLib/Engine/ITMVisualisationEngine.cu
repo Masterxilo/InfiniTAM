@@ -267,31 +267,27 @@ PROCESS_AND_DRAW_PIXEL(renderColour, drawPixelColour)
 PROCESS_AND_DRAW_PIXEL(renderGrey, drawPixelGrey)
 PROCESS_AND_DRAW_PIXEL(renderColourFromNormal, drawPixelNormal)
 
+using namespace ITMLib::Engine::ITMVisualisationEngine;
 // class implementation
-
-ITMRenderState* ITMVisualisationEngine::CreateRenderState(const Vector2i & imgSize) const {
-    return new ITMRenderState(imgSize);
-}
-
-static void RenderImage_common(
-    const ITMVisualisationEngine::RenderImageType type)
+void RenderImage_common(
+    const RenderImageType type)
 {
     cudaDeviceSynchronize(); // want to read imgSize -- todo why is this needed?
     switch (type) {
-    case ITMVisualisationEngine::RENDER_COLOUR_FROM_VOLUME:
+    case RenderImageType::RENDER_COLOUR_FROM_VOLUME:
         forEachPixelNoImage<renderColour>(imgSize);
         break;
-    case ITMVisualisationEngine::RENDER_COLOUR_FROM_NORMAL:
+    case RenderImageType::RENDER_COLOUR_FROM_NORMAL:
         forEachPixelNoImage<renderColourFromNormal>(imgSize);
         break;
-    case ITMVisualisationEngine::RENDER_SHADED_GREYSCALE:
+    case RenderImageType::RENDER_SHADED_GREYSCALE:
     default:
         forEachPixelNoImage<renderGrey>(imgSize);
         break;
     }
 }
 /// Initializes raycastResult
-void ITMVisualisationEngine::Common(
+static void Common(
     const ITMPose *pose,
     const ITMIntrinsics *intrinsics,
     ITMRenderState *renderState) {
@@ -308,44 +304,50 @@ void ITMVisualisationEngine::Common(
     forEachPixelNoImage<castRay>(imgSize);
 }
 
-void ITMVisualisationEngine::RenderImage(
-    const ITMPose *pose,
-    const ITMIntrinsics *intrinsics,
-    ITMRenderState *renderState,
+namespace ITMLib {
+    namespace Engine {
+        namespace ITMVisualisationEngine {
+            void RenderImage(
+                const ITMPose *pose,
+                const ITMIntrinsics *intrinsics,
+                ITMRenderState *renderState,
 
-    ITMUChar4Image *outputImage,
-    ITMVisualisationEngine::RenderImageType type)
-{
-    // Check dimensions and set output
-    assert(Scene::getCurrentScene());
-    assert(outputImage->noDims == renderState->raycastResult->noDims); 
-    outRendering = outputImage->GetData(MEMORYDEVICE_CUDA);
+                ITMUChar4Image *outputImage,
+                RenderImageType type)
+            {
+                // Check dimensions and set output
+                assert(Scene::getCurrentScene());
+                assert(outputImage->noDims == renderState->raycastResult->noDims);
+                outRendering = outputImage->GetData(MEMORYDEVICE_CUDA);
 
-    Common(pose, intrinsics, renderState);
+                Common(pose, intrinsics, renderState);
 
-    RenderImage_common(type);
+                RenderImage_common(type);
+            }
+
+            void CreateICPMaps(
+                ITMTrackingState * const trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
+                const ITMIntrinsics * const intrinsics_d,
+                ITMRenderState *const renderState //!< [in, out] builds renderingRangeImage for one-time use
+                )
+            {
+                assert(Scene::getCurrentScene());
+                // Check dimensions and set output
+                assert(trackingState->pointCloud->locations->noDims == trackingState->pointCloud->normals->noDims);
+                assert(trackingState->pointCloud->normals->noDims == renderState->raycastResult->noDims);
+                pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
+                normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
+
+                // Remember the pose from which this point cloud was rendered
+                trackingState->pointCloud->pose_pointCloud->SetFrom(trackingState->pose_d);
+
+                Common(trackingState->pose_d, intrinsics_d, renderState);
+
+                // Create ICP maps
+                cudaDeviceSynchronize(); // want to read imgSize -- todo why is this needed?
+                forEachPixelNoImage<processPixelICP>(imgSize);
+            }
+
+        }
+    }
 }
-
-void ITMVisualisationEngine::CreateICPMaps(
-    ITMTrackingState * const trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
-    const ITMIntrinsics * const intrinsics_d,
-    ITMRenderState *const renderState //!< [in, out] builds renderingRangeImage for one-time use
-    )
-{
-    assert(Scene::getCurrentScene());
-    // Check dimensions and set output
-    assert(trackingState->pointCloud->locations->noDims == trackingState->pointCloud->normals->noDims);
-    assert(trackingState->pointCloud->normals->noDims == renderState->raycastResult->noDims);
-    pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
-    normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
-
-    // Remember the pose from which this point cloud was rendered
-    trackingState->pointCloud->pose_pointCloud->SetFrom(trackingState->pose_d);
-
-    Common(trackingState->pose_d, intrinsics_d, renderState); 
-
-    // Create ICP maps
-    cudaDeviceSynchronize(); // want to read imgSize -- todo why is this needed?
-    forEachPixelNoImage<processPixelICP>(imgSize);
-}
-

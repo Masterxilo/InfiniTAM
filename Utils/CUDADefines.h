@@ -33,6 +33,11 @@
 #define CPU_AND_GPU  // alternatively: __host__ __device__, note that this is different for functions using dynamic parallelism!
 #endif
 
+
+#define xyz(p) p.x, p.y, p.z
+#define xy(p) p.x, p.y
+#define threadIdx_xyz threadIdx.x, threadIdx.y, threadIdx.z
+
 /*
 // For talking to global __device__ variables by name:
 #ifdef __CUDACC__ 

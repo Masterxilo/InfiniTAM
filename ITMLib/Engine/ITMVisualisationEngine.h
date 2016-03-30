@@ -13,13 +13,6 @@ namespace ITMLib
 {
 	namespace Engine
     {
-        /*!private!*/
-        struct RenderingBlock {
-            Vector2s upperLeft;
-            Vector2s lowerRight;
-            Vector2f zRange;
-        };
-
         /** \brief
         Interface to engines helping with the visualisation of
         the results from the rest of the library.
@@ -32,15 +25,8 @@ namespace ITMLib
         in an image, which can be used to speed up raycasting
         operations.
         */
-        class ITMVisualisationEngine
+        namespace ITMVisualisationEngine
         {
-        private:
-            void Common(
-                const ITMPose *pose,
-                const ITMIntrinsics *intrinsics,
-                ITMRenderState *renderState);
-
-		public:
 			enum RenderImageType
 			{
 				RENDER_SHADED_GREYSCALE,
@@ -49,12 +35,8 @@ namespace ITMLib
 			};
 
             /// Heatmap style color gradient for depth
-            static void DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src);
+            void DepthToUchar4(ITMUChar4Image *dst, const ITMFloatImage *src);
 
-            /** Creates a render state, 
-            */
-            ITMRenderState* CreateRenderState(const Vector2i & imgSize) const;
-            
 			/** This will render an image using raycasting. */
             void RenderImage(
                 const ITMPose *pose,
@@ -72,6 +54,6 @@ namespace ITMLib
                 ITMRenderState *const renderState //!< [out] builds raycastResult
                 );
 
-		};
+		}
 	}
 }

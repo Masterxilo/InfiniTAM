@@ -17,24 +17,12 @@ const char *calibFile;
     @para arg4 the IMU images. If images are omitted, some live sources will
     be tried.
 */
-static void CreateDefaultImageSource(ImageSourceEngine* & imageSource, const char *arg1, const char *arg2, const char *arg3)
+static ImageSourceEngine * CreateDefaultImageSource(
+    const char *calibFile, const char *rgbMask, const char *depthMask)
 {
-    calibFile = arg1;
-	const char *filename1 = arg2;
-	const char *filename2 = arg3;
-
-    if (!calibFile || strlen(calibFile) == 0) {
-        printf("no calib file given");
-        exit(1);
-    }
 	printf("using calibration file: %s\n", calibFile);
-
-	if (filename2 != NULL)
-	{
-		printf("using rgb images: %s\nusing depth images: %s\n", filename1, filename2);
-        usingImages = true;
-        imageSource = new ImageFileReader(calibFile, filename1, filename2);
-	}
+    printf("using rgb images: %s\nusing depth images: %s\n", rgbMask, depthMask);   
+    return new ImageFileReader(calibFile, rgbMask, depthMask);
 }
 
 void pause() {
@@ -49,50 +37,34 @@ void redirectStd();
 #include <iostream>
 #include <iostream>
 using namespace std;
-// Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/color%25i.png Files/Scenes/Teddy/Frames/depth%25i.png
-// Files\Scenes\fountain\calib.txt Files/Scenes/fountain/Frames/color%25i.png Files/Scenes/fountain/Frames/depth%25i.png
+// Files\Scenes\Teddy\calib.txt Files/Scenes/Teddy/Frames/color%25i.png Files/Scenes/Teddy/Frames/depth%25i.png ConvertDisparityToDepth
+// Files\Scenes\fountain\calib.txt Files/Scenes/fountain/Frames/color%25i.png Files/Scenes/fountain/Frames/depth%25i.png ScaleAndValidateDepth
 int main(int argc, char** argv) {
 
     //redirectStd();
     //tests(); // TODO enable again
     atexit(pause);
-	const char *arg1 = "";
-	const char *arg2 = NULL;
-	const char *arg3 = NULL;
 
-	int arg = 1;
-	do {
-		if (argv[arg] != NULL) arg1 = argv[arg]; else break;
-		++arg;
-		if (argv[arg] != NULL) arg2 = argv[arg]; else break;
-		++arg;
-		if (argv[arg] != NULL) arg3 = argv[arg]; else break;
-	} while (false);
-
-	if (arg == 1) {
+	if (argc != 5) {
 		printf("usage: %s <calibfile> [<imagesource>]\n"
             "  <calibfile>   : path to a file containing intrinsic calibration parameters. Must use backslashes (for internal copy system calls)\n"
-		       "  <imagesource> : either one argument to specify OpenNI device ID\n"
-		       "                  or two arguments specifying rgb and depth file masks\n"
+            "  <imagesource> : two arguments specifying rgb and depth file masks (sprintf)\n"
 		       "\n"
 		       "examples:\n"
-		       "  %s ./Files/Teddy/calib.txt ./Files/Teddy/Frames/%%04i.ppm ./Files/Teddy/Frames/%%04i.pgm\n"
-		       "  %s ./Files/Teddy/calib.txt\n\n", argv[0], argv[0], argv[0]);
+		       "  see files\\scenes\\*\\parameters\n"
+		       , argv[0], argv[0]);
 	}
 
 	printf("initialising ...\n");
-	ImageSourceEngine *imageSource = NULL;
-
-	CreateDefaultImageSource(imageSource, arg1, arg2, arg3);
-	if (imageSource==NULL)
-	{
-		std::cout << "failed to open any image stream" << std::endl;
-		return -1;
-	}
-    
+    auto imageSource = CreateDefaultImageSource(argv[1], argv[2], argv[3]);
+    ITMView::depthConversionType = argv[4];
 
 	ITMMainEngine *mainEngine = 
-        new ITMMainEngine(&imageSource->calib, imageSource->getRGBImageSize(), imageSource->getDepthImageSize());
+        new ITMMainEngine(
+        &imageSource->calib,
+        imageSource->getRGBImageSize(),
+        imageSource->getDepthImageSize()
+        );
 
     
 	UIEngine::Instance()->Initialise(argc, argv, imageSource, mainEngine, 
@@ -102,7 +74,7 @@ int main(int argc, char** argv) {
     //if (usingImages) 
     {
         // start reconstruction
-        UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_VIDEO;
+        UIEngine::Instance()->mainLoopAction = UIEngine::PROCESS_FRAME;// PROCESS_VIDEO;
     }
    
     // Start recording anything that happens

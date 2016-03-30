@@ -333,7 +333,6 @@ void testForEachPixelNoImage() {
 #include "itmlibdefines.h"
 #include "itmview.h"
 #include "ITMMath.h"
-#include "itmviewbuilder.h"
 
 #include <fstream>
 #include <vector>
@@ -341,7 +340,7 @@ void testForEachPixelNoImage() {
 using namespace std;
 using namespace ITMLib;
 using namespace ITMLib::Objects;
-using namespace ITMLib::Engine;
+//using namespace ITMLib::Engine;
 
 extern void ITMSceneReconstructionEngine_ProcessFrame_pre(
     const ITMView * const view,
@@ -402,9 +401,11 @@ void testAllocRequests(Matrix4f M_d,
     png::ReadImageFromFile(&depth, "Tests\\TestAllocRequests\\depth1.png");
     ITMRGBDCalib calib;
     readRGBDCalib("Tests\\TestAllocRequests\\calib.txt", calib);
-    ITMViewBuilder viewBuilder(&calib);
-    ITMView* view = 0;
-    viewBuilder.UpdateView(&view, &rgb, &depth);
+
+    ITMView* view = new ITMView(&calib, rgb.noDims, depth.noDims);
+    ITMView::depthConversionType = "ConvertDisparityToDepth";
+    view->Update(&rgb, &depth);
+
     assert(view->depth->noDims == Vector2i(640, 480));
     assert(view->rgb->noDims == Vector2i(640, 480));
     assert(view->calib->intrinsics_d.getInverseProjParams() ==
@@ -449,6 +450,11 @@ void testAllocRequests(Matrix4f M_d,
                 expectedRequests >> expectedBlockCoord.x >> expectedBlockCoord.y >> expectedBlockCoord.z;
             read = true;
             assert(!expectedRequests.fail());
+
+            printf("expecting %d %d %d got %d %d %d\n", 
+                xyz(expectedBlockCoord),
+                xyz(blockCoords[targetIdx])
+                );
 
             if (expectedBlockCoord != blockCoords[targetIdx]) {
                 // If the expectedBlockCoord is not in this file, it must be in the missed requests - 
@@ -530,29 +536,110 @@ void testAllocRequests(Matrix4f M_d,
 }
 
 /// Must exist on cpu
-void assertImageSame(ITMUChar4Image* a_, ITMUChar4Image* b_) {
-    Vector4u* a = a_->GetData(MEMORYDEVICE_CPU);
-    Vector4u* b = b_->GetData(MEMORYDEVICE_CPU);
+template<typename T>
+void assertImageSame(Image<T>* a_, Image<T>* b_) {
+    T* a = a_->GetData(MEMORYDEVICE_CPU);
+    T* b = b_->GetData(MEMORYDEVICE_CPU);
     int s = a_->dataSize;
     while (s--) {
-        assert(*a == *b);
+        if (*a != *b) {
+            png::SaveImageToFile(a_, "assertImageSame_a.png");
+            png::SaveImageToFile(b_, "assertImageSame_b.png");
+            assert(false);
+        }
         a++;
         b++;
     }
 }
+ITMUChar4Image* load(const char* fn) {
 
-void renderBlack() {
-    Scene* s = new Scene();
-
-    //->GetData(MEMORYDEVICE_CPU);
-
-    delete s;
+    ITMUChar4Image* i = new ITMUChar4Image(Vector2i(1, 1), true, false);
+    png::ReadImageFromFile(i, fn);
+    return i;
+}
+void testImageSame() {
+    auto i = load("Tests\\TestAllocRequests\\color1.png");
+    assertImageSame(i,i);
+    delete i;
 }
 
-// TODO take the tests apart, clean state inbetween
-void tests() {
-    testForEachPixelNoImage();
+#include "itmlib.h"
+#include "ITMVisualisationEngine.h"
 
+ITMUChar4Image* renderNow(Vector2i imgSize, ITMPose* pose) {
+    ITMRenderState* renderState_freeview = new ITMRenderState(imgSize);
+    auto render = new ITMUChar4Image(imgSize, true, true);
+
+    ITMVisualisationEngine::RenderImage(
+        pose, new ITMIntrinsics(),
+        renderState_freeview,
+        render,
+        ITMVisualisationEngine::RENDER_SHADED_GREYSCALE);
+    render->UpdateHostFromDevice();
+    delete renderState_freeview;
+    return render;
+}
+
+void renderExpecting(const char* fn, ITMPose* pose = new ITMPose()) {
+    auto expect = load(fn);
+    auto render = renderNow(expect->noDims, pose);
+    assertImageSame(expect, render);
+    delete expect;
+    delete render;
+    delete pose;
+}
+
+#define make(scene) Scene* scene = new Scene(); CURRENT_SCENE_SCOPE(scene);
+
+void testRenderBlack() {
+    make(scene);
+    renderExpecting("Tests\\TestRender\\black.png");
+    delete scene;
+}
+
+
+static KERNEL buildWallRequests() {
+    Scene::requestCurrentSceneVoxelBlockAllocation(
+        VoxelBlockPos(blockIdx.x,
+        blockIdx.y,
+        blockIdx.z));
+}
+
+// assumes buildWallRequests has been executed
+// followed by perform allocations
+// builds a solid wall, i.e.
+// an trunctated sdf reaching 0 at 
+// z == (SDF_BLOCK_SIZE / 2)*voxelSize
+// and negative at bigger z.
+struct BuildWall {
+    static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
+        assert(v);
+
+        float z = (threadIdx.z) * voxelSize;
+        float eta = (SDF_BLOCK_SIZE / 2)*voxelSize - z;
+        v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
+    }
+};
+
+void testRenderWall() {
+    make(scene);
+
+    // Build wall scene
+    buildWallRequests << <dim3(10, 10, 1), 1 >> >();
+    cudaDeviceSynchronize();
+    Scene::performCurrentSceneAllocations();
+    cudaDeviceSynchronize();
+    Scene::getCurrentScene()->doForEachAllocatedVoxel<BuildWall>();
+
+    // move everything away a bit so we can see the wall
+    auto pose = new ITMPose();
+    pose->SetT(Vector3f(0, 0, voxelSize * 100)); 
+
+    renderExpecting("Tests\\TestRender\\wall.png", pose);
+    delete scene;
+}
+
+void testAllocRequests() {
 
     // With the alignment generated by the (buggy?) original Track Camera on the first frame,
     // no conflicts occur
@@ -594,21 +681,34 @@ void tests() {
     testAllocRequests(M_d, "Tests\\TestAllocRequests\\expectedRequests.txt"
         , "Tests\\TestAllocRequests\\expectedMissedRequests.txt");
 
+}
+
+void testAllocRequests2() {
+
     // With identity matrix, we have some conflicts that are only resolved on a second allocation pass
     testAllocRequests(Matrix4f(
-        1,0,0,0,
-        0,1,0,0,
-        0,0,1,0,
-        0,0,0,1), "Tests\\TestAllocRequests\\expectedRequests2.txt"
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1), "Tests\\TestAllocRequests\\expectedRequests2.txt"
         , "Tests\\TestAllocRequests\\expectedMissedRequests2.txt"
         , "Tests\\TestAllocRequests\\possibleExtraRequests2.txt"
         );
+}
 
+// TODO take the tests apart, clean state inbetween
+void tests() {
+    testImageSame();
+    testForEachPixelNoImage();
+    testRenderBlack();
+    testRenderWall();
     testScene();
-
     testCholesky();
-
     testZ3Hasher();
     testNHasher();
     testZeroHasher();
+    testAllocRequests();
+    testAllocRequests2();
+
+    puts("==== All tests passed ====");
 }

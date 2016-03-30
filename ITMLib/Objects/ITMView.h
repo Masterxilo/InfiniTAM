@@ -31,29 +31,37 @@ namespace ITMLib
 		*/
 		class ITMView
 		{
+            ITMShortImage * const rawDepthImageGPU;
+
 		public:
 			/// Intrinsic calibration information for the view.
-			ITMRGBDCalib *calib;
+            ITMRGBDCalib const * const calib;
 
 			/// RGB colour image.
-			ITMUChar4Image *rgb; 
+            ITMUChar4Image * const rgb;
 
 			/// Float valued depth image converted from disparity image, 
             /// if available according to @ref inputImageType.
-			ITMFloatImage *depth;
+            ITMFloatImage * const depth;
 
-			ITMView(const ITMRGBDCalib *calibration, Vector2i imgSize_rgb, Vector2i imgSize_d, bool useGPU)
-			{
-				this->calib = new ITMRGBDCalib(*calibration);
-				this->rgb = new ITMUChar4Image(imgSize_rgb, true, useGPU);
-				this->depth = new ITMFloatImage(imgSize_d, true, useGPU);
+			ITMView(const ITMRGBDCalib *calibration, Vector2i imgSize_rgb, Vector2i imgSize_d) :
+                calib(new ITMRGBDCalib(*calibration)),
+                rgb(new ITMUChar4Image(imgSize_rgb, false, true)),
+                depth(new ITMFloatImage(imgSize_rgb, true, true)),
+                rawDepthImageGPU(new ITMShortImage(imgSize_rgb, false, true)) {
 			}
+
+            static std::string depthConversionType;
+            void ITMView::Update(
+                ITMUChar4Image *rgbImage,
+                ITMShortImage *rawDepthImage);
 
 			virtual ~ITMView(void)
 			{
 				delete calib;
 				delete rgb;
-				delete depth;
+                delete depth;
+                delete rawDepthImageGPU;
 			}
 		};
 	}
