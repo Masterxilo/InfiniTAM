@@ -1,5 +1,5 @@
 /// \file c.f. newcombe_etal_ismar2011.pdf
-
+/// T_{g,k} dnotes the transformation from framek's view space to global space
 #include "ITMDepthTracker.h"
 #include "ITMCUDAUtils.h"
 #include "CUDADefines.h"
@@ -9,20 +9,19 @@
 
 using namespace ITMLib::Engine;
 
+static __managed__ /*const*/ ITMDepthTracker::AccuCell accu;
+static __managed__ /*const*/ float *depth = 0;
+static __managed__ /*const*/ Matrix4f approxInvPose;//!< \f$T_{g,k}\f$ current estimate, approxInvPose
+static __managed__ /*const*/ Matrix4f scenePose; //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$, scenePose
+static __managed__ /*const*/ Vector4f sceneIntrinsics;//!< K
+static __managed__ /*const*/ Vector2i sceneImageSize;
+static __managed__ /*const*/ Vector4f viewIntrinsics;//!< K
+static __managed__ /*const*/ Vector2i viewImageSize;
+static __managed__ /*const*/ float distThresh;//!< \f$\epsilon_d\f$
 
-struct ITMDepthTracker_KernelParameters {
-    ITMDepthTracker::AccuCell *accu;
-    float *depth;
-    Matrix4f approxInvPose;
-    Vector4f *pointsMap;
-    Vector4f *normalsMap;
-    Vector4f sceneIntrinsics;
-    Vector2i sceneImageSize;
-    Matrix4f scenePose;
-    Vector4f viewIntrinsics;
-    Vector2i viewImageSize;
-    float distThresh;
-};
+// for ICP
+static __managed__ DEVICEPTR(Vector4f) * pointsMap = 0; //!< of size sceneImageSize, for frame k-1. \f$V_{k-1}\f$
+static __managed__ DEVICEPTR(Vector4f) * normalsMap = 0;//!< of size sceneImageSize, for frame k-1. \f$V_{k-1}\f$
 
 
 // device functions
@@ -59,15 +58,8 @@ CPU_AND_GPU inline bool computePerPointGH_Depth_Ab(
 
     const CONSTPTR(int) & x, const CONSTPTR(int) & y,
     const CONSTPTR(float) &depth, //!< \f$D_k(\mathbf u)\f$
-    const CONSTPTR(Vector2i) & viewImageSize,  //!< unused
-    const CONSTPTR(Vector4f) & viewIntrinsics, //!< K
-    const CONSTPTR(Vector2i) & sceneImageSize,
-    const CONSTPTR(Vector4f) & sceneIntrinsics, //!< K
-    const CONSTPTR(Matrix4f) & T_g_k, //!< \f$T_{g,k}\f$ current estimate
-    const CONSTPTR(Matrix4f) & T_km1_g, //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$
-    const CONSTPTR(Vector4f) *pointsMap,//!< of size sceneImageSize, for frame k-1. \f$V_{k-1}\f$
-    const CONSTPTR(Vector4f) *normalsMap, //!< of size sceneImageSize, for frame k-1. \f$N_{k-1}\f$
-    const float distThresh //!< \f$\epsilon_d\f$
+    const CONSTPTR(Matrix4f) & T_g_k, //!< \f$T_{g,k}\f$ current estimate, approxInvPose
+    const CONSTPTR(Matrix4f) & T_km1_g //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$, scenePose
     )
 {
     if (depth <= 1e-8f) return false;
@@ -81,7 +73,7 @@ CPU_AND_GPU inline bool computePerPointGH_Depth_Ab(
     // hat_u = \pi(K T_{k-1,g} T_{g,k}V_k(u) )
     Vector2f hat_u;
     if (!projectExtraBounds(sceneIntrinsics, sceneImageSize,
-        T_km1_g * p_k, // T_{g,k}V_k(u)
+        T_km1_g * p_k, // T_{k-1,g}V_k^g(u)
         hat_u)) return false;
     // p_km1 := V_{k-1}(\hat u)
     Vector4f p_km1 = interpolateBilinear<Vector4f, WITH_HOLES>(pointsMap, hat_u, sceneImageSize);
@@ -131,15 +123,7 @@ CPU_AND_GPU inline bool computePerPointGH_Depth_Ab(
 
 #define REDUCE_BLOCK_SIZE 256 // must be power of 2. Used for reduction of a sum.
 template<TrackerIterationType iterationType>
-__device__ void depthTrackerOneLevel_g_rt_device_main(
-    ITMDepthTracker::AccuCell *accu,
-    float *depth,
-    Matrix4f approxInvPose,
-    Vector4f *pointsMap,
-    Vector4f *normalsMap,
-    Vector4f sceneIntrinsics,
-    Vector2i sceneImageSize, Matrix4f scenePose, Vector4f viewIntrinsics, Vector2i viewImageSize,
-    float distThresh)
+KERNEL depthTrackerOneLevel_g_rt_device_main()
 {
     int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
 
@@ -158,8 +142,10 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
 
     if (x < viewImageSize.x && y < viewImageSize.y)
     {
-        isValidPoint = computePerPointGH_Depth_Ab<iterationType>(A, b, x, y, depth[x + y * viewImageSize.x],
-            viewImageSize, viewIntrinsics, sceneImageSize, sceneIntrinsics, approxInvPose, scenePose, pointsMap, normalsMap, distThresh);
+        isValidPoint = computePerPointGH_Depth_Ab<iterationType>(
+            A, b, x, y, 
+            depth[x + y * viewImageSize.x],
+            approxInvPose, scenePose);
         if (isValidPoint) should_prefix = true;
     }
 
@@ -181,7 +167,7 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
             isValidPoint,
             dim_shared1,
             locId_local,
-            &(accu->noValidPoints));
+            &(accu.noValidPoints));
     }
 
     { //reduction for energy function value
@@ -189,7 +175,7 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
             b*b,
             dim_shared1,
             locId_local,
-            &(accu->f));
+            &(accu.f));
     }
 
     __syncthreads();
@@ -223,9 +209,9 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
         __syncthreads();
 
         if (locId_local == 0) {
-            atomicAdd(&(accu->ATb[paraId + 0]), dim_shared1[0]);
-            atomicAdd(&(accu->ATb[paraId + 1]), dim_shared2[0]);
-            atomicAdd(&(accu->ATb[paraId + 2]), dim_shared3[0]);
+            atomicAdd(&(accu.ATb[paraId + 0]), dim_shared1[0]);
+            atomicAdd(&(accu.ATb[paraId + 1]), dim_shared2[0]);
+            atomicAdd(&(accu.ATb[paraId + 2]), dim_shared3[0]);
         }
     }
 
@@ -267,31 +253,26 @@ __device__ void depthTrackerOneLevel_g_rt_device_main(
         __syncthreads();
 
         if (locId_local == 0) {
-            atomicAdd(&(accu->AT_A_tri[paraId + 0]), dim_shared1[0]);
-            atomicAdd(&(accu->AT_A_tri[paraId + 1]), dim_shared2[0]);
-            atomicAdd(&(accu->AT_A_tri[paraId + 2]), dim_shared3[0]);
+            atomicAdd(&(accu.AT_A_tri[paraId + 0]), dim_shared1[0]);
+            atomicAdd(&(accu.AT_A_tri[paraId + 1]), dim_shared2[0]);
+            atomicAdd(&(accu.AT_A_tri[paraId + 2]), dim_shared3[0]);
         }
     }
-}
-
-template<TrackerIterationType iterationType>
-KERNEL depthTrackerOneLevel_g_rt_device(ITMDepthTracker_KernelParameters para)
-{
-    depthTrackerOneLevel_g_rt_device_main<iterationType>(para.accu, para.depth, para.approxInvPose, para.pointsMap, para.normalsMap, para.sceneIntrinsics, para.sceneImageSize, para.scenePose, para.viewIntrinsics, para.viewImageSize, para.distThresh);
 }
 
 // host methods
 
 ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate) {
-    Vector4f *pointsMap = this->pointsMap->GetData(MEMORYDEVICE_CUDA);
-    Vector4f *normalsMap = this->normalsMap->GetData(MEMORYDEVICE_CUDA);
-    Vector4f sceneIntrinsics = getViewIntrinsics();
-    Vector2i sceneImageSize = this->pointsMap->noDims;
+    cudaDeviceSynchronize(); // prepare writing to __managed__
+    ::pointsMap = this->pointsMap->GetData(MEMORYDEVICE_CUDA);
+    ::normalsMap = this->normalsMap->GetData(MEMORYDEVICE_CUDA);
+    ::sceneIntrinsics = getViewIntrinsics();
+    ::sceneImageSize = this->pointsMap->noDims;
     assert(sceneImageSize == this->normalsMap->noDims);
 
-    float *depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
-    Vector4f viewIntrinsics = currentTrackingLevel->intrinsics;
-    Vector2i viewImageSize = currentTrackingLevel->depth->noDims;
+    ::depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
+    ::viewIntrinsics = currentTrackingLevel->intrinsics;
+    ::viewImageSize = currentTrackingLevel->depth->noDims;
 
     dim3 blockSize(16, 16); // must equal REDUCE_BLOCK_SIZE
     assert(16 * 16 == REDUCE_BLOCK_SIZE);
@@ -300,22 +281,14 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
         (int)ceil((float)viewImageSize.x / (float)blockSize.x),
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
-    cudaSafeCall(cudaMemset(accu, 0, sizeof(AccuCell)));
 
-    struct ITMDepthTracker_KernelParameters args;
-    args.accu = accu;
-    args.depth = depth;
-    args.approxInvPose = T_g_k_estimate;
-    args.pointsMap = pointsMap;
-    args.normalsMap = normalsMap;
-    args.sceneIntrinsics = sceneIntrinsics;
-    args.sceneImageSize = sceneImageSize;
-    args.scenePose = scenePose;
-    args.viewIntrinsics = viewIntrinsics;
-    args.viewImageSize = viewImageSize;
-    args.distThresh = currentTrackingLevel->distanceThreshold;
+    ::accu.reset();
+    ::approxInvPose = T_g_k_estimate;
+    ::scenePose = scenePose;
+    ::distThresh = currentTrackingLevel->distanceThreshold;
+
 #define iteration(it) \
-			it: LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device<it>, gridSize, blockSize, args);
+			it: LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device_main<it>, gridSize, blockSize);
 
     switch (iterationType()) {
         case iteration(TRACKER_ITERATION_ROTATION);
@@ -325,7 +298,7 @@ ITMDepthTracker::AccuCell ITMDepthTracker::ComputeGandH(Matrix4f T_g_k_estimate)
 #undef iteration
 
     cudaDeviceSynchronize(); // for later access of accu
-    return *accu;
+    return accu;
 }
 
 
@@ -346,13 +319,6 @@ ITMDepthTracker::ITMDepthTracker(
     trackingLevels.push_back(TrackingLevel(8, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep, depthImgSize / 8));
     trackingLevels.push_back(TrackingLevel(10, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold, depthImgSize / 16));
     assert(trackingLevels.size() == noHierarchyLevels);
-
-    cudaSafeCall(cudaMallocManaged((void**)&accu, sizeof(AccuCell)));
-}
-
-ITMDepthTracker::~ITMDepthTracker(void)
-{
-    cudaSafeCall(cudaFree(accu));
 }
 
 void ITMDepthTracker::ComputeDelta(float *step, float *nabla, float *hessian) const

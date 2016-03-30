@@ -4,6 +4,7 @@
 
 #include "ITMLibDefines.h"
 #include "ITMTracker.h"
+#include "itmcudautils.h"
 #include "ITMLowLevelEngine.h"
 
 using namespace ITMLib::Objects;
@@ -39,16 +40,18 @@ namespace ITMLib
             ITMDepthTracker(
                 Vector2i depthImgSize,
                 const ITMLowLevelEngine *lowLevelEngine);
-            virtual ~ITMDepthTracker(void);
 
             /** private */
-            struct AccuCell {
+            struct AccuCell : Managed {
                 int noValidPoints;
                 float f;
                 // ATb
                 float ATb[6];
                 // AT_A_tri, upper right triangular part of AT_A
                 float AT_A_tri[1 + 2 + 3 + 4 + 5 + 6];
+                void reset() {
+                    memset(this, 0, sizeof(this));
+                }
             };
         private:
 
@@ -155,9 +158,6 @@ namespace ITMLib
 
                 return accu.noValidPoints;
             }
-
-            /// CUDA managed host/device memory (call cudaDeviceSynchronize before using on host)
-            AccuCell *accu;
 
             AccuCell ComputeGandH(Matrix4f T_g_k_estimate);
 
