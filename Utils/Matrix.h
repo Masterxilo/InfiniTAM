@@ -151,16 +151,16 @@ namespace ORUtils {
 		CPU_AND_GPU inline Matrix4 &operator -= (const Matrix4 &mat) { for (int i = 0; i < 16; ++i) this->m[i] -= mat.m[i]; return *this; }
 
 		CPU_AND_GPU inline friend bool operator == (const Matrix4 &lhs, const Matrix4 &rhs) {
-			bool r = lhs[0] == rhs[0];
+            bool r = lhs.m[0] == rhs.m[0];
 			for (int i = 1; i < 16; i++)
-				r &= lhs[i] == rhs[i];
+                r &= lhs.m[i] == rhs.m[i];
 			return r;
 		}
 
 		CPU_AND_GPU inline friend bool operator != (const Matrix4 &lhs, const Matrix4 &rhs) {
-			bool r = lhs[0] != rhs[0];
+            bool r = lhs.m[0] != rhs.m[0];
 			for (int i = 1; i < 16; i++)
-				r |= lhs[i] != rhs[i];
+                r |= lhs.m[i] != rhs.m[i];
 			return r;
 		}
 

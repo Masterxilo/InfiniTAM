@@ -3,7 +3,6 @@
 #include "ITMLibDefines.h"
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
-#include "ITMLocalVBA.h"
 
 // Reduce passing by using global variables.
 // Note that this whole program should be run single-threaded on a

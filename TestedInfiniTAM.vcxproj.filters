@@ -143,6 +143,9 @@
     <ClInclude Include="ITMLib\Objects\ITMView.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMDepthTrackerOld.h">
+      <Filter>ITMLib\Engine</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />
@@ -186,6 +189,11 @@
     <CudaCompile Include="ITMLib\Engine\ITMView.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMDepthTrackerOld.cu">
+      <Filter>ITMLib\Engine</Filter>
+    </CudaCompile>
+    <CudaCompile Include="depthtrackercommon.cu" />
+    <CudaCompile Include="depthtrackercommon2.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

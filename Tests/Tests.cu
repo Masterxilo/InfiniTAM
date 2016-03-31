@@ -347,8 +347,8 @@ extern void ITMSceneReconstructionEngine_ProcessFrame_pre(
     Matrix4f M_d
     );
 
-void approxEqual(float a, float b) {
-    assert(abs(a-b) < 0.00001);
+void approxEqual(float a, float b, const float eps = 0.00001) {
+    assert(abs(a - b) < eps);
 }
 
 void testAllocRequests(Matrix4f M_d, 
@@ -395,9 +395,9 @@ void testAllocRequests(Matrix4f M_d,
     }
 
     // ]]
-    ITMUChar4Image rgb(Vector2i(1,1), true, false);
+    ITMUChar4Image rgb(Vector2i(1,1));
     png::ReadImageFromFile(&rgb, "Tests\\TestAllocRequests\\color1.png");
-    ITMShortImage depth(Vector2i(1, 1), true, false);
+    ITMShortImage depth(Vector2i(1, 1));
     png::ReadImageFromFile(&depth, "Tests\\TestAllocRequests\\depth1.png");
     ITMRGBDCalib calib;
     readRGBDCalib("Tests\\TestAllocRequests\\calib.txt", calib);
@@ -536,7 +536,7 @@ void testAllocRequests(Matrix4f M_d,
 }
 /// Must exist on cpu
 template<typename T>
-bool checkImageSame(Image<T>* a_, Image<T>* b_) {
+static bool checkImageSame(Image<T>* a_, Image<T>* b_) {
     T* a = a_->GetData(MEMORYDEVICE_CPU);
     T* b = b_->GetData(MEMORYDEVICE_CPU);
 #define failifnot(x) if (!(x)) return false;
@@ -557,18 +557,18 @@ bool checkImageSame(Image<T>* a_, Image<T>* b_) {
 
 /// Must exist on cpu
 template<typename T>
-void assertImageSame(Image<T>* a_, Image<T>* b_) {
+static void assertImageSame(Image<T>* a_, Image<T>* b_) {
     assert(checkImageSame(a_,b_));
 }
-ITMUChar4Image* load(const char* fn) {
 
-    ITMUChar4Image* i = new ITMUChar4Image(Vector2i(1, 1), true, false);
-    png::ReadImageFromFile(i, fn);
+ITMUChar4Image* image(std::string fn) {
+    ITMUChar4Image* i = new ITMUChar4Image(Vector2i(1, 1));
+    assert(png::ReadImageFromFile(i, fn));
     return i;
-}
 
+}
 void testImageSame() {
-    auto i = load("Tests\\TestAllocRequests\\color1.png");
+    auto i = image("Tests\\TestAllocRequests\\color1.png");
     assertImageSame(i,i);
     delete i;
 }
@@ -578,20 +578,19 @@ void testImageSame() {
 
 ITMUChar4Image* renderNow(Vector2i imgSize, ITMPose* pose) {
     ITMRenderState* renderState_freeview = new ITMRenderState(imgSize);
-    auto render = new ITMUChar4Image(imgSize, true, true);
+    auto render = new ITMUChar4Image(imgSize);
 
     ITMVisualisationEngine::RenderImage(
         pose, new ITMIntrinsics(),
         renderState_freeview,
         render,
         ITMVisualisationEngine::RENDER_SHADED_GREYSCALE);
-    render->UpdateHostFromDevice();
     delete renderState_freeview;
     return render;
 }
 
 void renderExpecting(const char* fn, ITMPose* pose = new ITMPose()) {
-    auto expect = load(fn);
+    auto expect = image(fn);
     auto render = renderNow(expect->noDims, pose);
     assertImageSame(expect, render);
     delete expect;
@@ -708,9 +707,9 @@ void testAllocRequests2() {
 
 
 void testDump() {
-    auto i = load("Tests\\TestAllocRequests\\color1.png");
+    auto i = image("Tests\\TestAllocRequests\\color1.png");
     assert(dump::SaveImageToFile(i, "Tests\\TestAllocRequests\\color1.dump"));
-    auto j = new ITMUChar4Image(Vector2i(1, 1), true, false);
+    auto j = new ITMUChar4Image(Vector2i(1, 1));
     assert(dump::ReadImageFromFile(j, "Tests\\TestAllocRequests\\color1.dump"));
     assertImageSame(i, j);
     delete i;
@@ -724,13 +723,31 @@ void testDump() {
     assert(dump::ReadPODFromFile(&b, "dump"));
     assert(a == b);
 }
+#include "ITMDepthTrackerOld.h"
+
+void testTracker() {
+    auto trackingState = dump::load<ITMTrackingState>("Tests/Tracker/trackingState");
+    auto view = dump::load<ITMView>("Tests/Tracker/view");
+
+    auto dt = new ITMDepthTracker(trackingState->pointCloud->locations->noDims);
+    dt->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
+    // store output  
+    auto expectedPose = dump::load<ITMPose>("Tests/Tracker/out.pose_d");
+
+    for (int i = 0; i < 16; i++) {
+        approxEqual(expectedPose->GetM().m[i], trackingState->pose_d->GetM().m[i]);
+    }
+    return;
+}
 
 // TODO take the tests apart, clean state inbetween
 void tests() {
-    assert(!checkImageSame(load("Tests\\TestRender\\wall.png"), load("Tests\\TestRender\\black.png")));
-    assert(!dump::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1), true, false), "thisimagedoesnotexist"));
-    assert(!png::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1), true, false), "thisimagedoesnotexist"));
-    assert(!png::SaveImageToFile(new ITMUChar4Image(Vector2i(1, 1), true, false), "C:\\cannotSaveHere.png"));
+    testTracker();
+    return;
+    assert(!checkImageSame(image("Tests\\TestRender\\wall.png"), image("Tests\\TestRender\\black.png")));
+    assert(!dump::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1)), "thisimagedoesnotexist"));
+    assert(!png::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1)), "thisimagedoesnotexist"));
+    assert(!png::SaveImageToFile(new ITMUChar4Image(Vector2i(1, 1)), "C:\\cannotSaveHere.png"));
     testImageSame();
     testDump();
     testForEachPixelNoImage();

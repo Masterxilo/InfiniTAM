@@ -119,7 +119,10 @@
   <ItemGroup>
     <ClInclude Include="Engine\ImageSourceEngine.h" />
     <ClInclude Include="Engine\UIEngine.h" />
-    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h" />
+    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMDepthTrackerOld.h" />
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMMainEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMPixelUtils.h" />
@@ -159,6 +162,14 @@
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="DepthToUChar4.cu" />
+    <CudaCompile Include="depthtrackercommon.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
+    <CudaCompile Include="depthtrackercommon2.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
     <CudaCompile Include="Engine\ImageSourceEngine.cu" />
     <CudaCompile Include="Engine\UIEngine.cu" />
     <CudaCompile Include="GeometryRefinement.cu">
@@ -168,6 +179,9 @@
     </CudaCompile>
     <CudaCompile Include="InfiniTAM.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMDepthTrackerOld.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </CudaCompile>
     <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMView.cu" />

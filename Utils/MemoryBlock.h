@@ -4,6 +4,7 @@
 
 #include "PlatformIndependence.h"
 #include "CUDADefines.h"
+#include "itmcudautils.h"
 
 
 enum MemoryDeviceType { MEMORYDEVICE_CPU, MEMORYDEVICE_CUDA };
@@ -11,7 +12,12 @@ enum MemoryDeviceType { MEMORYDEVICE_CPU, MEMORYDEVICE_CUDA };
 namespace ORUtils
 {
 	/** \brief
-	Represents memory blocks, templated on the data type
+	Represents memory blocks, templated on the data type, 
+    behaving as if always allocated on both the gpu and the cpu, 
+    but not automatically synched.
+
+    TODO If the cpu or gpu version is never accessed, the memory never has to be allocated.
+    TODO acess the data in a write-only manner so that the update..from.. dont have to be called.
 	*/
 	template <typename T>
 	class MemoryBlock
@@ -24,110 +30,122 @@ namespace ORUtils
 		/** Pointer to memory on GPU, if available. */
 		DEVICEPTR(T)* data_cuda;
 
-
         size_t _dataSize;
+        // true when cpu memory has been possibly modified but gpu not updated
+        mutable bool dirtyCPU;
+        mutable bool dirtyGPU;
+
+
+        
+        /** Transfer data from GPU to CPU */
+        void UpdateHostFromDevice() const {
+            assert(dirtyGPU && !dirtyCPU);
+            cudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSizeInBytes(), cudaMemcpyDeviceToHost));
+            dirtyGPU = false;
+        }
 
     public:
-        bool isAllocated_CPU() const {
-            return data_cpu != 0;
-        }
-        bool isAllocated_CUDA() const {
-            return data_cuda != 0;
+        /** Transfer data from CPU to GPU */
+        void UpdateDeviceFromHost() const {
+            assert(!dirtyGPU && dirtyCPU);
+            cudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSizeInBytes(), cudaMemcpyHostToDevice));
+            dirtyCPU = false;
         }
 
-        size_t getDataSize() const { return _dataSize; } // getter must be public
+        CPU_AND_GPU size_t getDataSize() const { return _dataSize; } 
         /** Total #number of allocated entries in the data array. Read-only.
         Number of allocated BYTES computes as dataSize * sizeof(T)*/
         __declspec(property(get = getDataSize)) size_t dataSize;
 
+        CPU_AND_GPU size_t dataSizeInBytes() const {
+            return dataSize * sizeof(T);
+        }
 		enum MemoryCopyDirection { CPU_TO_CPU, CPU_TO_CUDA, CUDA_TO_CPU, CUDA_TO_CUDA };
 
-
 		/** Get the data pointer on CPU or GPU. */
-		inline DEVICEPTR(T)* GetData(MemoryDeviceType memoryType)
+		CPU_AND_GPU DEVICEPTR(T)* GetData(MemoryDeviceType memoryType)
 		{
 			switch (memoryType)
-			{
-            case MEMORYDEVICE_CPU: assert(isAllocated_CPU()); return data_cpu;
-            case MEMORYDEVICE_CUDA: assert(isAllocated_CUDA()); return data_cuda;
+            {
+#ifndef __CUDA_ARCH__
+            case MEMORYDEVICE_CPU: if (dirtyGPU) UpdateHostFromDevice(); assert(data_cpu && !dirtyGPU); dirtyCPU = true; return data_cpu;
+#endif
+            case MEMORYDEVICE_CUDA:
+#ifndef __CUDA_ARCH__
+                if (dirtyCPU) UpdateDeviceFromHost();
+#endif
+                assert(data_cuda && !dirtyCPU); dirtyGPU = true;
+                return data_cuda;
 			}
             assert(false);
             return 0;
-		}
+        }
 
-		/** Get the data pointer on CPU or GPU. */
-		inline const DEVICEPTR(T)* GetData(MemoryDeviceType memoryType) const
-		{
+        /** Get the const data pointer on CPU or GPU. */
+        CPU_AND_GPU const DEVICEPTR(T)* GetData(MemoryDeviceType memoryType) const
+        {
             switch (memoryType)
             {
-            case MEMORYDEVICE_CPU: assert(isAllocated_CPU()); return data_cpu;
-            case MEMORYDEVICE_CUDA: assert(isAllocated_CUDA()); return data_cuda;
+#ifndef __CUDA_ARCH__
+            case MEMORYDEVICE_CPU: if (dirtyGPU) UpdateHostFromDevice(); assert(data_cpu && !dirtyGPU); return data_cpu;
+#endif
+            case MEMORYDEVICE_CUDA:
+#ifndef __CUDA_ARCH__
+                if (dirtyCPU) UpdateDeviceFromHost();
+#endif
+                assert(data_cuda && !dirtyCPU);
+                return data_cuda;
             }
             assert(false);
             return 0;
-		}
+        }
+
+#ifdef __CUDA_ARCH__
+        /** Get the data pointer on CPU or GPU. */
+        GPU_ONLY DEVICEPTR(T)* GetData() {return GetData(MEMORYDEVICE_CUDA);}
+        GPU_ONLY const DEVICEPTR(T)* GetData() const { return GetData(MEMORYDEVICE_CUDA); }
+#else
+        inline DEVICEPTR(T)* GetData() { return GetData(MEMORYDEVICE_CPU); }
+        inline const DEVICEPTR(T)* GetData() const { return GetData(MEMORYDEVICE_CPU); }
+#endif
 
 		/** Initialize an empty memory block of the given size,
 		on CPU only or GPU only or on both. CPU might also use the
 		Metal compatible allocator (i.e. with 16384 alignment).
 		*/
-        MemoryBlock(size_t dataSize, bool allocate_CPU, bool allocate_CUDA) : data_cpu(0), data_cuda(0)
+        MemoryBlock(size_t dataSize) : data_cpu(0), data_cuda(0)
 		{
-			Allocate(dataSize, allocate_CPU, allocate_CUDA);
+			Allocate(dataSize);
 			Clear();
 		}
 
-		/** Initialize an empty memory block of the given size, either
-		on CPU only or on GPU only.
-		*/
-        MemoryBlock(size_t dataSize, MemoryDeviceType memoryType) : data_cpu(0), data_cuda(0)
-		{
-			switch (memoryType)
-			{
-			case MEMORYDEVICE_CPU: Allocate(dataSize, true, false); break;
-			case MEMORYDEVICE_CUDA: Allocate(dataSize, false, true); break;
-            default: assert(false); break;
-			}
-
-			Clear();
-		}
-
-		/** Set all image data to the given @p defaultValue. */
+		/** Set all data to the given @p defaultValue. */
 		void Clear(unsigned char defaultValue = 0)
 		{
-			if (isAllocated_CPU()) memset(data_cpu, defaultValue, dataSize * sizeof(T));
-			if (isAllocated_CUDA()) cudaSafeCall(cudaMemset(data_cuda, defaultValue, dataSize * sizeof(T)));
-		}
-
-		/** Transfer data from CPU to GPU, if possible. */
-		void UpdateDeviceFromHost() const {
-            assert(isAllocated_CUDA() && isAllocated_CPU());
-		    cudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSize * sizeof(T), cudaMemcpyHostToDevice));
-		}
-		/** Transfer data from GPU to CPU, if possible. */
-		void UpdateHostFromDevice() const {
-            assert(isAllocated_CUDA() && isAllocated_CPU());
-			cudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSize * sizeof(T), cudaMemcpyDeviceToHost));
+            memset(data_cpu, defaultValue, dataSizeInBytes());
+            cudaSafeCall(cudaMemset(data_cuda, defaultValue, dataSizeInBytes()));
+            dirtyCPU = dirtyGPU = false;
 		}
 
 		/** Copy data */
 		void SetFrom(const MemoryBlock<T> *source, MemoryCopyDirection memoryCopyDirection)
 		{
             assert(dataSize == source->dataSize);
+            assert(dataSizeInBytes() == source->dataSizeInBytes());
 			switch (memoryCopyDirection)
 			{
 			case CPU_TO_CPU:
-				memcpy(this->data_cpu, source->data_cpu, source->dataSize * sizeof(T));
+                memcpy(GetData(MEMORYDEVICE_CPU), source->GetData(MEMORYDEVICE_CPU), dataSizeInBytes());
 				break;
 
 			case CPU_TO_CUDA:
-				cudaSafeCall(cudaMemcpyAsync(this->data_cuda, source->data_cpu, source->dataSize * sizeof(T), cudaMemcpyHostToDevice));
+                cudaSafeCall(cudaMemcpyAsync(GetData(MEMORYDEVICE_CUDA), source->GetData(MEMORYDEVICE_CPU), dataSizeInBytes(), cudaMemcpyHostToDevice));
 				break;
 			case CUDA_TO_CPU:
-				cudaSafeCall(cudaMemcpy(this->data_cpu, source->data_cuda, source->dataSize * sizeof(T), cudaMemcpyDeviceToHost));
+                cudaSafeCall(cudaMemcpy(GetData(MEMORYDEVICE_CPU), source->GetData(MEMORYDEVICE_CUDA), dataSizeInBytes(), cudaMemcpyDeviceToHost));
 				break;
 			case CUDA_TO_CUDA:
-				cudaSafeCall(cudaMemcpyAsync(this->data_cuda, source->data_cuda, source->dataSize * sizeof(T), cudaMemcpyDeviceToDevice));
+                cudaSafeCall(cudaMemcpyAsync(GetData(MEMORYDEVICE_CUDA), source->GetData(MEMORYDEVICE_CUDA), dataSizeInBytes(), cudaMemcpyDeviceToDevice));
 				break;
 
 			default: break;
@@ -139,37 +157,24 @@ namespace ORUtils
 		/** Allocate image data of the specified size. If the
 		data has been allocated before, the data is freed.
 		*/
-		void Allocate(size_t dataSize, //!< 0 is not acceptable
-            bool allocate_CPU, bool allocate_CUDA)
+		void Allocate(size_t dataSize //!< 0 is not acceptable
+            )
 		{
             assert(dataSize);
-            assert(allocate_CPU || allocate_CUDA);
             Free();
-            assert(!isAllocated_CPU() && !isAllocated_CUDA());
             this->_dataSize = dataSize;
-            if (allocate_CPU) {
-                data_cpu = new T[dataSize];
-                assert(isAllocated_CPU());
-            }
-            if (allocate_CUDA) {
-                cudaSafeCall(cudaMalloc(&data_cuda, dataSize * sizeof(T)));
-                assert(isAllocated_CUDA());
-            }
+            data_cpu = new T[dataSize];
+            cudaSafeCall(cudaMalloc(&data_cuda, dataSizeInBytes()));
+            dirtyCPU = dirtyGPU = true;
 		}
 
 		void Free()
 		{
-			if (isAllocated_CPU()) {
-                delete[] data_cpu;
-                data_cpu = 0;
-                assert(!isAllocated_CPU());
-			}
+            delete[] data_cpu;
+            data_cpu = 0;
 
-			if (isAllocated_CUDA()) {
-                cudaSafeCall(cudaFree(data_cuda));
-                data_cuda = 0;
-                assert(!isAllocated_CUDA());
-			}
+            cudaSafeCall(cudaFree(data_cuda));
+            data_cuda = 0;
 		}
 	};
 }

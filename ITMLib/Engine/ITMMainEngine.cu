@@ -1,28 +1,6 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #include "ITMMainEngine.h"
-
 using namespace ITMLib::Engine;
 
-static KERNEL buildASceneA() {
-    Scene::requestCurrentSceneVoxelBlockAllocation(
-        VoxelBlockPos(blockIdx.x,
-        blockIdx.y,
-        blockIdx.z));
-}
-
-struct EachV {
-    static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
-
-        float z = (threadIdx.z) * voxelSize;
-        assert(v);
-        float eta = (SDF_BLOCK_SIZE / 2)*voxelSize - z;
-        v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
-
-    }
-};
-
-static ITMDepthTracker *dt;
 ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Vector2i imgSize_d)
 {
     scene = new Scene();
@@ -30,7 +8,6 @@ ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib, Vector2i imgSize_rgb, Ve
 	renderState_freeview = NULL; // will be created by the visualisation engine on demand
 
     trackingState = new ITMTrackingState(imgSize_d);
-    dt = new ITMDepthTracker(imgSize_d);
 
     view = new ITMView(calib, imgSize_rgb, imgSize_d); // will be allocated by the view builder
 }
@@ -46,6 +23,36 @@ ITMMainEngine::~ITMMainEngine()
     delete view;
 }
 
+#include "fileutils.h"
+
+using namespace ORUtils;
+template<typename T>
+static bool checkImageSame(Image<T>* a_, Image<T>* b_) {
+    T* a = a_->GetData(MEMORYDEVICE_CPU);
+    T* b = b_->GetData(MEMORYDEVICE_CPU);
+#define failifnot(x) if (!(x)) return false;
+    failifnot(a_->dataSize == b_->dataSize);
+    failifnot(a_->noDims == b_->noDims);
+    int s = a_->dataSize;
+    while (s--) {
+        if (*a != *b) {
+            failifnot(false);
+        }
+        a++;
+        b++;
+    }
+    return true;
+}
+
+/// Must exist on cpu
+template<typename T>
+static void assertImageSame(Image<T>* a_, Image<T>* b_) {
+    assert(checkImageSame(a_, b_));
+}
+
+int jj = 0;
+
+#include "ITMDepthTrackerOld.h"
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
 {
     CURRENT_SCENE_SCOPE(scene);
@@ -55,14 +62,37 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 
 	// tracking
     //ITMDepthTracker::
-        dt->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
-        dump::Sa
-	// fusion
-    ITMSceneReconstructionEngine_ProcessFrame(view, trackingState->pose_d->GetM());
 
     // raycast scene from current viewpoint 
     // to create point cloud for tracking
+    cudaDeviceSynchronize();
     ITMVisualisationEngine::CreateICPMaps(trackingState, &view->calib->intrinsics_d, renderState_live);
+
+    // store input
+    dump::store(trackingState, "Tests/Tracker/trackingState");
+    dump::store(view, "Tests/Tracker/view");
+
+    if (jj++) {
+        auto trackingState_ = dump::load<ITMTrackingState>("Tests/Tracker/trackingState");
+        assertImageSame(
+            trackingState->pointCloud->locations,
+            trackingState_->pointCloud->locations);
+
+        auto view_ = dump::load<ITMView>("Tests/Tracker/view");
+
+
+    }
+
+    auto dt = new ITMDepthTracker(trackingState->pointCloud->locations->noDims);
+    dt->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
+    // store output  
+    //dump::store(trackingState->pose_d, "Tests/Tracker/out.pose_d");
+
+    auto expectedPose = dump::load<ITMPose>("Tests/Tracker/out.pose_d");
+
+	// fusion
+    ITMSceneReconstructionEngine_ProcessFrame(view, trackingState->pose_d->GetM());
+
 }
 #include "fileutils.h"
 void ITMMainEngine::GetImage(
@@ -72,9 +102,6 @@ void ITMMainEngine::GetImage(
     const ITMIntrinsics * const intrinsics 
     )
 {
-    assert(out->isAllocated_CPU() && out->isAllocated_CUDA());
-	
-
 	out->Clear();
 
 	switch (getImageType)
@@ -86,7 +113,6 @@ void ITMMainEngine::GetImage(
 
 	case ITMMainEngine::InfiniTAM_IMAGE_ORIGINAL_DEPTH:
         out->ChangeDims(view->depth->noDims);
-        view->depth->UpdateHostFromDevice();
         ITMVisualisationEngine::DepthToUchar4(out, view->depth);
 		break;
 
@@ -107,7 +133,6 @@ void ITMMainEngine::GetImage(
 
         CURRENT_SCENE_SCOPE(scene);
 		ITMVisualisationEngine::RenderImage(pose, intrinsics, renderState_freeview, out, type);
-        out->UpdateHostFromDevice();
 
         png::SaveImageToFile(out, "out.png");
 

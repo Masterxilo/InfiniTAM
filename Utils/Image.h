@@ -9,6 +9,10 @@ namespace ORUtils
 {
 	/** \brief
 	Represents images, templated on the pixel type
+
+    Managed
+
+
 	*/
 	template <typename T>
 	class Image : public MemoryBlock < T >
@@ -17,22 +21,9 @@ namespace ORUtils
 		/** Size of the image in pixels. */
 		Vector2<int> noDims;
 
-		/** Initialize an empty image of the given size, either
-		on CPU only or on both CPU and GPU.
+		/** Initialize an empty image of the given size
 		*/
-		Image(Vector2<int> noDims, bool allocate_CPU, bool allocate_CUDA)
-            : MemoryBlock<T>(noDims.x * noDims.y, allocate_CPU, allocate_CUDA), noDims(noDims)
-		{
-		}
-
-
-		Image(bool allocate_CPU, bool allocate_CUDA)
-            : Image(Vector2<int>(1, 1), allocate_CPU, allocate_CUDA) {}
-
-		Image(Vector2<int> noDims, MemoryDeviceType memoryType)
-            : MemoryBlock<T>(noDims.x * noDims.y, memoryType), noDims(noDims)
-		{
-		}
+        Image(Vector2<int> noDims = Vector2<int>(1, 1)) : MemoryBlock<T>(noDims.area()), noDims(noDims) {}
 
 		/** Resize an image, loosing all old image data.
 		Essentially any previously allocated data is
@@ -41,14 +32,11 @@ namespace ORUtils
 		*/
 		void ChangeDims(Vector2<int> newDims)
 		{
-			if (newDims != noDims)
-			{
-				this->noDims = newDims;
-
-                bool wasCPU = isAllocated_CPU(), wasCUDA = isAllocated_CUDA();
-				this->Free();
-                this->Allocate(newDims.x * newDims.y, wasCPU, wasCUDA);
-			}
+            if (newDims == noDims) return;
+			this->noDims = newDims;
+			this->Free();
+            this->Allocate(newDims.area());
+            Clear();
 		}
 	};
 }

@@ -29,7 +29,7 @@ namespace ITMLib
 
             ITMRenderState(const Vector2i &imgSize) 
 			{
-                raycastResult = new ORUtils::Image<Vector4f>(imgSize, MEMORYDEVICE_CUDA);
+                raycastResult = new ORUtils::Image<Vector4f>(imgSize);
 			}
 
 			virtual ~ITMRenderState()

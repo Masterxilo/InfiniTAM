@@ -37,11 +37,11 @@ namespace ITMLib
 
                 explicit ITMPointCloud(Vector2i imgSize) : locations(0), normals(0)
                 {
-                    locations = new ORUtils::Image<Vector4f>(imgSize, MEMORYDEVICE_CUDA);
+                    locations = new ORUtils::Image<Vector4f>(imgSize);
                     assert((void*)locations != (void*)0xcdcdcdcd00000000);
                     assert((void*)locations != (void*)0xcdcdcdcdcdcdcdcd);
                     assert(locations);
-                    normals = new ORUtils::Image<Vector4f>(imgSize, MEMORYDEVICE_CUDA);
+                    normals = new ORUtils::Image<Vector4f>(imgSize);
                     assert(normals);
 
                     this->pose_pointCloud = new ITMPose();

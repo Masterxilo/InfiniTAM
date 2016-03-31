@@ -335,12 +335,11 @@ void UIEngine::Initialise(int & argc, char** argv, ImageSourceEngine *imageSourc
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, 1);
 
 
-	bool allocateGPU = true;
     for (auto& window : windows) 
-        window.outImage = new ITMUChar4Image(imageSource->getDepthImageSize(), true, allocateGPU);
+        window.outImage = new ITMUChar4Image(imageSource->getDepthImageSize());
 
-	inputRGBImage = new ITMUChar4Image(imageSource->getRGBImageSize(), true, allocateGPU);
-	inputRawDepthImage = new ITMShortImage(imageSource->getDepthImageSize(), true, allocateGPU);
+	inputRGBImage = new ITMUChar4Image(imageSource->getRGBImageSize());
+	inputRawDepthImage = new ITMShortImage(imageSource->getDepthImageSize());
 
 
 	mainLoopAction = PROCESS_PAUSED;

@@ -46,9 +46,9 @@ namespace ITMLib
 
 			ITMView(const ITMRGBDCalib *calibration, Vector2i imgSize_rgb, Vector2i imgSize_d) :
                 calib(new ITMRGBDCalib(*calibration)),
-                rgb(new ITMUChar4Image(imgSize_rgb, false, true)),
-                depth(new ITMFloatImage(imgSize_rgb, true, true)),
-                rawDepthImageGPU(new ITMShortImage(imgSize_rgb, false, true)) {
+                rgb(new ITMUChar4Image(imgSize_rgb)),
+                depth(new ITMFloatImage(imgSize_rgb)),
+                rawDepthImageGPU(new ITMShortImage(imgSize_rgb)) {
 			}
 
             static std::string depthConversionType;

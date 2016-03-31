@@ -41,8 +41,8 @@ void ImageFileReader::loadIntoCache(void)
 	//TODO> make nicer
     assert(cached_rgb == NULL);
     assert(cached_depth == NULL);
-	cached_rgb = new ITMUChar4Image(true, false); 
-	cached_depth = new ITMShortImage(true, false);
+	cached_rgb = new ITMUChar4Image(); 
+	cached_depth = new ITMShortImage();
 
 	char str[2048];
 	sprintf(str, rgbImageMask, currentFrameNo);
@@ -75,9 +75,6 @@ void ImageFileReader::getImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth)
     if (!hasMoreImages()) return;
     assert(rgb->noDims == cached_rgb->noDims);
     assert(rawDepth->noDims == cached_depth->noDims);
-    assert(rawDepth->isAllocated_CPU());
-    assert(rgb->isAllocated_CPU());
-
 
 	rgb->SetFrom(cached_rgb, ORUtils::MemoryBlock<Vector4u>::CPU_TO_CPU);
 	delete cached_rgb;
