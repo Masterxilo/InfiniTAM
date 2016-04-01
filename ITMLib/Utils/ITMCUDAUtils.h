@@ -1,6 +1,3 @@
-/// \file Assumes warp size of 32 (?)
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #pragma once
 
 #include <cuda_runtime.h>

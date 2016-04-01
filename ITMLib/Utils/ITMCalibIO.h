@@ -4,12 +4,5 @@
 
 #include "ITMRGBDCalib.h"
 
-
-namespace ITMLib
-{
-	namespace Objects
-	{
-		bool readRGBDCalib(const char *fileName, ITMRGBDCalib & dest);
-    }
-}
+bool readRGBDCalib(std::string fileName, ITMRGBDCalib & dest);
 

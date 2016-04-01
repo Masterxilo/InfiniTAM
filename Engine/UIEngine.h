@@ -5,103 +5,60 @@
 #include "../ITMLib/Engine/ITMMainEngine.h"
 #include "../ITMLib/Utils/ITMLibSettings.h"
 #include "FileUtils.h"
-#include "NVTimer.h"
 
 #include "ImageSourceEngine.h"
 
 #include <vector>
 
-namespace InfiniTAM
+class UIEngine
 {
-	namespace Engine
-	{
-		class UIEngine
-		{
-        public:
+public:
+private:
 
-            enum MainLoopAction
-            {
-                PROCESS_PAUSED, PROCESS_FRAME, PROCESS_VIDEO, EXIT
-            }mainLoopAction;
-        private:
+    void setFreeviewFromLive() {
+        assert(mainEngine->GetTrackingState());
+        freeviewPose.SetFrom(mainEngine->GetTrackingState()->pose_d);
+        assert(mainEngine->GetView() != NULL);
+        freeviewIntrinsics = mainEngine->GetView()->calib->intrinsics_d;
+        freeviewDim = mainEngine->GetView()->depth->noDims;
+    }
+	static UIEngine* instance;
 
-            void setFreeviewFromLive() {
-                freeviewPose.SetFrom(mainEngine->GetTrackingState()->pose_d);
-                assert(mainEngine->GetView() != NULL);
-                freeviewIntrinsics = mainEngine->GetView()->calib->intrinsics_d;
-                windows[0].outImage->ChangeDims(mainEngine->GetView()->depth->noDims);
-            }
-			static UIEngine* instance;
+	ImageFileReader *imageSource;
+	ITMMainEngine *mainEngine;
 
+private: 
 
-			struct UIColourMode {
-				const char *name;
-				ITMMainEngine::GetImageType type;
-				UIColourMode(const char *_name, ITMMainEngine::GetImageType _type)
-				 : name(_name), type(_type)
-				{}
-			};
-			std::vector<UIColourMode> colourModes;
-			int currentColourMode;
+	ITMUChar4Image *inputRGBImage;
+    ITMShortImage *inputRawDepthImage;
 
-			ImageSourceEngine *imageSource;
-			ITMMainEngine *mainEngine;
+    ITMUChar4Image *outputImage;
 
-			StopWatchInterface *timer_instant;
-			StopWatchInterface *timer_average;
+    Vector2i freeviewDim;
+	bool freeviewActive;
+	ITMPose freeviewPose;
+	ITMIntrinsics freeviewIntrinsics;
+    unsigned int textureId;
 
-		private: 
-            // For UI layout
-            Vector2i winSize;
-			static const int NUM_WIN = 3;
-            struct Window {
-                Vector4f winReg; // (x1, y1, x2, y2)
-                uint textureId;
-                ITMUChar4Image *outImage;
-                ITMMainEngine::GetImageType outImageType;
-            };
-            Window windows[NUM_WIN];
-
-			ITMUChar4Image *inputRGBImage; ITMShortImage *inputRawDepthImage;
-
-			bool freeviewActive;
-			bool intergrationActive;
-			ITMPose freeviewPose;
-			ITMIntrinsics freeviewIntrinsics;
-
-            enum MOUSESTATE { MLEFT, MMIDDLE, MRIGHT, MNONE };
-            MOUSESTATE mouseState;
-			Vector2i mouseLastClick;
+    int mouseLastClickButton, mouseLastClickState;
+	Vector2i mouseLastClickPos;
 
 
-		public:
-			int currentFrameNo; 
-			static UIEngine* Instance(void) {
-				if (instance == NULL) instance = new UIEngine();
-				return instance;
-			}
-
-
-
-			static void glutDisplayFunction();
-			static void glutIdleFunction();
-			static void glutKeyUpFunction(unsigned char key, int x, int y);
-			static void glutMouseButtonFunction(int button, int state, int x, int y);
-			static void glutMouseMoveFunction(int x, int y);
-			static void glutMouseWheelFunction(int button, int dir, int x, int y);
-
-			const Vector2i & getWindowSize(void) const
-			{ return winSize; }
-
-			int processedFrameNo;
-			bool needsRefresh;
-
-			void Initialise(int & argc, char** argv, ImageSourceEngine *imageSource, ITMMainEngine *mainEngine,
-				const char *outFolder);
-			void Shutdown();
-
-			void Run();
-			void ProcessFrame();
-		};
+public:
+	static UIEngine* Instance(void) {
+		if (instance == NULL) instance = new UIEngine();
+		return instance;
 	}
-}
+
+	static void glutDisplayFunction();
+	static void glutKeyUpFunction(unsigned char key, int x, int y);
+	static void glutMouseButtonFunction(int button, int state, int x, int y);
+	static void glutMouseMoveFunction(int x, int y);
+	static void glutMouseWheelFunction(int button, int dir, int x, int y);
+
+    void Initialise(int & argc, char** argv, ImageFileReader *imageSource, ITMMainEngine *mainEngine);
+	void Shutdown();
+
+	void Run();
+	void ProcessFrame();
+};

@@ -1,56 +1,37 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #pragma once
+#include "ITMLib.h"
+#include "FileUtils.h"
+#include <stdio.h>
 
-#include "../ITMLib/ITMLib.h"
-
-namespace InfiniTAM
+/** Represents a source of depth & color image data, together with the calibration of those two cameras. */ 
+class ImageFileReader
 {
-	namespace Engine
-	{
-        /** Represents a source of depth & color image data, together with the calibration of those two cameras. */
-		class ImageSourceEngine
-		{
-		public:
-			ITMRGBDCalib calib;
+private:
+    std::string rgbImageMask, depthImageMask;
+    int currentFrameNo;
 
-			ImageSourceEngine(const char *calibFilename);
-			virtual ~ImageSourceEngine() {}
+public:
+    ITMRGBDCalib calib;
+    // Returns the current frame and advances the frame counter for next time.
+    /// images must exist
+    void nextImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth) {
+        char str[2048];
+        sprintf(str, rgbImageMask.c_str(), currentFrameNo);
+        if (!png::ReadImageFromFile(rgb, str)) return;
 
-			virtual bool hasMoreImages(void) = 0;
-			virtual void getImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth) = 0;
-			virtual Vector2i getDepthImageSize(void) = 0;
-			virtual Vector2i getRGBImageSize(void) = 0;
-		};
+        sprintf(str, depthImageMask.c_str(), currentFrameNo);
+        if (!png::ReadImageFromFile(rawDepth, str)) return;
 
-		class ImageFileReader : public ImageSourceEngine
-		{
-		private:
-			static const int BUF_SIZE = 2048;
-			char rgbImageMask[BUF_SIZE];
-			char depthImageMask[BUF_SIZE];
+        ++currentFrameNo;
+    }
 
-			ITMUChar4Image *cached_rgb;
-			ITMShortImage *cached_depth;
-
-			void loadIntoCache();
-			int cachedFrameNo;
-			int currentFrameNo;
-
-		public:
-
-			ImageFileReader(const char *calibFilename, const char *rgbImageMask, const char *depthImageMask);
-			~ImageFileReader();
-
-            /// \returns whether currentFrameNo exists (and is loaded into cache)
-			bool hasMoreImages(void);
-
-            // Returns the current frame and advances the frame counter for next time.
-            /// images must exist on cpu and be of correct dimensions
-			void getImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth);
-			Vector2i getDepthImageSize(void);
-			Vector2i getRGBImageSize(void);
-		};
-	}
-}
+    ImageFileReader(
+        std::string calibFilename,
+        std::string rgbImageMask,
+        std::string depthImageMask,
+        int firstFrameNo
+        ) : currentFrameNo(firstFrameNo), rgbImageMask(rgbImageMask), depthImageMask(depthImageMask) {
+        readRGBDCalib(calibFilename, calib);
+    }
+};
 

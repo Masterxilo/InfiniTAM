@@ -156,7 +156,7 @@ struct IntegrateVoxel {
 };
 
 // Allocation request and setup of global variables part
-void ITMSceneReconstructionEngine_ProcessFrame_pre(
+void FuseView_pre(
     const ITMView * const view,
     Matrix4f M_d
     ) {
@@ -182,11 +182,11 @@ void ITMSceneReconstructionEngine_ProcessFrame_pre(
 }
 
 /// Fusion stage of the system
-void ITMSceneReconstructionEngine_ProcessFrame(
+void FuseView(
     const ITMView * const view,
     Matrix4f M_d)
 {
-    ITMSceneReconstructionEngine_ProcessFrame_pre(
+    FuseView_pre(
         view, M_d
         );
 

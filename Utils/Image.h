@@ -38,5 +38,12 @@ namespace ORUtils
             this->Allocate(newDims.area());
             Clear();
 		}
+
+        /** Copy data, resize if needed */
+        void SetFrom(const Image<T> *source, MemoryCopyDirection memoryCopyDirection)
+        {
+            ChangeDims(source->noDims);
+            __super::SetFrom(source, memoryCopyDirection);
+        }
 	};
 }

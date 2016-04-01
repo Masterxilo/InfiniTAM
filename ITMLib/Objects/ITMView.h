@@ -1,8 +1,4 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #pragma once
-
-
 #include "ITMLibDefines.h"
 #define ITMFloatImage ORUtils::Image<float>
 #define ITMFloat2Image ORUtils::Image<Vector2f>
@@ -21,49 +17,43 @@
 #include "ITMCalibIO.h"
 
 
-namespace ITMLib
+/** \brief
+	Represents a single "view", i.e. RGB and depth images along
+	with all intrinsic and relative calibration information
+*/
+class ITMView
 {
-	namespace Objects
-	{
-		/** \brief
-		    Represents a single "view", i.e. RGB and depth images along
-		    with all intrinsic and relative calibration information
-		*/
-		class ITMView
-		{
-            ITMShortImage * const rawDepthImageGPU;
+    ITMShortImage * const rawDepthImageGPU;
 
-		public:
-			/// Intrinsic calibration information for the view.
-            ITMRGBDCalib const * const calib;
+public:
+	/// Intrinsic calibration information for the view.
+    ITMRGBDCalib const * const calib;
 
-			/// RGB colour image.
-            ITMUChar4Image * const rgb;
+	/// RGB colour image.
+    ITMUChar4Image * const rgb;
 
-			/// Float valued depth image converted from disparity image, 
-            /// if available according to @ref inputImageType.
-            ITMFloatImage * const depth;
+	/// Float valued depth image converted from disparity image, 
+    /// if available according to @ref inputImageType.
+    ITMFloatImage * const depth;
 
-			ITMView(const ITMRGBDCalib *calibration, Vector2i imgSize_rgb, Vector2i imgSize_d) :
-                calib(new ITMRGBDCalib(*calibration)),
-                rgb(new ITMUChar4Image(imgSize_rgb)),
-                depth(new ITMFloatImage(imgSize_rgb)),
-                rawDepthImageGPU(new ITMShortImage(imgSize_rgb)) {
-			}
-
-            static std::string depthConversionType;
-            void ITMView::Update(
-                ITMUChar4Image *rgbImage,
-                ITMShortImage *rawDepthImage);
-
-			virtual ~ITMView(void)
-			{
-				delete calib;
-				delete rgb;
-                delete depth;
-                delete rawDepthImageGPU;
-			}
-		};
+	ITMView(const ITMRGBDCalib *calibration) :
+        calib(new ITMRGBDCalib(*calibration)),
+        rgb(new ITMUChar4Image()),
+        depth(new ITMFloatImage()),
+        rawDepthImageGPU(new ITMShortImage()) {
 	}
-}
+
+    static std::string depthConversionType;
+    void ITMView::Update(
+        ITMUChar4Image *rgbImage,
+        ITMShortImage *rawDepthImage);
+
+	virtual ~ITMView(void)
+	{
+		delete calib;
+		delete rgb;
+        delete depth;
+        delete rawDepthImageGPU;
+	}
+};
 

@@ -133,7 +133,7 @@ KERNEL alloc(HashMap<ZeroHasher>* myHash, int p, int* o) {
 void testZeroHasher() {
     int n = 10;
     auto myHash = new HashMap<ZeroHasher>(n); // space for BUCKET_NUM(1) + excessnum(n-1) = n entries
-
+    assert(myHash->getLowestFreeSequenceNumber() == 1);
     int* p; cudaMallocManaged(&p, sizeof(int));
 
     const int extra = 0; // doing one more will crash it at
@@ -156,6 +156,8 @@ void testZeroHasher() {
             assert(i <= j ? *p == i + 1 : *p == 0);
         }
     }
+
+    assert(myHash->getLowestFreeSequenceNumber() != 1);
 }
 #include "Cholesky.h"
 using namespace ORUtils;
@@ -338,11 +340,9 @@ void testForEachPixelNoImage() {
 #include <vector>
 #include <algorithm>
 using namespace std;
-using namespace ITMLib;
-using namespace ITMLib::Objects;
-//using namespace ITMLib::Engine;
 
-extern void ITMSceneReconstructionEngine_ProcessFrame_pre(
+
+extern void FuseView_pre(
     const ITMView * const view,
     Matrix4f M_d
     );
@@ -402,7 +402,7 @@ void testAllocRequests(Matrix4f M_d,
     ITMRGBDCalib calib;
     readRGBDCalib("Tests\\TestAllocRequests\\calib.txt", calib);
 
-    ITMView* view = new ITMView(&calib, rgb.noDims, depth.noDims);
+    ITMView* view = new ITMView(&calib);
     ITMView::depthConversionType = "ConvertDisparityToDepth";
     view->Update(&rgb, &depth);
 
@@ -417,9 +417,8 @@ void testAllocRequests(Matrix4f M_d,
     Scene* scene = new Scene();
     CURRENT_SCENE_SCOPE(scene);
 
-
-    // test ITMSceneReconstructionEngine_ProcessFrame_pre
-    ITMSceneReconstructionEngine_ProcessFrame_pre(
+    // test FuseView_pre
+    FuseView_pre(
         view, M_d
         );
 
@@ -484,8 +483,8 @@ void testAllocRequests(Matrix4f M_d,
 
     cudaDeviceSynchronize();
     // --- again!
-    // test ITMSceneReconstructionEngine_ProcessFrame_pre
-    ITMSceneReconstructionEngine_ProcessFrame_pre(
+    // test FuseView_pre
+    FuseView_pre(
         view, M_d
         );
 
@@ -580,11 +579,10 @@ ITMUChar4Image* renderNow(Vector2i imgSize, ITMPose* pose) {
     ITMRenderState* renderState_freeview = new ITMRenderState(imgSize);
     auto render = new ITMUChar4Image(imgSize);
 
-    ITMVisualisationEngine::RenderImage(
+    RenderImage(
         pose, new ITMIntrinsics(),
         renderState_freeview,
-        render,
-        ITMVisualisationEngine::RENDER_SHADED_GREYSCALE);
+        render, "renderGrey");
     delete renderState_freeview;
     return render;
 }
@@ -595,7 +593,6 @@ void renderExpecting(const char* fn, ITMPose* pose = new ITMPose()) {
     assertImageSame(expect, render);
     delete expect;
     delete render;
-    delete pose;
 }
 
 #define make(scene) Scene* scene = new Scene(); CURRENT_SCENE_SCOPE(scene);
@@ -629,22 +626,33 @@ struct BuildWall {
         v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
     }
 };
-
-void testRenderWall() {
-    make(scene);
-
+void buildWallScene() {
     // Build wall scene
     buildWallRequests << <dim3(10, 10, 1), 1 >> >();
     cudaDeviceSynchronize();
     Scene::performCurrentSceneAllocations();
     cudaDeviceSynchronize();
     Scene::getCurrentScene()->doForEachAllocatedVoxel<BuildWall>();
+}
+
+
+void testRenderWall() {
+    make(scene);
+
+    renderExpecting("Tests\\TestRender\\black.png");
+
+    buildWallScene();
+
+    renderExpecting("Tests\\TestRender\\black.png");
 
     // move everything away a bit so we can see the wall
     auto pose = new ITMPose();
     pose->SetT(Vector3f(0, 0, voxelSize * 100)); 
 
     renderExpecting("Tests\\TestRender\\wall.png", pose);
+    renderExpecting("Tests\\TestRender\\wall.png", pose); // unchanged
+    pose->SetT(Vector3f(0, 0, 0)); // nothing again
+    renderExpecting("Tests\\TestRender\\black.png");
     delete scene;
 }
 
@@ -723,14 +731,12 @@ void testDump() {
     assert(dump::ReadPODFromFile(&b, "dump"));
     assert(a == b);
 }
-#include "ITMDepthTrackerOld.h"
 
 void testTracker() {
     auto trackingState = dump::load<ITMTrackingState>("Tests/Tracker/trackingState");
     auto view = dump::load<ITMView>("Tests/Tracker/view");
 
-    auto dt = new ITMDepthTracker(trackingState->pointCloud->locations->noDims);
-    dt->TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
+    TrackCamera(trackingState, view); // affects relative orientation of blocks to camera because the pose is not left unchanged even on the first try (why? on what basis is the camera moved?
     // store output  
     auto expectedPose = dump::load<ITMPose>("Tests/Tracker/out.pose_d");
 
@@ -740,10 +746,132 @@ void testTracker() {
     return;
 }
 
+#include "engine/imagesourceengine.h"
+void testImageSource() {
+    ImageFileReader r(
+        "Tests\\TestAllocRequests\\calib.txt", 
+        "Tests\\TestAllocRequests\\color%d.png",
+        "Tests\\TestAllocRequests\\depth%d.png", 1);
+    auto rgb = new ITMUChar4Image();
+    auto depth = new ITMShortImage();
+    r.nextImages(rgb, depth);
+    assert(rgb->noDims == Vector2i(640, 480));
+    assert(depth->noDims == Vector2i(640, 480));
+
+    assert(r.calib.intrinsics_d.projectionParamsSimple.all != Vector4f(0, 0, 0, 0));
+
+    assertImageSame(rgb, image("Tests\\TestAllocRequests\\color1.png"));
+
+    auto odepth = new ITMShortImage();
+    png::ReadImageFromFile(odepth, "Tests\\TestAllocRequests\\depth1.png");
+    assertImageSame(depth, odepth);
+
+    delete odepth;
+    delete rgb;
+    delete depth;
+}
+
+__managed__ int* data;
+KERNEL set_data() {
+    data[1] = 42;
+}
+KERNEL check_data() {
+    assert(data[1] == 42);
+}
+void testMemblock() {   
+    cudaDeviceSynchronize();
+    auto mem = new MemoryBlock<int>(10);
+    assert(mem->dataSize == 10);
+    assert(!mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+
+    mem->GetData(MEMORYDEVICE_CPU);
+    assert(mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+
+    mem->GetData(MEMORYDEVICE_CUDA);
+    assert(!mem->dirtyCPU);
+    assert(mem->dirtyGPU);
+
+    mem->Clear(0);
+    assert(!mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+
+    auto const* const cmem = mem;
+    cmem->GetData(MEMORYDEVICE_CPU);
+    assert(!mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+    cmem->GetData(MEMORYDEVICE_CUDA);
+    assert(!mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+
+    mem->GetData()[1] = 42;
+    assert(mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+    data = mem->GetData(MEMORYDEVICE_CUDA);
+    assert(!mem->dirtyCPU);
+    assert(mem->dirtyGPU);
+    check_data << <1, 1 >> >();
+    cudaDeviceSynchronize();
+
+    mem->Clear(0);
+
+    // NOTE wrongly assumes that everything is still clean because we reused the pointer instead of claiming it again
+    // consequently, memory will not be equal.
+    set_data << <1, 1 >> >();
+    cudaDeviceSynchronize();
+    assert(!mem->dirtyCPU);
+    assert(!mem->dirtyGPU);
+    check_data << <1, 1 >> >();
+    cudaDeviceSynchronize();
+    assert(mem->GetData()[1] == 0);
+
+    // re-requesting fixes the problem and syncs the buffers again
+    mem->Clear(0);
+    data = mem->GetData(MEMORYDEVICE_CUDA);
+    set_data << <1, 1 >> >();
+    check_data << <1, 1 >> >();
+    cudaDeviceSynchronize();
+    assert(mem->GetData()[1] == 42);
+}
+
+void testMainEngine() {
+    auto me = new ITMMainEngine(new ITMRGBDCalib());
+
+    ITMPose* pose = new ITMPose();
+    pose->SetT(Vector3f(0, 0, voxelSize * 100));
+    auto imgSize = Vector2i(640, 480);
+    auto render = new ITMUChar4Image(imgSize);
+
+    me->GetImage(render, pose, new ITMIntrinsics(), "renderGrey");
+    assertImageSame(image("Tests\\TestRender\\black.png"), render);
+
+    me->GetImage(render, pose, new ITMIntrinsics(), "renderGrey");
+    assertImageSame(image("Tests\\TestRender\\black.png"), render);
+
+    CURRENT_SCENE_SCOPE(me->scene);
+    buildWallScene();
+
+    me->GetImage(render, pose, new ITMIntrinsics(), "renderGrey");
+    assertImageSame(image("Tests\\TestRender\\wall.png"), render);
+
+    pose->SetT(Vector3f(0, 0, 0));
+
+    me->GetImage(render, pose, new ITMIntrinsics(), "renderGrey");
+    assertImageSame(image("Tests\\TestRender\\black.png"), render);
+
+    delete me;
+    delete pose;
+    delete render;
+}
+
 // TODO take the tests apart, clean state inbetween
 void tests() {
+    testMemblock();
+    testImageSource();
     testTracker();
-    return;
+    testMainEngine();
+
     assert(!checkImageSame(image("Tests\\TestRender\\wall.png"), image("Tests\\TestRender\\black.png")));
     assert(!dump::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1)), "thisimagedoesnotexist"));
     assert(!png::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1)), "thisimagedoesnotexist"));

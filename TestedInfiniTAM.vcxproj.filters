@@ -36,9 +36,6 @@
     <ClInclude Include="Utils\MemoryBlock.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Utils\NVTimer.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="Utils\PlatformIndependence.h">
       <Filter>Utils</Filter>
     </ClInclude>
@@ -88,9 +85,6 @@
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMIntrinsics.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMLocalVBA.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMPose.h">
@@ -143,17 +137,11 @@
     <ClInclude Include="ITMLib\Objects\ITMView.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMDepthTrackerOld.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />
     <CudaCompile Include="Utils\FileUtilsPNG.cu">
       <Filter>Utils</Filter>
-    </CudaCompile>
-    <CudaCompile Include="Engine\ImageSourceEngine.cu">
-      <Filter>Engine</Filter>
     </CudaCompile>
     <CudaCompile Include="Engine\UIEngine.cu">
       <Filter>Engine</Filter>
@@ -185,15 +173,9 @@
     <CudaCompile Include="LightingEstimation.cu" />
     <CudaCompile Include="GeometryRefinement.cu" />
     <CudaCompile Include="Scene.cu" />
-    <CudaCompile Include="DepthToUChar4.cu" />
     <CudaCompile Include="ITMLib\Engine\ITMView.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMDepthTrackerOld.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
-    <CudaCompile Include="depthtrackercommon.cu" />
-    <CudaCompile Include="depthtrackercommon2.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

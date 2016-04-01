@@ -31,10 +31,11 @@ namespace ORUtils
 		DEVICEPTR(T)* data_cuda;
 
         size_t _dataSize;
+    public: /* private */
         // true when cpu memory has been possibly modified but gpu not updated
         mutable bool dirtyCPU;
         mutable bool dirtyGPU;
-
+    protected:
 
         
         /** Transfer data from GPU to CPU */

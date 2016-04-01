@@ -52,7 +52,7 @@ namespace png {
         return SaveImageToFile_<Vector4u, LodePNGColorType::LCT_RGBA, 8>(image, fileName);
     }
 
-    bool SaveImageToFile_(const ITMShortImage* image, std::string fileName)
+    bool SaveImageToFile(const ITMShortImage* image, std::string fileName)
     {
         return SaveImageToFile_<short, LodePNGColorType::LCT_GREY, 16>(image, fileName);
     }

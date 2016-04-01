@@ -1,5 +1,3 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #pragma once
 
 #include "CUDADefines.h"
@@ -44,12 +42,7 @@ static KERNEL FILTERNAME ## _device(T *imageData_out, Vector2i newDims, const T 
 
 FILTER(filterSubsample)
 
-namespace ITMLib
-{
-	namespace Engine
-	{
-        namespace ITMLowLevelEngine
-		{
+
 
             // host methods
 #define FILTERMETHOD(METHODNAME, WITHHOLES)\
@@ -71,7 +64,3 @@ namespace ITMLib
 
 FILTERMETHOD(FilterSubsample, false)
 FILTERMETHOD(FilterSubsampleWithHoles, WITH_HOLES)
-
-		}
-	}
-}

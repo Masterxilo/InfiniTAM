@@ -10,8 +10,6 @@
 #include "itmpose.h"
 #include "itmtrackingstate.h"
 #include "ITMLibDefines.h"
-using namespace ITMLib;
-using namespace ITMLib::Objects;
 
 // .png files
 /// \returns true iff operation succeeded
@@ -95,7 +93,7 @@ namespace dump {
             imgSize_rgb = *load<Vector2i>(f + ".imgSize_rgb"), 
             imgSize_d = *load<Vector2i>(f + ".imgSize_d");
         ITMRGBDCalib *calib = load<ITMRGBDCalib>(f + ".calib");
-        ITMView* v = new ITMView(calib, imgSize_rgb, imgSize_d);
+        ITMView* v = new ITMView(calib);
         ReadImageFromFile(v->depth, f+".depth");
         ReadImageFromFile(v->rgb, f + ".rgb");
         return v;

@@ -1,11 +1,8 @@
-// Copyright 2014-2015 Isis Innovation Limited and the authors of InfiniTAM
-
 #include <math.h>
 #include "ITMPose.h"
 
 #include <stdio.h>
 
-using namespace ITMLib::Objects;
 
 ITMPose::ITMPose(void) { this->SetFrom(0, 0, 0, 0, 0, 0); }
 

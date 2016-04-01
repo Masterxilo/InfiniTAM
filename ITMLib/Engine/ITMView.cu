@@ -3,8 +3,6 @@
 #include "MemoryBlock.h"
 #include "ITMPixelUtils.h"
 #include "itmlibdefines.h"
-using namespace ITMLib::Objects;
-using namespace ORUtils;
 
 static __managed__ float *d_out;
 static __managed__ const short *d_in;
@@ -51,6 +49,10 @@ void ITMView::Update(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
     rawDepthImageGPU->SetFrom(rawDepthImage, MemoryBlock<short>::CPU_TO_CUDA);
 
     ::d_in = rawDepthImageGPU->GetData(MEMORYDEVICE_CUDA);
+
+
+    depth->ChangeDims(rawDepthImageGPU->noDims);
+
     ::d_out = depth->GetData(MEMORYDEVICE_CUDA);
     ::fx_depth = calib->intrinsics_d.projectionParamsSimple.fx;
     ::disparityCalibParams = calib->disparityCalib.params;
