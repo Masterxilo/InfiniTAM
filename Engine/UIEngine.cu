@@ -106,6 +106,8 @@ void UIEngine::glutDisplayFunction()
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, (const char*)str);
 
 	glutSwapBuffers();
+
+    glutKeyUpFunction('n', 0, 0);
 }
 
 void UIEngine::glutMouseButtonFunction(int button, int state, int x, int y)
@@ -203,9 +205,7 @@ void UIEngine::glutMouseWheelFunction(int button, int dir, int x, int y)
 
 void UIEngine::Initialise(int & argc, char** argv, ImageFileReader *imageSource, ITMMainEngine *mainEngine ) 
 {
-    this->freeviewActive = true;// true;
-    freeviewPose.SetT(Vector3f(0, 0, voxelSize * 100));
-
+    this->freeviewActive = false;
 
 	this->imageSource = imageSource;
 	this->mainEngine = mainEngine;
@@ -232,6 +232,8 @@ void UIEngine::Initialise(int & argc, char** argv, ImageFileReader *imageSource,
 
     mouseLastClickPos = Vector2i(0, 0);
     mouseLastClickState = GLUT_UP;
+
+    glutPostRedisplay();
 }
 
 void UIEngine::ProcessFrame() {

@@ -26,9 +26,9 @@ extern std::wstring _errmsg;
 
 bool assertImpl(bool f, const char* const expr, const char* const file, int line);
 #if UNIT_TESTING
-#define assert(x) if(!assertImpl((x), #x, __FILE__, __LINE__)) if (!IsDebuggerPresent()) {Assert::IsTrue(false, _errmsg.c_str());} else DebugBreak();
+#define assert(x) if(!assertImpl((x), #x, __FILE__, __LINE__)) if (!IsDebuggerPresent()) {Assert::IsTrue(false, _errmsg.c_str());OutputDebugStringA("execution continues after failed assertion");} else {DebugBreak();OutputDebugStringA("execution continues after failed assertion");}
 #else // not unit testing
-#define assert(x) if(!assertImpl((x), #x, __FILE__, __LINE__)) {DebugBreak();}
+#define assert(x) if(!assertImpl((x), #x, __FILE__, __LINE__)) {DebugBreak();OutputDebugStringA("execution continues after failed assertion");} // having an extra statement makes the debugger not leave this block, thus keeping the variables intact
 #endif
  
 #endif // __CUDA_ARCH__

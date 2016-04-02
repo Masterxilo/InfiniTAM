@@ -8,16 +8,19 @@ class ImageFileReader
 {
 private:
     std::string rgbImageMask, depthImageMask;
-    int currentFrameNo;
+    
 
-public:
+public:int currentFrameNo;
     ITMRGBDCalib calib;
     // Returns the current frame and advances the frame counter for next time.
     /// images must exist
     void nextImages(ITMUChar4Image *rgb, ITMShortImage *rawDepth) {
         char str[2048];
         sprintf(str, rgbImageMask.c_str(), currentFrameNo);
-        if (!png::ReadImageFromFile(rgb, str)) return;
+        if (!png::ReadImageFromFile(rgb, str)) {
+            if (1 == currentFrameNo) assert(false); // should have at least one image
+            return;
+        }
 
         sprintf(str, depthImageMask.c_str(), currentFrameNo);
         if (!png::ReadImageFromFile(rawDepth, str)) return;

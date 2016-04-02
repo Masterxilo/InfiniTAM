@@ -23,6 +23,9 @@ ITMMainEngine::~ITMMainEngine()
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
 {
+    assert(rgbImage->noDims.area() > 1);
+    assert(rawDepthImage->noDims.area() > 1);
+
     CURRENT_SCENE_SCOPE(scene);
 
 	// prepare image and turn it into a depth image

@@ -544,6 +544,44 @@ static bool checkImageSame(Image<T>* a_, Image<T>* b_) {
     int s = a_->dataSize;
     while (s--) {
         if (*a != *b) {
+            failifnot(false);
+        }
+        a++;
+        b++;
+    }
+    return true;
+}
+
+template<>
+static bool checkImageSame(Image<Vector4u>* a_, Image<Vector4u>* b_) {
+    Vector4u* a = a_->GetData(MEMORYDEVICE_CPU);
+    Vector4u* b = b_->GetData(MEMORYDEVICE_CPU);
+#define failifnot(x) if (!(x)) return false;
+    failifnot(a_->dataSize == b_->dataSize);
+    failifnot(a_->noDims == b_->noDims);
+    int s = a_->dataSize;
+    while (s--) {
+        if (*a != *b) {
+            png::SaveImageToFile(a_, "checkImageSame_a.png");
+            png::SaveImageToFile(b_, "checkImageSame_b.png");
+            failifnot(false);
+        }
+        a++;
+        b++;
+    }
+    return true;
+}
+
+template<>
+static bool checkImageSame(Image<short>* a_, Image<short>* b_) {
+    short* a = a_->GetData(MEMORYDEVICE_CPU);
+    short* b = b_->GetData(MEMORYDEVICE_CPU);
+#define failifnot(x) if (!(x)) return false;
+    failifnot(a_->dataSize == b_->dataSize);
+    failifnot(a_->noDims == b_->noDims);
+    int s = a_->dataSize;
+    while (s--) {
+        if (*a != *b) {
             png::SaveImageToFile(a_, "checkImageSame_a.png");
             png::SaveImageToFile(b_, "checkImageSame_b.png");
             failifnot(false);
@@ -835,8 +873,10 @@ void testMemblock() {
     assert(mem->GetData()[1] == 42);
 }
 
+#include <memory>
+using namespace std;
 void testMainEngine() {
-    auto me = new ITMMainEngine(new ITMRGBDCalib());
+    auto_ptr<ITMMainEngine> me(new ITMMainEngine(new ITMRGBDCalib()));
 
     ITMPose* pose = new ITMPose();
     pose->SetT(Vector3f(0, 0, voxelSize * 100));
@@ -860,13 +900,65 @@ void testMainEngine() {
     me->GetImage(render, pose, new ITMIntrinsics(), "renderGrey");
     assertImageSame(image("Tests\\TestRender\\black.png"), render);
 
-    delete me;
     delete pose;
     delete render;
 }
 
+#include "itmview.h"
+void testMainEngineProcessFrame() {
+    auto expectedRaycastResult = new Image<Vector4f>();
+    auto expectedRaycastResult2 = new Image<Vector4f>();
+
+    auto imageSource = new ImageFileReader(
+        "Tests\\TestFountain\\calib.txt",
+        "Tests\\TestFountain\\color%i.png",
+        "Tests\\TestFountain\\depth%i.png",
+        1);
+    ITMView::depthConversionType = "ScaleAndValidateDepth";
+    auto rgb = new ITMUChar4Image();
+    auto depth = new ITMShortImage();
+    assert(imageSource->currentFrameNo == 1);
+    imageSource->nextImages(rgb, depth);
+    assert(rgb->noDims.area() > 1);
+    assert(depth->noDims.area() > 1);
+    assert(imageSource->currentFrameNo == 2);
+    auto mainEngine = new ITMMainEngine(&imageSource->calib);
+    assert(!mainEngine->renderState_freeview);
+    assert(!mainEngine->renderState_live);
+
+    mainEngine->ProcessFrame(rgb, depth);
+    assert(mainEngine->GetView()->depth->noDims == depth->noDims);
+    assert(mainEngine->GetView()->rgb->noDims == rgb->noDims);
+    assert(!mainEngine->renderState_freeview);
+    assert(mainEngine->renderState_live);
+    assert(mainEngine->renderState_live->raycastResult->noDims == depth->noDims);
+
+    dump::ReadImageFromFile(expectedRaycastResult, "Tests\\TestFountain\\live.raycastResult.dump");
+    dump::ReadImageFromFile(expectedRaycastResult2, "Tests\\TestFountain\\freeview.raycastResult.dump");
+    assert(!checkImageSame(expectedRaycastResult, expectedRaycastResult2));
+
+    dump::ReadImageFromFile(expectedRaycastResult, "Tests\\TestFountain\\live.raycastResult.dump");
+    assertImageSame(expectedRaycastResult, mainEngine->renderState_live->raycastResult);
+
+    auto imgSize = Vector2i(640, 480);
+    ITMPose* pose = new ITMPose();
+    auto render = new ITMUChar4Image(imgSize);
+    mainEngine->GetImage(render, pose, new ITMIntrinsics(), "renderGrey");
+
+    assertImageSame(render, image("Tests\\TestFountain\\render.png"));
+    
+    dump::ReadImageFromFile(expectedRaycastResult, "Tests\\TestFountain\\freeview.raycastResult.dump");
+    assertImageSame(expectedRaycastResult, mainEngine->renderState_freeview->raycastResult);
+
+    delete rgb;
+    delete depth;
+    delete mainEngine;
+    delete expectedRaycastResult;
+}
+
 // TODO take the tests apart, clean state inbetween
 void tests() {
+    testMainEngineProcessFrame();
     testMemblock();
     testImageSource();
     testTracker();

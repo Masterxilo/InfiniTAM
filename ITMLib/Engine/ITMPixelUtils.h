@@ -63,7 +63,7 @@ to each pixel in the image */
 template<typename T, typename F>
 static void forEachPixel(T* image, Vector2i imgSize) {
     const dim3 blockSize(16, 16);
-    //LAUNCH_KERNEL(
+    //LAUNCH_KERNEL( // cannot use , in argument to macro
     forEachPixel_device<T, F> << <
         getGridSize(dim3(xy(imgSize)), blockSize),
         blockSize >> > (

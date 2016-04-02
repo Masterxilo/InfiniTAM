@@ -1,5 +1,7 @@
-/// \file c.f. newcombe_etal_ismar2011.pdf
-/// T_{g,k} dnotes the transformation from framek's view space to global space
+/** \file c.f. newcombe_etal_ismar2011.pdf
+ * T_{g,k} denotes the transformation from frame k's view space to global space
+ * T_{k,g} is the inverse
+ */
 #include "ITMDepthTracker.h"
 #include "ITMCUDAUtils.h"
 #include "CUDADefines.h"
@@ -504,6 +506,7 @@ void TrackCamera(
         currentTrackingLevel = &trackingLevels[levelId];
         if (iterationType() == TRACKER_ITERATION_NONE) continue;
 
+        // T_{k,g} transforms global (g) coordinates to eye or view coordinates of the k-th frame
 #define T_k_g_estimate trackingState->pose_d
         // T_g_k_estimate caches T_k_g_estimate->GetInvM()
         Matrix4f T_g_k_estimate = T_k_g_estimate->GetInvM();

@@ -28,7 +28,9 @@ struct Managed {
     }
 };
 
+/// ! Must be run by a single warp (32 threads) simultaneously.
 inline __device__ void warpReduce(volatile float* sdata, int tid) {
+    // Ignore the fact that we compute some unnecessary sums.
 	sdata[tid] += sdata[tid + 32];
 	sdata[tid] += sdata[tid + 16];
 	sdata[tid] += sdata[tid + 8];

@@ -47,12 +47,12 @@ private:
 	ITMView *view;
 	ITMTrackingState *trackingState;
 
+public:
     /// Describes the tracked camera position and possibly a frame rendered from that position
 	ITMRenderState *renderState_live;
 
     /// Describes a free camera position and frame rendered from that position
 	ITMRenderState *renderState_freeview;
-public:
 
     Scene* scene;
 	/// Gives access to the current input frame
