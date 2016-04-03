@@ -16,9 +16,7 @@ class ITMPose
 {
 private:
 	void SetRPartOfM(const Matrix3f& R) {
-		M.m[0 + 4 * 0] = Rij(0, 0); M.m[1 + 4 * 0] = Rij(1, 0); M.m[2 + 4 * 0] = Rij(2, 0);
-		M.m[0 + 4 * 1] = Rij(0, 1); M.m[1 + 4 * 1] = Rij(1, 1); M.m[2 + 4 * 1] = Rij(2, 1);
-		M.m[0 + 4 * 2] = Rij(0, 2); M.m[1 + 4 * 2] = Rij(1, 2); M.m[2 + 4 * 2] = Rij(2, 2);
+        M.SetR(R);
 	}
 
 	/** This is the minimal representation of the pose with
@@ -33,7 +31,8 @@ private:
 			float rx, ry, rz;
 		}each;
 		struct {
-			Vector3f t;
+            Vector3f t;
+            // r is an "Euler vector", i.e. the vector "axis of rotation (u) * theta" (axis angle representation)
 			Vector3f r;
 		};
 	} params;

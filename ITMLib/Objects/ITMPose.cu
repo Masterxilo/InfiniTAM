@@ -111,7 +111,7 @@ void ITMPose::SetModelViewFromParams()
 	const Vector3f cross2 = cross(w, crossV);
 	const Vector3f T = t +  B * crossV + C * cross2;
 	
-	// w = t u, u \in S^2
+	// w = t u, u \in S^2, t === theta
 	// R = exp(w . L) = I + sin(t) (u . L) + (1 - cos(t)) (u . L)^2
 	// u . L == [u]_x, the matrix computing the left cross product with u (u x *)
 	// L = (L_x, L_y, L_z) the lie algebra basis
@@ -248,12 +248,7 @@ void ITMPose::MultiplyWith(const ITMPose *pose)
 
 Matrix3f ITMPose::GetR(void) const
 {
-	Matrix3f R;
-	Rij(0, 0) = M.m[0 + 4*0]; Rij(1, 0) = M.m[1 + 4*0]; Rij(2, 0) = M.m[2 + 4*0];
-	Rij(0, 1) = M.m[0 + 4*1]; Rij(1, 1) = M.m[1 + 4*1]; Rij(2, 1) = M.m[2 + 4*1];
-	Rij(0, 2) = M.m[0 + 4*2]; Rij(1, 2) = M.m[1 + 4*2]; Rij(2, 2) = M.m[2 + 4*2];
-
-	return R;
+    return M.GetR();
 }
 
 Vector3f ITMPose::GetT(void) const

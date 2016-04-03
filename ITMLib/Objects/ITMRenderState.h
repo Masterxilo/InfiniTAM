@@ -27,7 +27,8 @@ public:
 	}
 
 	virtual ~ITMRenderState()
-	{
+    {
+        cudaDeviceSynchronize();
 		delete raycastResult;
 	}
 };

@@ -24,7 +24,7 @@ static ImageFileReader * CreateDefaultImageSource(
 
 void tests();
 int main(int argc, char** argv) {
-    tests();
+    //tests();
 
     auto imageSource = CreateDefaultImageSource(argv[1], argv[2], argv[3]);
     ITMView::depthConversionType = argv[4];

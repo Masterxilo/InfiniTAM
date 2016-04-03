@@ -248,7 +248,7 @@ inline CPU_AND_GPU float toFloat(float c) {
 /// IF withHoles == WITH_HOLES: returns makeIllegalColor<OUT>() when any of the four surrounding pixels is illegal (has negative w).
 template<typename T_OUT, //!< Vector4f or float
     bool withHoles = false, typename T_IN> CPU_AND_GPU inline Vector4f interpolateBilinear(
-    const CONSTPTR(T_IN) *source,
+    const CONSTPTR(T_IN) * const source,
 	const THREADPTR(Vector2f) & position, const CONSTPTR(Vector2i) & imgSize)
 {
     T_OUT result;

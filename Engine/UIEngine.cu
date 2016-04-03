@@ -71,7 +71,8 @@ void UIEngine::glutDisplayFunction()
                 uiEngine->outputImage,
                 &uiEngine->freeviewPose,
                 &uiEngine->freeviewIntrinsics,
-                "renderGrey");
+                "renderColour" //renderGrey"
+                );
             png::SaveImageToFile(uiEngine->outputImage, "out.png");
 
             glBindTexture(GL_TEXTURE_2D, uiEngine->textureId);
@@ -117,34 +118,7 @@ void UIEngine::glutMouseButtonFunction(int button, int state, int x, int y)
     uiEngine->mouseLastClickState = state;
     uiEngine->mouseLastClickPos = Vector2i(x, y);
 }
-
-static inline Matrix3f createRotation(const Vector3f & _axis, float angle)
-{
-    // TODO leverage ITMPose which does this conversion given r = axis * angle
-	Vector3f axis = normalize(_axis);
-	float si = sinf(angle);
-	float co = cosf(angle);
-
-	Matrix3f ret;
-	ret.setIdentity();
-
-	ret *= co;
-	for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) ret.at(c, r) += (1.0f - co) * axis[c] * axis[r];
-
-	Matrix3f skewmat;
-	skewmat.setZeros();
-	skewmat.at(1, 0) = -axis.z;
-	skewmat.at(0, 1) = axis.z;
-	skewmat.at(2, 0) = axis.y;
-	skewmat.at(0, 2) = -axis.y;
-	skewmat.at(2, 1) = axis.x;
-	skewmat.at(1, 2) = -axis.x;
-	skewmat *= si;
-	ret += skewmat;
-
-	return ret;
-}
-
+Matrix3f createRotation(const Vector3f & _axis, float angle);
 void UIEngine::glutMouseMoveFunction(int x, int y)
 {
 	UIEngine *uiEngine = UIEngine::Instance();
@@ -168,7 +142,7 @@ void UIEngine::glutMouseMoveFunction(int x, int y)
 		// rotation
 		Vector3f axis((float)-movement.y, (float)-movement.x, 0.0f);
 		float angle = scale_rotation * sqrt((float)(movement.x * movement.x + movement.y*movement.y));
-		Matrix3f rot = createRotation(axis, angle);
+        Matrix3f rot = createRotation(axis, angle);
 		uiEngine->freeviewPose.SetRT(rot * uiEngine->freeviewPose.GetR(), rot * uiEngine->freeviewPose.GetT());
 		uiEngine->freeviewPose.Coerce();
 

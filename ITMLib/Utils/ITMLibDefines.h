@@ -178,12 +178,12 @@ private:
     ITMVoxel blockVoxels[SDF_BLOCK_SIZE3];
 };
 
+
 /// The tracker iteration type used to define the tracking iteration regime
 enum TrackerIterationType
 {
     /// Update only the current rotation estimate. This is preferable for the coarse solution stages.
     TRACKER_ITERATION_ROTATION = 1,
-    TRACKER_ITERATION_TRANSLATION = 2,
     TRACKER_ITERATION_BOTH = 3,
     TRACKER_ITERATION_NONE = 4
 };
@@ -206,3 +206,15 @@ enum TrackerIterationType
 #include "ITMLibSettings.h" // must be included after tracker iteration type is defined
 
 #define INVALID_DEPTH (-1.f)
+
+
+#include "CoordinateSystem.h"
+
+/// (0,0,0) is the lower corner of the first voxel block, (1,1,1) its upper corner,
+/// corresponding to (voxelBlockSize, voxelBlockSize, voxelBlockSize) in world coordinates.
+extern __managed__ CoordinateSystem* voxelBlockCoordinates;
+
+/// (0,0,0) is the lower corner of the voxel, (1,1,1) its upper corner,
+/// corresponding to (voxelSize, voxelSize, voxelSize) in world coordinates.
+extern __managed__ CoordinateSystem* voxelCoordinates;
+extern void initCoordinateSystems();

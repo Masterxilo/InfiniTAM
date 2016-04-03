@@ -1,4 +1,6 @@
 
+#define _USE_MATH_DEFINES
+#include <math.h>
 #include "Scene.h" // defines: #include "HashMap.h"
 #include <stdio.h>
 
@@ -351,6 +353,17 @@ void approxEqual(float a, float b, const float eps = 0.00001) {
     assert(abs(a - b) < eps);
 }
 
+
+void approxEqual(Matrix4f a, Matrix4f b, const float eps = 0.00001) {
+    for (int i = 0; i < 4 * 4; i++)
+        approxEqual(a.m[i], b.m[i], eps);
+}
+
+void approxEqual(Matrix3f a, Matrix3f b, const float eps = 0.00001) {
+    for (int i = 0; i < 3 * 3; i++)
+        approxEqual(a.m[i], b.m[i], eps);
+}
+
 void testAllocRequests(Matrix4f M_d, 
     const char* expectedRequestsFilename, 
     const char* missedExpectedRequestsFile,
@@ -405,6 +418,7 @@ void testAllocRequests(Matrix4f M_d,
     ITMView* view = new ITMView(&calib);
     ITMView::depthConversionType = "ConvertDisparityToDepth";
     view->Update(&rgb, &depth);
+    cudaDeviceSynchronize();
 
     assert(view->depth->noDims == Vector2i(640, 480));
     assert(view->rgb->noDims == Vector2i(640, 480));
@@ -642,11 +656,21 @@ void testRenderBlack() {
 }
 
 
-static KERNEL buildWallRequests() {
+static KERNEL buildBlockRequests(Vector3i offset) {
     Scene::requestCurrentSceneVoxelBlockAllocation(
-        VoxelBlockPos(blockIdx.x,
-        blockIdx.y,
-        blockIdx.z));
+        VoxelBlockPos(
+        offset.x + blockIdx.x,
+        offset.y + blockIdx.y,
+        offset.z + blockIdx.z));
+}
+static KERNEL countAllocatedBlocks(Vector3i offset) {
+    if (Scene::getCurrentSceneVoxel(
+        VoxelBlockPos(
+        offset.x + blockIdx.x,
+        offset.y + blockIdx.y,
+        offset.z + blockIdx.z).toInt() * SDF_BLOCK_SIZE
+        ))
+        atomicAdd(&counter, 1);
 }
 
 // assumes buildWallRequests has been executed
@@ -666,11 +690,64 @@ struct BuildWall {
 };
 void buildWallScene() {
     // Build wall scene
-    buildWallRequests << <dim3(10, 10, 1), 1 >> >();
+    buildBlockRequests << <dim3(10, 10, 1), 1 >> >(Vector3i(0,0,0));
     cudaDeviceSynchronize();
     Scene::performCurrentSceneAllocations();
     cudaDeviceSynchronize();
     Scene::getCurrentScene()->doForEachAllocatedVoxel<BuildWall>();
+}
+
+
+static KERNEL buildSphereRequests() {
+    Scene::requestCurrentSceneVoxelBlockAllocation(
+        VoxelBlockPos(blockIdx.x,
+        blockIdx.y,
+        blockIdx.z));
+}
+
+static __managed__ float radiusInWorldCoordinates;
+struct BuildSphere {
+    static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
+        assert(v);
+        assert(radiusInWorldCoordinates > 0);
+
+        Vector3f voxelGlobalPos = (vb->getPos().toFloat() * SDF_BLOCK_SIZE + localPos.toFloat()) * voxelSize;
+
+        // Compute distance to origin
+        const float distanceToOrigin = length(voxelGlobalPos);
+        // signed distance to radiusInWorldCoordinates, positive when bigger
+        const float dist = distanceToOrigin - radiusInWorldCoordinates;
+        
+        // Truncate and convert to -1..1 for band of size mu
+        const float eta = dist;
+        v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
+    }
+};
+void buildSphereScene(const float radiusInWorldCoordinates) {
+    assert(radiusInWorldCoordinates > 0);
+    ::radiusInWorldCoordinates = radiusInWorldCoordinates;
+    const float diameterInWorldCoordinates = radiusInWorldCoordinates * 2;
+    int offseti = -ceil(radiusInWorldCoordinates / voxelBlockSize) - 1; // -1 for extra space
+    assert(offseti < 0);
+
+    Vector3i offset(offseti, offseti, offseti);
+    int counti = ceil(diameterInWorldCoordinates / voxelBlockSize) + 2; // + 2 for extra space
+    assert(counti > 0);
+    dim3 count(counti, counti, counti);
+    assert(offseti + count.x == -offseti);
+
+    // repeat allocation a few times to avoid holes
+    do {
+        buildBlockRequests << <count, 1 >> >(offset);
+        cudaDeviceSynchronize();
+        Scene::performCurrentSceneAllocations();
+        cudaDeviceSynchronize();
+        counter = 0;
+        countAllocatedBlocks << <count, 1 >> >(offset);
+        cudaDeviceSynchronize();
+    } while (counter != counti*counti*counti);
+
+    Scene::getCurrentScene()->doForEachAllocatedVoxel<BuildSphere>();
 }
 
 
@@ -778,9 +855,7 @@ void testTracker() {
     // store output  
     auto expectedPose = dump::load<ITMPose>("Tests/Tracker/out.pose_d");
 
-    for (int i = 0; i < 16; i++) {
-        approxEqual(expectedPose->GetM().m[i], trackingState->pose_d->GetM().m[i]);
-    }
+    approxEqual(expectedPose->GetM(), trackingState->pose_d->GetM(), 0.003f);
     return;
 }
 
@@ -956,8 +1031,127 @@ void testMainEngineProcessFrame() {
     delete expectedRaycastResult;
 }
 
+KERNEL writeImage(Image<char>* image) {
+    assert(image->noDims.area() == 1);
+    image->GetData()[0] = 42;
+}
+KERNEL readImage(Image<char>* image,int val) {
+    assert(image->GetData()[0] == val);
+}
+void testImage() {
+    auto_ptr<Image<char>> image(new Image<char>());
+    const auto* cimage = image.get();
+    assert(image->noDims.area() == 1);
+    // write gpu
+    writeImage << <1, 1 >> >(image.get());
+    cudaDeviceSynchronize();
+    assert(image->dirtyGPU);
+
+    assert(cimage->GetData()[0] == 42); // must use cimage, otherwise image might be dirty and we forgot update!
+    readImage << <1, 1 >> >(image.get(), 42);
+    cudaDeviceSynchronize();
+
+    // Write cpu
+    image->GetData()[0] = 30;
+    image->UpdateDeviceFromHost();// // must manually update device from host because GPU code cannot request this
+    readImage << <1, 1 >> >(image.get(), 30);
+    cudaDeviceSynchronize();
+
+
+    image->ChangeDims(Vector2i(10, 10));
+    readImage << <1, 1 >> >(image.get(), 0);
+    cudaDeviceSynchronize();
+}
+
+/// Alternative/external implementation of axis-angle rotation matrix construction
+/// axis does not need to be normalized.
+Matrix3f createRotation(const Vector3f & _axis, float angle)
+{
+    Vector3f axis = normalize(_axis);
+    float si = sinf(angle);
+    float co = cosf(angle);
+
+    Matrix3f ret;
+    ret.setIdentity();
+
+    ret *= co;
+    for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) ret.at(c, r) += (1.0f - co) * axis[c] * axis[r];
+
+    Matrix3f skewmat;
+    skewmat.setZeros();
+    skewmat.at(1, 0) = -axis.z;
+    skewmat.at(0, 1) = axis.z;
+    skewmat.at(2, 0) = axis.y;
+    skewmat.at(0, 2) = -axis.y;
+    skewmat.at(2, 1) = axis.x; // should be -axis.x;
+    skewmat.at(1, 2) = -axis.x;// should be axis.x;
+    skewmat *= si;
+    ret += skewmat;
+
+    return ret;
+}
+
+void testPose() {
+    Matrix3f m = createRotation(Vector3f(0, 0, 0), 0);
+    Matrix3f id; id.setIdentity();
+    approxEqual(m, id);
+
+    {
+        Matrix3f rot = createRotation(Vector3f(0, 0, 1), M_PI);
+        Matrix3f rot_ = {
+            -1, 0, 0,
+            0, -1, 0,
+            0, 0, 1
+        };
+        ITMPose pose(0, 0, 0,
+            0, 0, M_PI);
+        approxEqual(rot, rot_);
+        approxEqual(rot, pose.GetR());
+    }
+    {
+#define ran (rand() / (1.f * RAND_MAX))
+        Vector3f axis(ran, ran, ran);
+        axis = axis.normalised(); // axis must have unit length for itmPose
+        float angle = rand() / (1.f * RAND_MAX);
+
+        ITMPose pose(0, 0, 0,
+            axis.x*angle, axis.y*angle, axis.z*angle);
+
+        Matrix3f rot = createRotation(axis, angle);
+        approxEqual(rot, pose.GetR());
+#undef ran
+    }
+}
+
+void testMatrix() {
+    // Various ways of accessing matrix elements 
+    Matrix4f m;
+    m.setZeros();
+    // at(x,y), mxy (not myx!, i.e. both syntaxes give the column first, then the row, different from standard maths)
+    m.at(1, 0) = 1;
+    m.at(0, 1) = 2;
+
+    Matrix4f n;
+    n.setZeros();
+    n.m10 = 1;
+    n.m01 = 2;
+    /* m = n =
+    0 1 0 0 
+    2 0 0 0 
+    0 0 0 0
+    0 0 0 0*/
+
+    approxEqual(m, n);
+
+    Vector4f v(1,8,1,2);
+    assert(m*v == Vector4f(8,2,0,0));
+    assert(n*v == Vector4f(8, 2, 0, 0));
+}
 // TODO take the tests apart, clean state inbetween
 void tests() {
+    testMatrix();
+    testPose();
+    testImage();
     testMainEngineProcessFrame();
     testMemblock();
     testImageSource();

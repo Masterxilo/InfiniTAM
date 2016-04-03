@@ -176,6 +176,7 @@
     <CudaCompile Include="ITMLib\Engine\ITMView.cu">
       <Filter>ITMLib\Engine</Filter>
     </CudaCompile>
+    <CudaCompile Include="CoordinateSystems.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

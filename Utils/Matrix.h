@@ -49,6 +49,8 @@ namespace ORUtils {
 		T m[s*s];
 	};
 
+    template<class T>
+    class Matrix3;
 	//////////////////////////////////////////////////////////////////////////
 	// Matrix class with math operators
 	//////////////////////////////////////////////////////////////////////////
@@ -64,7 +66,25 @@ namespace ORUtils {
 			this->m10 = a10; this->m11 = a11; this->m12 = a12; this->m13 = a13;
 			this->m20 = a20; this->m21 = a21; this->m22 = a22; this->m23 = a23;
 			this->m30 = a30; this->m31 = a31; this->m32 = a32; this->m33 = a33;
-		}
+        }
+
+#define Rij(row, col) R.m[row + 3 * col]
+        CPU_AND_GPU Matrix3<T> GetR(void) const
+        {
+            Matrix3<T> R;
+            Rij(0, 0) = m[0 + 4 * 0]; Rij(1, 0) = m[1 + 4 * 0]; Rij(2, 0) = m[2 + 4 * 0];
+            Rij(0, 1) = m[0 + 4 * 1]; Rij(1, 1) = m[1 + 4 * 1]; Rij(2, 1) = m[2 + 4 * 1];
+            Rij(0, 2) = m[0 + 4 * 2]; Rij(1, 2) = m[1 + 4 * 2]; Rij(2, 2) = m[2 + 4 * 2];
+
+            return R;
+        }
+
+        CPU_AND_GPU void SetR(const Matrix3<T>& R) {
+            m[0 + 4 * 0] = Rij(0, 0); m[1 + 4 * 0] = Rij(1, 0); m[2 + 4 * 0] = Rij(2, 0);
+            m[0 + 4 * 1] = Rij(0, 1); m[1 + 4 * 1] = Rij(1, 1); m[2 + 4 * 1] = Rij(2, 1);
+            m[0 + 4 * 2] = Rij(0, 2); m[1 + 4 * 2] = Rij(1, 2); m[2 + 4 * 2] = Rij(2, 2);
+        }
+#undef Rij
 
 		CPU_AND_GPU inline void getValues(T *mp) const	{ memcpy(mp, this->m, sizeof(T) * 16); }
 		CPU_AND_GPU inline const T *getValues() const { return this->m; }
@@ -164,6 +184,11 @@ namespace ORUtils {
 			return r;
 		}
 
+        CPU_AND_GPU inline Matrix4 getInv() const {
+            Matrix4 out; 
+            this->inv(out);
+            return out;
+        }
 		/// Set out to be the inverse matrix of this.
 		CPU_AND_GPU inline bool inv(Matrix4 &out) const {
 			T tmp[12], src[16], det;

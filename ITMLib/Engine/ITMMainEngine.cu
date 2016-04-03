@@ -1,7 +1,12 @@
 #include "ITMMainEngine.h"
+
+
+void buildSphereScene(const float radiusInWorldCoordinates);
 ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib)
 {
     scene = new Scene();
+    CURRENT_SCENE_SCOPE(scene);
+   // buildSphereScene(10 * voxelBlockSize);
 
     renderState_live = NULL;
 	renderState_freeview = NULL; // will be created by the visualisation engine on demand
@@ -64,5 +69,6 @@ void ITMMainEngine::GetImage(
 
     CURRENT_SCENE_SCOPE(scene);
 	RenderImage(pose, intrinsics, renderState_freeview, out, shader);
+    cudaDeviceSynchronize();
     assert(out->dirtyGPU);
 }

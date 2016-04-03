@@ -10,19 +10,19 @@
 #include "ITMPixelUtils.h"
 #include <vector>
 
-struct AccuCell : Managed {
+struct AccuCell : public Managed {
     int noValidPoints;
     float f;
     // ATb
     float ATb[6];
-    // AT_A_tri, upper right triangular part of AT_A
-    float AT_A_tri[1 + 2 + 3 + 4 + 5 + 6];
+    // AT_A (note that this is actually a symmetric matrix, so we could save some effort and memory)
+    float AT_A[6][6];
     void reset() {
         memset(this, 0, sizeof(AccuCell));
     }
 };
 
-struct TrackingLevel {
+struct TrackingLevel : public Managed {
     /// FilterSubsampleWithHoles result of one level higher
     ITMFloatImage* depth;
     /// Half of the intrinsics of one level higher
@@ -31,7 +31,6 @@ struct TrackingLevel {
     const float distanceThreshold;
     const int numberOfIterations;
     const TrackerIterationType iterationType;
-    TrackingLevel() : distanceThreshold(0), numberOfIterations(0), iterationType(TRACKER_ITERATION_BOTH){}
 
     TrackingLevel(int numberOfIterations, TrackerIterationType iterationType, float distanceThreshold) :
         numberOfIterations(numberOfIterations), iterationType(iterationType), distanceThreshold(distanceThreshold) {
@@ -39,7 +38,7 @@ struct TrackingLevel {
     }
 };
 // ViewHierarchy, 0 is highest resolution
-static std::vector<TrackingLevel> trackingLevels;
+static std::vector<TrackingLevel*> trackingLevels;
 struct ITMDepthTracker_
 {
     ITMDepthTracker_() {
@@ -48,38 +47,28 @@ struct ITMDepthTracker_
         const float distThreshStep = depthTrackerICPThreshold / noHierarchyLevels;
         // starting with highest resolution (lowest level, last to be executed)
 #define iterations
-        trackingLevels.push_back(TrackingLevel(2  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 4));
-        trackingLevels.push_back(TrackingLevel(4  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 3));
-        trackingLevels.push_back(TrackingLevel(6  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep * 2));
-        trackingLevels.push_back(TrackingLevel(8  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep));
-        trackingLevels.push_back(TrackingLevel(10 iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold));
+        trackingLevels.push_back(new TrackingLevel(2  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 4));
+        trackingLevels.push_back(new TrackingLevel(4  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 3));
+        trackingLevels.push_back(new TrackingLevel(6  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep * 2));
+        trackingLevels.push_back(new TrackingLevel(8  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep));
+        trackingLevels.push_back(new TrackingLevel(10 iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold));
         assert(trackingLevels.size() == noHierarchyLevels);
     }
 } _;
 
-static TrackingLevel* currentTrackingLevel;
+static __managed__ /*const*/ TrackingLevel* currentTrackingLevel;
 
 static TrackerIterationType iterationType() {
     return currentTrackingLevel->iterationType;
 }
 static bool shortIteration() {
-    return (iterationType() == TRACKER_ITERATION_ROTATION) ||
-        (iterationType() == TRACKER_ITERATION_TRANSLATION);
+    return (iterationType() == TRACKER_ITERATION_ROTATION);
 }
-
-static int noPara()  {
-    return shortIteration() ? 3 : 6;
-}
-
-static int noParaSQ()  {
-    return shortIteration() ? 3 + 2 + 1 : 6 + 5 + 4 + 3 + 2 + 1;
-}
-
 
 static __managed__ /*const*/ AccuCell accu;
 static __managed__ /*const*/ float *depth = 0;
-static __managed__ /*const*/ Matrix4f approxInvPose;//!< \f$T_{g,k}\f$ current estimate, approxInvPose
-static __managed__ /*const*/ Matrix4f scenePose; //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$, scenePose
+static __managed__ /*const*/ Matrix4f T_g_k;//!< \f$T_{g,k}\f$ current estimate
+static __managed__ /*const*/ Matrix4f T_km1_g; //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$
 static __managed__ /*const*/ Vector4f sceneIntrinsics;//!< K
 static __managed__ /*const*/ Vector2i sceneImageSize;
 static __managed__ /*const*/ Vector4f viewIntrinsics;//!< K
@@ -95,7 +84,6 @@ static __managed__ DEVICEPTR(Vector4f) * normalsMap = 0;//!< of size sceneImageS
 /// \file Depth Tracker, c.f. newcombe_etal_ismar2011.pdf Sensor Pose Estimation
 // The current discussion ignores the optimizations/special iterations with 
 // rotation estimation only ("At the coarser levels we optimise only for the rotation matrix R.")
-// Also 'translation only' is not used for the depth ICP tracker.
 
 
 /**
@@ -118,15 +106,12 @@ the direction in which \f$p_k\f$ is observed (projective data association).
 \return false on failure
 \see newcombe_etal_ismar2011.pdf Sensor Pose Estimation
 */
-template<TrackerIterationType iterationType>
 CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
-    THREADPTR(float) *AT, //!< [out]
+    THREADPTR(float) AT[6], //!< [out]
     THREADPTR(float) &b,//!< [out]
 
     const CONSTPTR(int) & x, const CONSTPTR(int) & y,
-    const CONSTPTR(float) &depth, //!< \f$D_k(\mathbf u)\f$
-    const CONSTPTR(Matrix4f) & T_g_k, //!< \f$T_{g,k}\f$ current estimate, approxInvPose
-    const CONSTPTR(Matrix4f) & T_km1_g //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$, scenePose
+    const CONSTPTR(float) &depth //!< \f$D_k(\mathbf u)\f$
     )
 {
     if (depth <= 1e-8f) return false;
@@ -166,30 +151,21 @@ CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
 
     // Compute A^T = G(u)^T . n_{k-1}
     // Where G(u) = [ [p_k]_x Id ] a 3 x 6 matrix
-    // [v]_x denotes the skew symmetric matrix such that for all w [v]_x w = v \cross w
+    // [v]_x denotes the skew symmetric matrix such that for all w, [v]_x w = v \cross w
     int counter = 0;
-#define rotationPart() do {\
-    AT[counter++] = +p_k.z * n_km1.y - p_k.y * n_km1.z;\
-    AT[counter++] = -p_k.z * n_km1.x + p_k.x * n_km1.z;\
-    AT[counter++] = +p_k.y * n_km1.x - p_k.x * n_km1.y;} while(false)
-#define translationPart() do {\
-    AT[counter++] = n_km1.x;\
-    AT[counter++] = n_km1.y;\
-    AT[counter++] = n_km1.z;} while(false)
-
-    switch (iterationType) {
-    case TRACKER_ITERATION_ROTATION: rotationPart(); break;
-    case TRACKER_ITERATION_TRANSLATION: translationPart(); break;
-    case TRACKER_ITERATION_BOTH: rotationPart(); translationPart(); break;
-    }
-#undef rotationPart
-#undef translationPart
+    // rotationPart
+    AT[counter++] = +p_k.z * n_km1.y - p_k.y * n_km1.z;
+    AT[counter++] = -p_k.z * n_km1.x + p_k.x * n_km1.z;
+    AT[counter++] = +p_k.y * n_km1.x - p_k.x * n_km1.y;
+    // translationPart
+    AT[counter++] = n_km1.x;
+    AT[counter++] = n_km1.y;
+    AT[counter++] = n_km1.z;
 
     return true;
 }
 
 #define REDUCE_BLOCK_SIZE 256 // must be power of 2. Used for reduction of a sum.
-template<TrackerIterationType iterationType>
 static KERNEL depthTrackerOneLevel_g_rt_device_main()
 {
     int x = threadIdx.x + blockIdx.x * blockDim.x, y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -201,23 +177,20 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
     should_prefix = false;
     __syncthreads();
 
-    const bool shortIteration = iterationType != TRACKER_ITERATION_BOTH;
-    const int noPara = shortIteration ? 3 : 6;
-    const int noParaSQ = shortIteration ? 3 + 2 + 1 : 6 + 5 + 4 + 3 + 2 + 1;
-    float A[noPara]; float b;
+    float A[6];
+    float b;
     bool isValidPoint = false;
 
     if (x < viewImageSize.x && y < viewImageSize.y)
     {
-        isValidPoint = computePerPointGH_Depth_Ab<iterationType>(
+        isValidPoint = computePerPointGH_Depth_Ab(
             A, b, x, y, 
-            depth[x + y * viewImageSize.x],
-            approxInvPose, scenePose);
+            depth[x + y * viewImageSize.x]);
         if (isValidPoint) should_prefix = true;
     }
 
     if (!isValidPoint) {
-        for (int i = 0; i < noPara; i++) A[i] = 0.0f;
+        for (int i = 0; i < 6; i++) A[i] = 0.0f;
         b = 0.0f;
     }
 
@@ -236,93 +209,26 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
             locId_local,
             &(accu.noValidPoints));
     }
-
+#define reduce(what, into) warpReduce256<float>((what),dim_shared1,locId_local,&(into));
     { //reduction for energy function value
-        warpReduce256<float>(
-            b*b,
-            dim_shared1,
-            locId_local,
-            &(accu.f));
+        reduce(b*b, accu.f);
     }
-
-    __syncthreads();
 
     //reduction for nabla
-    for (unsigned char paraId = 0; paraId < noPara; paraId += 3)
+    for (unsigned char paraId = 0; paraId < 6; paraId++)
     {
-        dim_shared1[locId_local] = b*A[paraId + 0];
-        dim_shared2[locId_local] = b*A[paraId + 1];
-        dim_shared3[locId_local] = b*A[paraId + 2];
-        __syncthreads();
-
-        if (locId_local < 128) {
-            dim_shared1[locId_local] += dim_shared1[locId_local + 128];
-            dim_shared2[locId_local] += dim_shared2[locId_local + 128];
-            dim_shared3[locId_local] += dim_shared3[locId_local + 128];
-        }
-        __syncthreads();
-        if (locId_local < 64) {
-            dim_shared1[locId_local] += dim_shared1[locId_local + 64];
-            dim_shared2[locId_local] += dim_shared2[locId_local + 64];
-            dim_shared3[locId_local] += dim_shared3[locId_local + 64];
-        }
-        __syncthreads();
-
-        if (locId_local < 32) {
-            warpReduce(dim_shared1, locId_local);
-            warpReduce(dim_shared2, locId_local);
-            warpReduce(dim_shared3, locId_local);
-        }
-        __syncthreads();
-
-        if (locId_local == 0) {
-            atomicAdd(&(accu.ATb[paraId + 0]), dim_shared1[0]);
-            atomicAdd(&(accu.ATb[paraId + 1]), dim_shared2[0]);
-            atomicAdd(&(accu.ATb[paraId + 2]), dim_shared3[0]);
-        }
+        reduce(b*A[paraId], accu.ATb[paraId]);
     }
 
-    __syncthreads();
-
-    float localHessian[noParaSQ];
-
-    for (unsigned char r = 0, counter = 0; r < noPara; r++)
+    float AT_A[6][6];
+    int counter = 0;
+    for (int r = 0; r < 6; r++)
     {
-        for (int c = 0; c <= r; c++, counter++) localHessian[counter] = A[r] * A[c];
-    }
+        for (int c = 0; c < 6; c++) {
+            AT_A[r][c] = A[r] * A[c];
 
-    //reduction for hessian
-    for (unsigned char paraId = 0; paraId < noParaSQ; paraId += 3)
-    {
-        dim_shared1[locId_local] = localHessian[paraId + 0];
-        dim_shared2[locId_local] = localHessian[paraId + 1];
-        dim_shared3[locId_local] = localHessian[paraId + 2];
-        __syncthreads();
-
-        if (locId_local < 128) {
-            dim_shared1[locId_local] += dim_shared1[locId_local + 128];
-            dim_shared2[locId_local] += dim_shared2[locId_local + 128];
-            dim_shared3[locId_local] += dim_shared3[locId_local + 128];
-        }
-        __syncthreads();
-        if (locId_local < 64) {
-            dim_shared1[locId_local] += dim_shared1[locId_local + 64];
-            dim_shared2[locId_local] += dim_shared2[locId_local + 64];
-            dim_shared3[locId_local] += dim_shared3[locId_local + 64];
-        }
-        __syncthreads();
-
-        if (locId_local < 32) {
-            warpReduce(dim_shared1, locId_local);
-            warpReduce(dim_shared2, locId_local);
-            warpReduce(dim_shared3, locId_local);
-        }
-        __syncthreads();
-
-        if (locId_local == 0) {
-            atomicAdd(&(accu.AT_A_tri[paraId + 0]), dim_shared1[0]);
-            atomicAdd(&(accu.AT_A_tri[paraId + 1]), dim_shared2[0]);
-            atomicAdd(&(accu.AT_A_tri[paraId + 2]), dim_shared3[0]);
+            //reduction for hessian
+            reduce(AT_A[r][c], accu.AT_A[r][c]);
         }
     }
 }
@@ -336,7 +242,7 @@ AccuCell ComputeGandH(Matrix4f T_g_k_estimate) {
     ::viewIntrinsics = currentTrackingLevel->intrinsics;
     ::viewImageSize = currentTrackingLevel->depth->noDims;
     ::accu.reset();
-    ::approxInvPose = T_g_k_estimate;
+    ::T_g_k = T_g_k_estimate;
     ::distThresh = currentTrackingLevel->distanceThreshold;
 
     dim3 blockSize(16, 16); // must equal REDUCE_BLOCK_SIZE
@@ -346,47 +252,27 @@ AccuCell ComputeGandH(Matrix4f T_g_k_estimate) {
         (int)ceil((float)viewImageSize.x / (float)blockSize.x),
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
-
-
-#define iteration(it) \
-			it: LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device_main<it>, gridSize, blockSize);
-
-    switch (iterationType()) {
-        case iteration(TRACKER_ITERATION_ROTATION);
-            case iteration(TRACKER_ITERATION_TRANSLATION);
-                case iteration(TRACKER_ITERATION_BOTH);
-    }
-#undef iteration
+    LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device_main, gridSize, blockSize);
 
     cudaDeviceSynchronize(); // for later access of accu
     return accu;
 }
 
-
-
-AccuCell ComputeGandH(Matrix4f T_g_k_estimate); /// evaluate error function at the current T_g_k_estimate, 
+/// evaluate error function at the supplied T_g_k_estimate, 
 /// compute sum_ATb and sum_AT_A, the system we need to solve to compute the
 /// next update step (note: this system is not yet solved and we don't know the new energy yet!)
 /// \returns noValidPoints
 int ComputeGandH(
     float &f,
-    float *sum_ATb,
-    float *sum_AT_A,
+    float sum_ATb[6],
+    float sum_AT_A[6][6],
     Matrix4f T_g_k_estimate) {
     AccuCell accu = ComputeGandH(T_g_k_estimate);
 
-    memcpy(sum_ATb, accu.ATb, sizeof(float) * noPara());
-
-    // output sum_AT_A, sum_ATb
-    // Construct full output (hessian) matrix from accumulated sum
-    // lower right triangular part
-    for (int r = 0, counter = 0; r < noPara(); r++)
-        for (int c = 0; c <= r; c++)
-            sum_AT_A[r * 6 + c] = accu.AT_A_tri[counter++]; // here, r is bigger than c 
-    // Symmetric part
-    for (int r = 0; r < noPara(); ++r)
-        for (int c = r + 1; c < noPara(); c++)
-            sum_AT_A[r * 6 + c] = sum_AT_A[c * 6 + r]; // here, c is bigger than r, that part was initialized above
+    memcpy(sum_ATb, accu.ATb, sizeof(float) * 6);
+    assert(sum_ATb[4] == accu.ATb[4]);
+    memcpy(sum_AT_A, accu.AT_A, sizeof(float) * 6 * 6);
+    assert(sum_AT_A[3][4] == accu.AT_A[3][4]);
 
     // Output energy -- if we have very few points, output some high energy
     f = (accu.noValidPoints > 100) ? sqrt(accu.f) / accu.noValidPoints : 1e5f;
@@ -394,28 +280,33 @@ int ComputeGandH(
     return accu.noValidPoints;
 }
 
-
 /// Solves hessian.step = nabla
 /// \param delta output array of 6 floats 
 /// \param hessian 6x6
 /// \param delta 3 or 6
 /// \param nabla 3 or 6
 /// \param shortIteration whether there are only 3 parameters
-void ComputeDelta(float *step, float *nabla, float *hessian)
+void ComputeDelta(float step[6], float nabla[6], float hessian[6][6])
 {
     for (int i = 0; i < 6; i++) step[i] = 0;
 
     if (shortIteration())
     {
         // Keep only upper 3x3 part of hessian
-        float smallHessian[3 * 3];
-        for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) smallHessian[r + c * 3] = hessian[r + c * 6];
+        float smallHessian[3][3];
+        for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) smallHessian[r][c] = hessian[r][c];
 
-        ORUtils::Cholesky::solve(smallHessian, 3, nabla, step);
+        ORUtils::Cholesky::solve((float*)smallHessian, 3, nabla, step);
+        
+        // check
+        float result[3];
+        matmul((float*)smallHessian, step, result, 3, 3);
+        for (int r = 0; r < 3; r++)
+            assert(abs(result[r] - nabla[r]) / abs(result[r]) < 0.0001);
     }
     else
     {
-        ORUtils::Cholesky::solve(hessian, 6, nabla, step);
+        ORUtils::Cholesky::solve((float*)hessian, 6, nabla, step);
     }
 }
 
@@ -444,10 +335,6 @@ Matrix4f ComputeTinc(const float *delta)
     case TRACKER_ITERATION_ROTATION:
         step[0] = (float)(delta[0]); step[1] = (float)(delta[1]); step[2] = (float)(delta[2]);
         step[3] = 0.0f; step[4] = 0.0f; step[5] = 0.0f;
-        break;
-    case TRACKER_ITERATION_TRANSLATION:
-        step[0] = 0.0f; step[1] = 0.0f; step[2] = 0.0f;
-        step[3] = (float)(delta[0]); step[4] = (float)(delta[1]); step[5] = (float)(delta[2]);
         break;
     default:
     case TRACKER_ITERATION_BOTH:
@@ -480,7 +367,7 @@ void TrackCamera(
 {
     /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
     cudaDeviceSynchronize(); // prepare writing to __managed__
-    ::scenePose = trackingState->pointCloud->pose_pointCloud->GetM();
+    ::T_km1_g = trackingState->pointCloud->pose_pointCloud->GetM();
     ::pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
     ::normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
     ::sceneIntrinsics = view->calib->intrinsics_d.projectionParamsSimple.all;
@@ -488,14 +375,15 @@ void TrackCamera(
     assert(sceneImageSize == trackingState->pointCloud->normals->noDims);
 
     /// Init image hierarchy levels
-    trackingLevels[0].depth = view->depth;
-    trackingLevels[0].intrinsics = sceneIntrinsics;
+    trackingLevels[0]->depth = view->depth;
+    trackingLevels[0]->intrinsics = sceneIntrinsics;
     for (int i = 1; i < trackingLevels.size(); i++)
     {
-        TrackingLevel* currentLevel = &trackingLevels[i];
-        TrackingLevel* previousLevel = &trackingLevels[i - 1];
+        TrackingLevel* currentLevel = trackingLevels[i];
+        TrackingLevel* previousLevel = trackingLevels[i - 1];
 
         FilterSubsampleWithHoles(currentLevel->depth, previousLevel->depth);
+        cudaDeviceSynchronize();
 
         currentLevel->intrinsics = previousLevel->intrinsics * 0.5f;
     }
@@ -503,7 +391,7 @@ void TrackCamera(
     // Coarse to fine
     for (int levelId = trackingLevels.size() - 1; levelId >= 0; levelId--)
     {
-        currentTrackingLevel = &trackingLevels[levelId];
+        currentTrackingLevel = trackingLevels[levelId];
         if (iterationType() == TRACKER_ITERATION_NONE) continue;
 
         // T_{k,g} transforms global (g) coordinates to eye or view coordinates of the k-th frame
@@ -567,12 +455,12 @@ T_g_k_estimate = T_k_g_estimate->GetInvM();
             float f_new;
             int noValidPoints;
             float new_sum_ATb[6];
-            float new_sum_AT_A[6 * 6];
+            float new_sum_AT_A[6][6];
             noValidPoints = ComputeGandH(f_new, new_sum_ATb, new_sum_AT_A, T_g_k_estimate);
             // ]]
 
-            float least_energy_sum_AT_A[6 * 6],
-                damped_least_energy_sum_AT_A[6 * 6];
+            float least_energy_sum_AT_A[6][6],
+                damped_least_energy_sum_AT_A[6][6];
             float least_energy_sum_ATb[6];
 
             // check if energy actually *increased* with the last update
@@ -592,8 +480,8 @@ T_g_k_estimate = T_k_g_estimate->GetInvM();
 
                 // Prepare to solve a new system
 
-                // Preconditioning
-                for (int i = 0; i < 6 * 6; ++i) least_energy_sum_AT_A[i] = new_sum_AT_A[i] / noValidPoints;
+                // Preconditioning: Normalize by noValidPoints
+                for (int i = 0; i < 6; ++i) for (int j = 0; j < 6; ++j) least_energy_sum_AT_A[i][j] = new_sum_AT_A[i][j] / noValidPoints;
                 for (int i = 0; i < 6; ++i) least_energy_sum_ATb[i] = new_sum_ATb[i] / noValidPoints;
 
                 // Accept and decrease damping
@@ -602,8 +490,8 @@ T_g_k_estimate = T_k_g_estimate->GetInvM();
             // Solve normal equations
 
             // Apply levenberg-marquart style damping (multiply diagonal of ATA by 1.0f + lambda)
-            for (int i = 0; i < 6 * 6; ++i) damped_least_energy_sum_AT_A[i] = least_energy_sum_AT_A[i];
-            for (int i = 0; i < 6; ++i) damped_least_energy_sum_AT_A[i + i * 6] *= 1.0f + lambda;
+            for (int i = 0; i < 6; ++i) for (int j = 0; j < 6; ++j) damped_least_energy_sum_AT_A[i][j] = least_energy_sum_AT_A[i][j];
+            for (int i = 0; i < 6; ++i) damped_least_energy_sum_AT_A[i][i] *= 1.0f + lambda;
 
             // compute the update step parameter vector x
             float x[6];

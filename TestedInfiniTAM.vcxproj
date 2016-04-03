@@ -156,6 +156,7 @@
     <ClInclude Include="Utils\Vector.h" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="CoordinateSystems.cu" />
     <CudaCompile Include="Engine\UIEngine.cu" />
     <CudaCompile Include="GeometryRefinement.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

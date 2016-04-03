@@ -20,7 +20,7 @@ namespace ORUtils
     TODO acess the data in a write-only manner so that the update..from.. dont have to be called.
 	*/
 	template <typename T>
-	class MemoryBlock
+	class MemoryBlock : public Managed
 	{
 	protected:
 
@@ -38,7 +38,7 @@ namespace ORUtils
     protected:
 
         
-        /** Transfer data from GPU to CPU */
+        /** Transfer data from GPU to CPU. Happens implicitly when the pointer is requested */
         void UpdateHostFromDevice() const {
             assert(dirtyGPU && !dirtyCPU);
             cudaSafeCall(cudaMemcpy(data_cpu, data_cuda, dataSizeInBytes(), cudaMemcpyDeviceToHost));
@@ -46,7 +46,7 @@ namespace ORUtils
         }
 
     public:
-        /** Transfer data from CPU to GPU */
+        /** Transfer data from CPU to GPU. Cannot be requested from GPU */
         void UpdateDeviceFromHost() const {
             assert(!dirtyGPU && dirtyCPU);
             cudaSafeCall(cudaMemcpy(data_cuda, data_cpu, dataSizeInBytes(), cudaMemcpyHostToDevice));
@@ -75,7 +75,8 @@ namespace ORUtils
 #ifndef __CUDA_ARCH__
                 if (dirtyCPU) UpdateDeviceFromHost();
 #endif
-                assert(data_cuda && !dirtyCPU); dirtyGPU = true;
+                assert(data_cuda && !dirtyCPU); 
+                dirtyGPU = true; // TODO calling this function often will cause many unnecessary memory transfers
                 return data_cuda;
 			}
             assert(false);
@@ -94,7 +95,7 @@ namespace ORUtils
 #ifndef __CUDA_ARCH__
                 if (dirtyCPU) UpdateDeviceFromHost();
 #endif
-                assert(data_cuda && !dirtyCPU);
+                assert(data_cuda && !dirtyCPU); // did you forget to UpdateDeviceFromHost?
                 return data_cuda;
             }
             assert(false);

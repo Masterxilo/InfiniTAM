@@ -20,9 +20,12 @@ Beyond that a sliding average is computed.
 */
 #define maxW 100
 /// Size of a voxel, usually given in meters.
-/// In world space coordinates. (
+/// In world space coordinates. 
 #define voxelSize 0.005f
 #define oneOverVoxelSize (1.0f / voxelSize)
+/// In world space coordinates.
+#define voxelBlockSize (voxelSize*SDF_BLOCK_SIZE)
+#define oneOverVoxelBlockWorldspaceSize (1.0f / (voxelBlockSize))
 /** @{ */
 /** \brief
 Fallback parameters: consider only parts of the

@@ -17,13 +17,13 @@ inline dim3 getGridSize(Vector2i taskSize, dim3 blockSize)
 struct Managed {
     void *operator new(size_t len){
         void *ptr;
-        cudaMallocManaged(&ptr, len);
+        cudaMallocManaged(&ptr, len); // did some earlier kernel throw an assert?
         cudaDeviceSynchronize();
         return ptr;
     }
 
     void operator delete(void *ptr) {
-        cudaDeviceSynchronize();
+        cudaDeviceSynchronize();  // did some earlier kernel throw an assert?
         cudaFree(ptr);
     }
 };

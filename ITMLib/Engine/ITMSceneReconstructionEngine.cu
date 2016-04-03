@@ -3,22 +3,18 @@
 #include "ITMLibDefines.h"
 #include "ITMPixelUtils.h"
 #include "ITMRepresentationAccess.h"
+#include "CoordinateSystem.h"
+#include "CameraImage.h"
 
 // Reduce passing by using global variables.
 // Note that this whole program should be run single-threaded on a
 // single GPU and single GPU context, so this is no problem
 // TODO use __const__ memory (TODO is passing parameters faster?)
-static __managed__ /*const*/ Vector2i imgSize_d;
-static __managed__ /*const*/ Vector2i imgSize_rgb;
-static __managed__ /*const*/ Matrix4f M_d;
-static __managed__ /*const*/ Matrix4f invM_d;//!< depth to world transformation
-static __managed__ /*const*/ Matrix4f M_rgb;
-static __managed__ /*const*/ Vector4f projParams_d;
-static __managed__ /*const*/ Vector4f projParams_rgb;
-/// current depth image
-static __managed__ /*const*/ float* depth;
+
 /// current color image
-static __managed__ /*const*/ Vector4u *rgb;
+static __managed__ /*const*/ CameraImage<Vector4u>* colorImage = 0;
+/// current depth image
+static __managed__ /*const*/ DepthImage* depthImage = 0;
 
 /// Fusion Stage - Camera Data Integration
 /// \returns \f$\eta\f$, -1 on failure
@@ -26,22 +22,24 @@ static __managed__ /*const*/ Vector4u *rgb;
 // in [-1,1] within the truncation band.
 GPU_ONLY inline float computeUpdatedVoxelDepthInfo(
     DEVICEPTR(ITMVoxel) &voxel, //!< X
-    const THREADPTR(Vector4f) & pt_model //!< in world space
+    const THREADPTR(Point) & pt_model //!< in world space
     )
 {
 
     // project point into depth image
     /// X_d, depth camera coordinate system
-    Vector4f pt_camera;
+    const Vector4f pt_camera = Vector4f(
+        depthImage->eyeCoordinates->convert(pt_model).location,
+        1);
     /// \pi(K_dX_d), projection into the depth image
     Vector2f pt_image;
-    if (!projectModel(projParams_d, M_d,
-        imgSize_d, pt_model, pt_camera, pt_image)) return -1;
+    if (!depthImage->project(pt_model, pt_image))
+        return -1;
 
     // get measured depth from image, no interpolation
     /// I_d(\pi(K_dX_d))
-    const float depth_measure = sampleNearest(depth, pt_image, imgSize_d);
-    if (depth_measure <= 0.0) return -1;
+    auto p = depthImage->getPointForPixel(pt_image.toInt());
+    const float depth_measure = p.location.z;
 
     /// I_d(\pi(K_dX_d)) - X_d^(z)          (3)
     float const eta = depth_measure - pt_camera.z;
@@ -67,17 +65,17 @@ GPU_ONLY inline float computeUpdatedVoxelDepthInfo(
 /// \returns early on failure
 GPU_ONLY inline void computeUpdatedVoxelColorInfo(
     DEVICEPTR(ITMVoxel) &voxel,
-    const THREADPTR(Vector4f) & pt_model)
+    const THREADPTR(Point) & pt_model)
 {
-    Vector4f pt_camera; Vector2f pt_image;
-    if (!projectModel(projParams_rgb, M_rgb,
-        imgSize_rgb, pt_model, pt_camera, pt_image)) return;
+    Vector2f pt_image;
+    if (!colorImage->project(pt_model, pt_image))
+        return;
 
     int oldW = (float)voxel.w_color;
     const Vector3f oldC = TO_FLOAT3(voxel.clr);
 
     /// Like formula (4) for depth
-    const Vector3f newC = TO_VECTOR3(interpolateBilinear<Vector4f>(rgb, pt_image, imgSize_rgb));
+    const Vector3f newC = TO_VECTOR3(interpolateBilinear<Vector4f>(colorImage->image->GetData(), pt_image, colorImage->imgSize()));
     int newW = 1;
 
     updateVoxelColorInformation(
@@ -88,7 +86,7 @@ GPU_ONLY inline void computeUpdatedVoxelColorInfo(
 
 GPU_ONLY static void computeUpdatedVoxelInfo(
     DEVICEPTR(ITMVoxel) & voxel, //!< [in, out] updated voxel
-    const THREADPTR(Vector4f) & pt_model) {
+    const THREADPTR(Point) & pt_model) {
     const float eta = computeUpdatedVoxelDepthInfo(voxel, pt_model);
 
     // Only the voxels within +- 25% mu of the surface get color
@@ -102,37 +100,37 @@ GPU_ONLY static void computeUpdatedVoxelInfo(
 /// \param x,y [in] loop over depth image.
 struct buildHashAllocAndVisibleTypePP {
     forEachPixelNoImage_process() {
-        // Find 3d position of depth pixel xy, in world coordinates
-        const float depth_measure = sampleNearest(depth, x, y, imgSize_d);
-        if (depth_measure <= 0 || (depth_measure - mu) < 0 || (depth_measure - mu) < viewFrustum_min || (depth_measure + mu) > viewFrustum_max) return;
+        // Find 3d position of depth pixel xy, in eye coordinates
+        auto pt_camera = depthImage->getPointForPixel(Vector2i(x, y));
 
-        const Vector4f pt_camera_f = depthTo3D(projParams_d, x, y, depth_measure);
+        const float depth = pt_camera.location.z;
+        if (depth <= 0 || (depth - mu) < 0 || (depth - mu) < viewFrustum_min || (depth + mu) > viewFrustum_max) return;
 
-        // distance from camera
-        float norm = length(pt_camera_f.toVector3());
+        // the found point +- mu
+        const Vector pt_camera_v = (pt_camera - depthImage->location());
+        const float norm = length(pt_camera_v.direction);
+        const Vector pt_camera_v_minus_mu = pt_camera_v*(1.0f - mu / norm);
+        const Vector pt_camera_v_plus_mu = pt_camera_v*(1.0f + mu / norm);
 
-        // Transform into fractional block coordinates the found point +- mu
-        // TODO why /norm? An adhoc fix to not allocate too much when far away and allocate more when nearby?
-#define oneOverVoxelBlockWorldspaceSize (1.0f / (voxelSize * SDF_BLOCK_SIZE))
-        Vector3f       point = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f - mu / norm))) * oneOverVoxelBlockWorldspaceSize;
-        const Vector3f point_e = TO_VECTOR3(invM_d * (pt_camera_f * (1.0f + mu / norm))) * oneOverVoxelBlockWorldspaceSize;
+        // Convert to voxel block coordinates  
+        // the initial point pt_camera_v_minus_mu
+        Point point = voxelBlockCoordinates->convert(depthImage->location() + pt_camera_v_minus_mu);
+        // the direction towards pt_camera_v_plus_mu in voxelBlockCoordinates
+        const Vector vector = voxelBlockCoordinates->convert(pt_camera_v_plus_mu - pt_camera_v_minus_mu);
 
         // We will step along point -> point_e and add all voxel blocks we encounter to the visible list
         // "Create a segment on the line of sight in the range of the T-SDF truncation band"
-        Vector3f direction = point_e - point;
-        norm = length(direction);
-        const int noSteps = (int)ceil(2.0f*norm);
-
-        direction /= (float)(noSteps - 1);
+        const int noSteps = (int)ceil(2.0f* length(vector.direction) ); // make steps smaller than 1, maybe even < 1/2 to really land in all blocks at least once
+        const Vector direction = vector * (1.f / (float)(noSteps - 1));
 
         //add neighbouring blocks
         for (int i = 0; i < noSteps; i++)
         {
             // "take the block coordinates of voxels on this line segment"
-            VoxelBlockPos blockPos = TO_SHORT_FLOOR3(point);
+            const VoxelBlockPos blockPos = TO_SHORT_FLOOR3(point.location);
             Scene::requestCurrentSceneVoxelBlockAllocation(blockPos);
 
-            point += direction;
+            point = point + direction;
         }
     }
 };
@@ -142,16 +140,12 @@ struct buildHashAllocAndVisibleTypePP {
 struct IntegrateVoxel {
     static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
         const Vector3i globalPos = vb->pos.toInt() * SDF_BLOCK_SIZE;
-        const Vector4f pt_model = Vector4f(
-            (globalPos.toFloat() + localPos.toFloat()) * voxelSize, 1.f);
 
-        /*
-        float z = (threadIdx.z) * voxelSize;
-        assert(v);
-        float eta = (SDF_BLOCK_SIZE / 2)*voxelSize - z;
-        v->setSDF(MAX(MIN(1.0f, eta / mu), -1.f));
-        */
-        computeUpdatedVoxelInfo(*v, pt_model);
+        computeUpdatedVoxelInfo(*v, 
+            Point(
+                CoordinateSystem::global(), 
+                (globalPos.toFloat() + localPos.toFloat()) * voxelSize
+            ));
     }
 };
 
@@ -163,22 +157,19 @@ void FuseView_pre(
     cudaDeviceSynchronize();
     assert(Scene::getCurrentScene());
 
-    imgSize_d = view->depth->noDims;
-    imgSize_rgb = view->rgb->noDims;
-    ::M_d = M_d;
-    M_d.inv(invM_d);
+    Matrix4f M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
 
-    M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
-    projParams_d = view->calib->intrinsics_d.projectionParamsSimple.all;
-    projParams_rgb = view->calib->intrinsics_rgb.projectionParamsSimple.all;
-    depth = view->depth->GetData(MEMORYDEVICE_CUDA);
-    rgb = view->rgb->GetData(MEMORYDEVICE_CUDA);
+    auto depthCs = new CoordinateSystem(M_d.getInv());
+    depthImage = new DepthImage(view->depth, depthCs, view->calib->intrinsics_d.projectionParamsSimple.all);
+
+    auto colorCs = new CoordinateSystem(M_rgb.getInv());
+    colorImage = new CameraImage<Vector4u>(view->rgb, colorCs, view->calib->intrinsics_rgb.projectionParamsSimple.all);
+        
 
     // allocation request
-    forEachPixelNoImage<buildHashAllocAndVisibleTypePP>(imgSize_d);
+    forEachPixelNoImage<buildHashAllocAndVisibleTypePP>(view->depth->noDims);
 
     cudaDeviceSynchronize();
-
 }
 
 /// Fusion stage of the system
@@ -190,32 +181,18 @@ void FuseView(
         view, M_d
         );
 
-    // dump ra
-    printf("----------\n");
-    // test content of requests "allocate planned"
-    uchar *entriesAllocType = (uchar *)malloc(SDF_GLOBAL_BLOCK_NUM);
-    Vector3s *blockCoords = (Vector3s *)malloc(SDF_GLOBAL_BLOCK_NUM * sizeof(Vector3s));
-
-    cudaMemcpy(entriesAllocType,
-        Scene::getCurrentScene()->voxelBlockHash->needsAllocation,
-        SDF_GLOBAL_BLOCK_NUM,
-        cudaMemcpyDeviceToHost);
-
-    cudaMemcpy(blockCoords,
-        Scene::getCurrentScene()->voxelBlockHash->naKey,
-        SDF_GLOBAL_BLOCK_NUM * sizeof(VoxelBlockPos),
-        cudaMemcpyDeviceToHost);
-
-    for (int targetIdx = 0; targetIdx < SDF_GLOBAL_BLOCK_NUM; targetIdx++) {
-        if (entriesAllocType[targetIdx] == 0) continue;
-        printf("%d %d %d\n", blockCoords[targetIdx].x, blockCoords[targetIdx].y, blockCoords[targetIdx].z);
-    }
-
     // allocation
     Scene::performCurrentSceneAllocations();
 
     // camera data integration
     cudaDeviceSynchronize();
     Scene::getCurrentScene()->doForEachAllocatedVoxel<IntegrateVoxel>();
+
+
+    delete depthImage->eyeCoordinates;
+    delete depthImage; depthImage = 0;
+    delete colorImage->eyeCoordinates;
+    delete colorImage; colorImage = 0;
 }
 
+// 222

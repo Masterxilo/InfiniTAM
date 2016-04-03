@@ -141,6 +141,11 @@
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CameraImage.h" />
+    <ClInclude Include="CoordinateSystem.h" />
+    <ClInclude Include="positive.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 7.0.targets" />
