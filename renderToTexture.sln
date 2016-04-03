@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2013
+VisualStudioVersion = 12.0.31101.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "renderToTexture", "renderToTexture.vcxproj", "{870857A8-69F5-4A56-81D3-FFE063B955DD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Debug|Win32.ActiveCfg = Debug|Win32
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Debug|Win32.Build.0 = Debug|Win32
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Debug|x64.ActiveCfg = Debug|x64
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Debug|x64.Build.0 = Debug|x64
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Release|Win32.ActiveCfg = Release|Win32
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Release|Win32.Build.0 = Release|Win32
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Release|x64.ActiveCfg = Release|x64
+		{870857A8-69F5-4A56-81D3-FFE063B955DD}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
