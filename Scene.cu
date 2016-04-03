@@ -22,6 +22,7 @@ void Scene::setCurrentScene(Scene* s) {
 
 Scene::Scene() {
     initCoordinateSystems();
+    assert(mu > voxelSize * 2);
     voxelBlockHash = new HashMap<Z3Hasher, AllocateVB>(SDF_EXCESS_LIST_SIZE);
     cudaSafeCall(cudaMalloc(&localVBA, sizeof(ITMVoxelBlock) *SDF_LOCAL_BLOCK_NUM));
 }

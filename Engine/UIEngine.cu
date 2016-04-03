@@ -71,7 +71,7 @@ void UIEngine::glutDisplayFunction()
                 uiEngine->outputImage,
                 &uiEngine->freeviewPose,
                 &uiEngine->freeviewIntrinsics,
-                "renderColour" //renderGrey"
+                "renderGrey" //renderGrey"
                 );
             png::SaveImageToFile(uiEngine->outputImage, "out.png");
 

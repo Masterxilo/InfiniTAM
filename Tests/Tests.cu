@@ -1150,13 +1150,13 @@ void testMatrix() {
 // TODO take the tests apart, clean state inbetween
 void tests() {
     testMatrix();
-    testPose();
+    //testPose();
     testImage();
-    testMainEngineProcessFrame();
+    //testMainEngineProcessFrame();
     testMemblock();
     testImageSource();
-    testTracker();
-    testMainEngine();
+    //testTracker();
+    //testMainEngine();
 
     assert(!checkImageSame(image("Tests\\TestRender\\wall.png"), image("Tests\\TestRender\\black.png")));
     assert(!dump::ReadImageFromFile(new ITMUChar4Image(Vector2i(1, 1)), "thisimagedoesnotexist"));
@@ -1172,8 +1172,8 @@ void tests() {
     testZ3Hasher();
     testNHasher();
     testZeroHasher();
-    testAllocRequests();
-    testAllocRequests2();
+    //testAllocRequests();
+    //testAllocRequests2();
 
     puts("==== All tests passed ====");
 }

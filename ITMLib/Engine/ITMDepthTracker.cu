@@ -66,17 +66,12 @@ static bool shortIteration() {
 }
 
 static __managed__ /*const*/ AccuCell accu;
+/// In world-coordinates
 static __managed__ /*const*/ float distThresh;//!< \f$\epsilon_d\f$
 
 #include "cameraimage.h"
-/// currentTrackingLevel view, 
-//static __managed__ /*const*/ Matrix4f T_g_k;//!< \f$T_{g,k}\f$ current estimate, the transformation from frame k's view space to global space
-//static __managed__ /*const*/ Vector4f viewIntrinsics;//!< K
-//static __managed__ /*const*/ Vector2i viewImageSize;
-//static __managed__ /*const*/ float *depth = 0;
+/// currentTrackingLevel view
 static __managed__ DEVICEPTR(DepthImage) * depthImage = 0;
-
-
 
 /// In world coordinates, points map, normals map, for frame k-1, \f$V_{k-1}\f$
 static __managed__ DEVICEPTR(RayImage) * lastFrameICPMap = 0;
@@ -141,10 +136,6 @@ CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
     // d := p_km1 - p_k
     const Vector d = p_km1 - p_k;
 
-    assert(CoordinateSystem::global() == d.coordinateSystem);
-    assert(CoordinateSystem::global() == n_km1.coordinateSystem);
-    assert(CoordinateSystem::global() == p_km1.coordinateSystem);
-    assert(CoordinateSystem::global() == p_k.coordinateSystem);
     // [
     // Projective data assocation rejection test, "\Omega_k(u) != 0"
     // TODO check whether normal matches normal from image, done in the original paper, but does not seem to be required
@@ -318,11 +309,11 @@ void ComputeDelta(float step[6], float nabla[6], float hessian[6][6])
         ORUtils::Cholesky::solve((float*)smallHessian, 3, nabla, step);
         
         // check
-        float result[3];
+        /*float result[3];
         matmul((float*)smallHessian, step, result, 3, 3);
         for (int r = 0; r < 3; r++)
             assert(abs(result[r] - nabla[r]) / abs(result[r]) < 0.0001);
-    }
+    */}
     else
     {
         ORUtils::Cholesky::solve((float*)hessian, 6, nabla, step);
@@ -411,6 +402,8 @@ void TrackCamera(
 
         FilterSubsampleWithHoles(currentLevel->depth, previousLevel->depth);
         cudaDeviceSynchronize();
+        //currentLevel->depth->UpdateDeviceFromHost();
+        //cudaDeviceSynchronize();
 
         currentLevel->intrinsics = previousLevel->intrinsics * 0.5f;
     }

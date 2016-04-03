@@ -12,6 +12,8 @@ signed distance transform that is actually stored
 in the volume. This is again usually specified in
 meters. The resulting width in voxels is @ref mu
 divided by @ref voxelSize.
+
+Must be greater than voxelSize.
 */
 #define mu 0.02f
 /** \brief
