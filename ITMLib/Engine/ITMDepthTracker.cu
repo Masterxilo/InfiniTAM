@@ -66,19 +66,20 @@ static bool shortIteration() {
 }
 
 static __managed__ /*const*/ AccuCell accu;
-static __managed__ /*const*/ float *depth = 0;
-static __managed__ /*const*/ Matrix4f T_g_k;//!< \f$T_{g,k}\f$ current estimate
-static __managed__ /*const*/ Matrix4f T_km1_g; //!< \f$T_{g, k-1}^{-1}\f$, i.e. \f$T_{k-1,g}\f$
-static __managed__ /*const*/ Vector4f sceneIntrinsics;//!< K
-static __managed__ /*const*/ Vector2i sceneImageSize;
-static __managed__ /*const*/ Vector4f viewIntrinsics;//!< K
-static __managed__ /*const*/ Vector2i viewImageSize;
 static __managed__ /*const*/ float distThresh;//!< \f$\epsilon_d\f$
 
-// for ICP
-static __managed__ DEVICEPTR(Vector4f) * pointsMap = 0; //!< of size sceneImageSize, for frame k-1. \f$V_{k-1}\f$
-static __managed__ DEVICEPTR(Vector4f) * normalsMap = 0;//!< of size sceneImageSize, for frame k-1. \f$V_{k-1}\f$
+#include "cameraimage.h"
+/// currentTrackingLevel view, 
+//static __managed__ /*const*/ Matrix4f T_g_k;//!< \f$T_{g,k}\f$ current estimate, the transformation from frame k's view space to global space
+//static __managed__ /*const*/ Vector4f viewIntrinsics;//!< K
+//static __managed__ /*const*/ Vector2i viewImageSize;
+//static __managed__ /*const*/ float *depth = 0;
+static __managed__ DEVICEPTR(DepthImage) * depthImage = 0;
 
+
+
+/// In world coordinates, points map, normals map, for frame k-1, \f$V_{k-1}\f$
+static __managed__ DEVICEPTR(RayImage) * lastFrameICPMap = 0;
 
 // device functions
 /// \file Depth Tracker, c.f. newcombe_etal_ismar2011.pdf Sensor Pose Estimation
@@ -110,57 +111,67 @@ CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
     THREADPTR(float) AT[6], //!< [out]
     THREADPTR(float) &b,//!< [out]
 
-    const CONSTPTR(int) & x, const CONSTPTR(int) & y,
-    const CONSTPTR(float) &depth //!< \f$D_k(\mathbf u)\f$
+    const CONSTPTR(int) & x, const CONSTPTR(int) & y
     )
 {
-    if (depth <= 1e-8f) return false;
-
-    // (1) Grab the corresponding points by projective data association
     // p_k := T_{g,k}V_k(u) = V_k^g(u)
-    Vector4f p_k = T_g_k *
-        depthTo3D(viewIntrinsics, x, y, depth); // V_k(u) = D_k(u)K^{-1}u 
-    p_k.w = 1.0f;
+    Point V_ku = depthImage->getPointForPixel(Vector2i(x, y));
+    if (V_ku.location.z <= 1e-8f) return false;
+    assert(V_ku.coordinateSystem == depthImage->eyeCoordinates);
+    Point p_k = CoordinateSystem::global()->convert(V_ku);
 
     // hat_u = \pi(K T_{k-1,g} T_{g,k}V_k(u) )
     Vector2f hat_u;
-    if (!projectExtraBounds(sceneIntrinsics, sceneImageSize,
-        T_km1_g * p_k, // T_{k-1,g}V_k^g(u)
-        hat_u)) return false;
+    if (!lastFrameICPMap->project(
+        p_k,
+        hat_u,
+        EXTRA_BOUNDS))
+        return false;
+
+    bool isIllegal = false;
+    Ray ray = lastFrameICPMap->getRayForPixelInterpolated(hat_u, isIllegal);
+    if (isIllegal) return false;
+
     // p_km1 := V_{k-1}(\hat u)
-    Vector4f p_km1 = interpolateBilinear<Vector4f, WITH_HOLES>(pointsMap, hat_u, sceneImageSize);
-    if (!isLegalColor(p_km1)) return false;
+    const Point p_km1 = ray.origin;
 
     // n_km1 := N_{k-1}(\hat u)
-    Vector4f n_km1 = interpolateBilinear<Vector4f, WITH_HOLES>(normalsMap, hat_u, sceneImageSize);
-    if (!isLegalColor(n_km1)) return false;
+    const Vector n_km1 = ray.direction;
 
     // d := p_km1 - p_k
-    Vector3f d = p_km1.toVector3() - p_k.toVector3();
+    const Vector d = p_km1 - p_k;
 
+    assert(CoordinateSystem::global() == d.coordinateSystem);
+    assert(CoordinateSystem::global() == n_km1.coordinateSystem);
+    assert(CoordinateSystem::global() == p_km1.coordinateSystem);
+    assert(CoordinateSystem::global() == p_k.coordinateSystem);
     // [
     // Projective data assocation rejection test, "\Omega_k(u) != 0"
     // TODO check whether normal matches normal from image, done in the original paper, but does not seem to be required
-    if (length2(d) > distThresh) return false;
+    if (length2(d.direction) > distThresh) return false;
     // ]
 
     // (2) Point-plane ICP computations
 
     // b = n_km1 . (p_km1 - p_k)
-    b = dot(n_km1.toVector3(), d);
+    b = n_km1.dot(d);
 
     // Compute A^T = G(u)^T . n_{k-1}
     // Where G(u) = [ [p_k]_x Id ] a 3 x 6 matrix
     // [v]_x denotes the skew symmetric matrix such that for all w, [v]_x w = v \cross w
     int counter = 0;
-    // rotationPart
-    AT[counter++] = +p_k.z * n_km1.y - p_k.y * n_km1.z;
-    AT[counter++] = -p_k.z * n_km1.x + p_k.x * n_km1.z;
-    AT[counter++] = +p_k.y * n_km1.x - p_k.x * n_km1.y;
-    // translationPart
-    AT[counter++] = n_km1.x;
-    AT[counter++] = n_km1.y;
-    AT[counter++] = n_km1.z;
+    {
+        const Vector3f pk = p_k.location;
+        const Vector3f nkm1 = n_km1.direction;
+        // rotationPart
+        AT[counter++] = +pk.z * nkm1.y - pk.y * nkm1.z;
+        AT[counter++] = -pk.z * nkm1.x + pk.x * nkm1.z;
+        AT[counter++] = +pk.y * nkm1.x - pk.x * nkm1.y;
+        // translationPart
+        AT[counter++] = nkm1.x;
+        AT[counter++] = nkm1.y;
+        AT[counter++] = nkm1.z;
+    }
 
     return true;
 }
@@ -181,11 +192,12 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
     float b;
     bool isValidPoint = false;
 
-    if (x < viewImageSize.x && y < viewImageSize.y)
+    auto viewImageSize = depthImage->imgSize();
+    if (x < viewImageSize.width && y < viewImageSize.height
+        )
     {
         isValidPoint = computePerPointGH_Depth_Ab(
-            A, b, x, y, 
-            depth[x + y * viewImageSize.x]);
+            A, b, x, y);
         if (isValidPoint) should_prefix = true;
     }
 
@@ -238,11 +250,18 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
 AccuCell ComputeGandH(Matrix4f T_g_k_estimate) {
     cudaDeviceSynchronize(); // prepare writing to __managed__
 
-    ::depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
-    ::viewIntrinsics = currentTrackingLevel->intrinsics;
-    ::viewImageSize = currentTrackingLevel->depth->noDims;
+    //::depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
+    //::viewIntrinsics = currentTrackingLevel->intrinsics;
+    auto viewImageSize = currentTrackingLevel->depth->noDims;
+    //::T_g_k = T_g_k_estimate;
+    std::auto_ptr<CoordinateSystem> depthCoordinateSystemEstimate(new CoordinateSystem(T_g_k_estimate));
+    depthImage = new DepthImage(
+        currentTrackingLevel->depth, 
+        depthCoordinateSystemEstimate.get(),
+        currentTrackingLevel->intrinsics
+        );
+    assert(depthImage->imgSize() == currentTrackingLevel->depth->noDims);
     ::accu.reset();
-    ::T_g_k = T_g_k_estimate;
     ::distThresh = currentTrackingLevel->distanceThreshold;
 
     dim3 blockSize(16, 16); // must equal REDUCE_BLOCK_SIZE
@@ -352,7 +371,7 @@ Matrix4f ComputeTinc(const float *delta)
     Tinc.m03 = 0.0f;		Tinc.m13 = 0.0f;		Tinc.m23 = 0.0f;		Tinc.m33 = 1.0f;
     return Tinc;
 }
-
+#include <memory>
 /** Performing ICP based depth tracking.
 Implements the original KinectFusion tracking algorithm.
 
@@ -367,12 +386,20 @@ void TrackCamera(
 {
     /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
     cudaDeviceSynchronize(); // prepare writing to __managed__
-    ::T_km1_g = trackingState->pointCloud->pose_pointCloud->GetM();
-    ::pointsMap = trackingState->pointCloud->locations->GetData(MEMORYDEVICE_CUDA);
-    ::normalsMap = trackingState->pointCloud->normals->GetData(MEMORYDEVICE_CUDA);
-    ::sceneIntrinsics = view->calib->intrinsics_d.projectionParamsSimple.all;
-    ::sceneImageSize = trackingState->pointCloud->locations->noDims;
-    assert(sceneImageSize == trackingState->pointCloud->normals->noDims);
+    auto sceneIntrinsics =
+        view->calib->intrinsics_d.projectionParamsSimple.all;
+
+    std::auto_ptr<CoordinateSystem> lastFrameEyeCoordinateSystem(new CoordinateSystem(
+        trackingState->pointCloud->pose_pointCloud->GetInvM()
+        ));
+    lastFrameICPMap = new RayImage(
+        trackingState->pointCloud->locations, 
+        trackingState->pointCloud->normals,
+        CoordinateSystem::global(), // locations and normals are both in world-coordinates
+
+        lastFrameEyeCoordinateSystem.get(),
+        sceneIntrinsics
+        );
 
     /// Init image hierarchy levels
     trackingLevels[0]->depth = view->depth;
@@ -510,6 +537,7 @@ T_g_k_estimate = T_k_g_estimate->GetInvM();
         }
     }
 
-    // Convert T_g_k (k to global) to T_k_g (global to k)
+    delete lastFrameICPMap;
+    lastFrameICPMap = 0;
 }
-        
+// 540        

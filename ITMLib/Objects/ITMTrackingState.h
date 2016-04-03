@@ -24,10 +24,10 @@ public:
     public:
         /// The pose used to generate the point cloud.
         ITMPose *pose_pointCloud;
-
-        ORUtils::Image<Vector4f> *locations,
-            *normals
-            ;
+        // world-space locations
+        ORUtils::Image<Vector4f> *locations;
+        // world-space normals
+        ORUtils::Image<Vector4f> *normals;
 
         explicit ITMPointCloud(Vector2i imgSize) : locations(0), normals(0)
         {
@@ -50,7 +50,7 @@ public:
     };
 	ITMPointCloud *pointCloud;
 
-	/// Current pose of the depth camera.
+	/// Current pose of the depth camera, world to depth-camera-view coordinate transform
 	ITMPose *pose_d;
 
 	ITMTrackingState(Vector2i imgSize)

@@ -91,7 +91,7 @@ namespace ORUtils {
 		CPU_AND_GPU const T *getValues() const { return this->v; }
 		CPU_AND_GPU Vector2<T> &setValues(const T *rhs) { this->x = rhs[0]; this->y = rhs[1]; return *this; }
 
-        CPU_AND_GPU T area() {
+        CPU_AND_GPU T area() const {
             return x * y;
         }
 		// indexing operators

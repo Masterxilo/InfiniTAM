@@ -3,6 +3,7 @@
 
 class Point;
 class Vector;
+class Ray;
 class CoordinateSystem;
 extern __managed__ CoordinateSystem* globalcs;
 
@@ -38,7 +39,8 @@ public:
     }
 
     CPU_AND_GPU Point convert(Point p)const;
-    CPU_AND_GPU Vector convert(Vector p)const;
+    CPU_AND_GPU Vector convert(Vector p)const; 
+    CPU_AND_GPU Ray convert(Ray p)const;
 };
 
 // Entries are considered equal only when they have the same coordinates.
@@ -147,4 +149,7 @@ inline CPU_AND_GPU Vector CoordinateSystem::convert(Vector p) const {
     Vector o = this->fromGlobalVector(p.coordinateSystem->toGlobalVector(p));
     assert(o.coordinateSystem == this);
     return o;
+}
+inline CPU_AND_GPU Ray CoordinateSystem::convert(Ray p) const {
+    return Ray(convert(p.origin), convert(p.direction));
 }

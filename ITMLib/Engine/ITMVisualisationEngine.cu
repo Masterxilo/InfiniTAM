@@ -16,7 +16,7 @@ static __managed__ DEVICEPTR(Vector4f *) raycastResult = 0; //  = renderState->r
 
 // for ICP
 static __managed__ DEVICEPTR(Vector4f) * pointsMap = 0; //!< [out] receives output points in world coordinates
-static __managed__ DEVICEPTR(Vector4f) * normalsMap = 0;
+static __managed__ DEVICEPTR(Vector4f) * normalsMap = 0;//!< [out] receives world space normals computed from pointsMap
 
 // for RenderImage
 static __managed__ DEVICEPTR(Vector4u) * outRendering = 0; //;outputImage->GetData(MEMORYDEVICE_CUDA);

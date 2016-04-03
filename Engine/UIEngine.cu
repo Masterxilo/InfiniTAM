@@ -207,7 +207,8 @@ void UIEngine::Initialise(int & argc, char** argv, ImageFileReader *imageSource,
     mouseLastClickPos = Vector2i(0, 0);
     mouseLastClickState = GLUT_UP;
 
-    glutPostRedisplay();
+    glutKeyUpFunction('n', 0, 0);
+    //glutPostRedisplay();
 }
 
 void UIEngine::ProcessFrame() {

@@ -244,7 +244,7 @@ inline CPU_AND_GPU float toFloat(float c) {
 
 /// Whether interpolation should return an illegal color when holes make interpolation impossible
 #define WITH_HOLES true
-/// Sample 4 channel image with bilinear interpolation (T::toFloat must return Vector4f)
+/// Sample 4 channel image with bilinear interpolation (T_IN::toFloat must return Vector4f)
 /// IF withHoles == WITH_HOLES: returns makeIllegalColor<OUT>() when any of the four surrounding pixels is illegal (has negative w).
 template<typename T_OUT, //!< Vector4f or float
     bool withHoles = false, typename T_IN> CPU_AND_GPU inline Vector4f interpolateBilinear(
