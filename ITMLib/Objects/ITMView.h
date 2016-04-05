@@ -15,45 +15,89 @@
 
 #include "ITMRGBDCalib.h"
 #include "ITMCalibIO.h"
+#include "cameraimage.h"
+#include "ITMRenderState.h"
 
+class ITMView;
+extern __managed__ ITMView * currentView = 0;
 
 /** \brief
 	Represents a single "view", i.e. RGB and depth images along
-	with all intrinsic and relative calibration information
+	with all intrinsic, relative and extrinsic calibration information
 */
-class ITMView
-{
-    ITMShortImage * const rawDepthImageGPU;
+class ITMView : Managed {
+    /// RGB colour image.
+    ITMUChar4Image * const rgbData;
 
+    /// Float valued depth image converted from disparity image, 
+    /// if available according to @ref inputImageType.
+    ITMFloatImage * const depthData;
+
+    ITMRenderState* tempICPRenderState;
+    ITMTrackingState* tempTrackingState;
+
+    Vector2i imgSize_d() const {
+        assert(depthImage->imgSize().area() > 1);
+        return depthImage->imgSize();
+    }
 public:
+    ITMRenderState* getRenderState() {
+        if (!tempICPRenderState) tempICPRenderState = new ITMRenderState(imgSize_d());
+        return tempICPRenderState;
+    }
+    ITMTrackingState* getTrackingState() {
+        if (!tempTrackingState) tempTrackingState = new ITMTrackingState(imgSize_d());
+        return tempTrackingState;
+    }
+
 	/// Intrinsic calibration information for the view.
     ITMRGBDCalib const * const calib;
 
 	/// RGB colour image.
-    ITMUChar4Image * const rgb;
+    CameraImage<Vector4u> * colorImage;
 
 	/// Float valued depth image converted from disparity image, 
     /// if available according to @ref inputImageType.
-    ITMFloatImage * const depth;
+    DepthImage * depthImage;
+
+    void ChangePose(Matrix4f M_d) {
+        // TODO delete old ones!
+        auto depthCs = new CoordinateSystem(M_d.getInv());
+        depthImage = new DepthImage(
+            depthData,
+            depthCs, 
+            calib->intrinsics_d.projectionParamsSimple.all);
+
+        Matrix4f M_rgb = calib->trafo_rgb_to_depth.calib_inv * M_d;
+        auto colorCs = new CoordinateSystem(M_rgb.getInv());
+        colorImage = new CameraImage<Vector4u>(
+            rgbData,
+            colorCs,
+            calib->intrinsics_rgb.projectionParamsSimple.all);
+    }
 
 	ITMView(const ITMRGBDCalib *calibration) :
+        tempICPRenderState(0),
         calib(new ITMRGBDCalib(*calibration)),
-        rgb(new ITMUChar4Image()),
-        depth(new ITMFloatImage()),
-        rawDepthImageGPU(new ITMShortImage()) {
+        rgbData(new ITMUChar4Image()),
+        depthData(new ITMFloatImage()) {
+
+        M_d = trackingState->pose_d->GetM();
+        Matrix4f M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
+
+        auto depthCs = new CoordinateSystem(M_d.getInv());
+        depthImage = new DepthImage(view->depth, depthCs, view->calib->intrinsics_d.projectionParamsSimple.all);
+
+        auto colorCs = new CoordinateSystem(M_rgb.getInv());
+        colorImage = new CameraImage<Vector4u>(view->rgb, colorCs, view->calib->intrinsics_rgb.projectionParamsSimple.all);
+
 	}
 
     static std::string depthConversionType;
-    void ITMView::Update(
+
+    /// prepare image and turn it into a world-scale depth image (if it is a disparity image)
+    void ITMView::ChangeImages(
         ITMUChar4Image *rgbImage,
         ITMShortImage *rawDepthImage);
-
-	virtual ~ITMView(void)
-	{
-		delete calib;
-		delete rgb;
-        delete depth;
-        delete rawDepthImageGPU;
-	}
 };
 

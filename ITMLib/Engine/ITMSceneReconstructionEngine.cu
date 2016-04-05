@@ -6,16 +6,6 @@
 #include "CoordinateSystem.h"
 #include "CameraImage.h"
 
-// Reduce passing by using global variables.
-// Note that this whole program should be run single-threaded on a
-// single GPU and single GPU context, so this is no problem
-// TODO use __const__ memory (TODO is passing parameters faster?)
-
-/// current color image
-static __managed__ /*const*/ CameraImage<Vector4u>* colorImage = 0;
-/// current depth image
-static __managed__ /*const*/ DepthImage* depthImage = 0;
-
 /// Fusion Stage - Camera Data Integration
 /// \returns \f$\eta\f$, -1 on failure
 // Note that the stored T-SDF values are normalized to lie
@@ -29,16 +19,16 @@ GPU_ONLY inline float computeUpdatedVoxelDepthInfo(
     // project point into depth image
     /// X_d, depth camera coordinate system
     const Vector4f pt_camera = Vector4f(
-        depthImage->eyeCoordinates->convert(pt_model).location,
+        currentView->depthImage->eyeCoordinates->convert(pt_model).location,
         1);
     /// \pi(K_dX_d), projection into the depth image
     Vector2f pt_image;
-    if (!depthImage->project(pt_model, pt_image))
+    if (!currentView->depthImage->project(pt_model, pt_image))
         return -1;
 
     // get measured depth from image, no interpolation
     /// I_d(\pi(K_dX_d))
-    auto p = depthImage->getPointForPixel(pt_image.toInt());
+    auto p = currentView->depthImage->getPointForPixel(pt_image.toInt());
     const float depth_measure = p.location.z;
 
     /// I_d(\pi(K_dX_d)) - X_d^(z)          (3)
@@ -68,14 +58,14 @@ GPU_ONLY inline void computeUpdatedVoxelColorInfo(
     const THREADPTR(Point) & pt_model)
 {
     Vector2f pt_image;
-    if (!colorImage->project(pt_model, pt_image))
+    if (!currentView->colorImage->project(pt_model, pt_image))
         return;
 
     int oldW = (float)voxel.w_color;
     const Vector3f oldC = TO_FLOAT3(voxel.clr);
 
     /// Like formula (4) for depth
-    const Vector3f newC = TO_VECTOR3(interpolateBilinear<Vector4f>(colorImage->image->GetData(), pt_image, colorImage->imgSize()));
+    const Vector3f newC = TO_VECTOR3(interpolateBilinear<Vector4f>(currentView->colorImage->image->GetData(), pt_image, currentView->colorImage->imgSize()));
     int newW = 1;
 
     updateVoxelColorInformation(
@@ -101,20 +91,20 @@ GPU_ONLY static void computeUpdatedVoxelInfo(
 struct buildHashAllocAndVisibleTypePP {
     forEachPixelNoImage_process() {
         // Find 3d position of depth pixel xy, in eye coordinates
-        auto pt_camera = depthImage->getPointForPixel(Vector2i(x, y));
+        auto pt_camera = currentView->depthImage->getPointForPixel(Vector2i(x, y));
 
         const float depth = pt_camera.location.z;
         if (depth <= 0 || (depth - mu) < 0 || (depth - mu) < viewFrustum_min || (depth + mu) > viewFrustum_max) return;
 
         // the found point +- mu
-        const Vector pt_camera_v = (pt_camera - depthImage->location());
+        const Vector pt_camera_v = (pt_camera - currentView->depthImage->location());
         const float norm = length(pt_camera_v.direction);
         const Vector pt_camera_v_minus_mu = pt_camera_v*(1.0f - mu / norm);
         const Vector pt_camera_v_plus_mu = pt_camera_v*(1.0f + mu / norm);
 
         // Convert to voxel block coordinates  
         // the initial point pt_camera_v_minus_mu
-        Point point = voxelBlockCoordinates->convert(depthImage->location() + pt_camera_v_minus_mu);
+        Point point = voxelBlockCoordinates->convert(currentView->depthImage->location() + pt_camera_v_minus_mu);
         // the direction towards pt_camera_v_plus_mu in voxelBlockCoordinates
         const Vector vector = voxelBlockCoordinates->convert(pt_camera_v_plus_mu - pt_camera_v_minus_mu);
 
@@ -149,37 +139,16 @@ struct IntegrateVoxel {
     }
 };
 
-// Allocation request and setup of global variables part
-void FuseView_pre(
-    const ITMView * const view,
-    Matrix4f M_d
-    ) {
+/// Fusion stage of the system
+void Fuse()
+{
     cudaDeviceSynchronize();
     assert(Scene::getCurrentScene());
-
-    Matrix4f M_rgb = view->calib->trafo_rgb_to_depth.calib_inv * M_d;
-
-    auto depthCs = new CoordinateSystem(M_d.getInv());
-    depthImage = new DepthImage(view->depth, depthCs, view->calib->intrinsics_d.projectionParamsSimple.all);
-
-    auto colorCs = new CoordinateSystem(M_rgb.getInv());
-    colorImage = new CameraImage<Vector4u>(view->rgb, colorCs, view->calib->intrinsics_rgb.projectionParamsSimple.all);
-        
+    assert(currentView);
 
     // allocation request
-    forEachPixelNoImage<buildHashAllocAndVisibleTypePP>(view->depth->noDims);
-
+    forEachPixelNoImage<buildHashAllocAndVisibleTypePP>(currentView->depthImage->imgSize());
     cudaDeviceSynchronize();
-}
-
-/// Fusion stage of the system
-void FuseView(
-    const ITMView * const view,
-    Matrix4f M_d)
-{
-    FuseView_pre(
-        view, M_d
-        );
 
     // allocation
     Scene::performCurrentSceneAllocations();
@@ -187,12 +156,4 @@ void FuseView(
     // camera data integration
     cudaDeviceSynchronize();
     Scene::getCurrentScene()->doForEachAllocatedVoxel<IntegrateVoxel>();
-
-
-    delete depthImage->eyeCoordinates;
-    delete depthImage; depthImage = 0;
-    delete colorImage->eyeCoordinates;
-    delete colorImage; colorImage = 0;
 }
-
-// 222

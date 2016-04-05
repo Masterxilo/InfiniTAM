@@ -49,19 +49,3 @@ public:
         }
     };
 	ITMPointCloud *pointCloud;
-
-	/// Current pose of the depth camera, world to depth-camera-view coordinate transform
-	ITMPose *pose_d;
-
-	ITMTrackingState(Vector2i imgSize)
-	{
-		this->pointCloud = new ITMPointCloud(imgSize);
-		this->pose_d = new ITMPose();
-	}
-
-	~ITMTrackingState(void)
-	{
-		delete pointCloud;
-		delete pose_d;
-	}
-};

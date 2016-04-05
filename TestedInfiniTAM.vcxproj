@@ -131,7 +131,6 @@
     <ClInclude Include="ITMLib\Objects\ITMExtrinsics.h" />
     <ClInclude Include="ITMLib\Objects\ITMIntrinsics.h" />
     <ClInclude Include="ITMLib\Objects\ITMPose.h" />
-    <ClInclude Include="ITMLib\Objects\ITMRenderState.h" />
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h" />
     <ClInclude Include="ITMLib\Objects\ITMView.h" />
@@ -172,6 +171,9 @@
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu" />
     <CudaCompile Include="ITMLib\Utils\ITMCalibIO.cu">
       <Keep Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</Keep>
+    </CudaCompile>
+    <CudaCompile Include="RenderingRangeImage.cu">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </CudaCompile>
     <CudaCompile Include="Scene.cu" />
     <CudaCompile Include="Tests\Tests.cu">

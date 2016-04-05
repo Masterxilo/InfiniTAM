@@ -31,6 +31,11 @@ std::string readFile(std::string fn) {
         std::istreambuf_iterator<char>());
 }
 
+#include <stdio.h>
+
+#include <windows.h>
+#include <tchar.h>
+#include <stdio.h>
 #define stdoutfile "stdout.txt"
 #define stderrfile "stderr.txt"
 void redirectStd() {
@@ -39,11 +44,6 @@ void redirectStd() {
     freopen(stderrfile, "w", stderr);
 }
 
-#include <stdio.h>
-
-#include <windows.h>
-#include <tchar.h>
-#include <stdio.h>
 
 int fileExists(TCHAR * file)
 {

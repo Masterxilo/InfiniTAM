@@ -28,6 +28,9 @@
     <Filter Include="Tests\Framework">
       <UniqueIdentifier>{cac1f627-384f-4740-b050-61c5a07b0d34}</UniqueIdentifier>
     </Filter>
+    <Filter Include="WorkingSet">
+      <UniqueIdentifier>{641b4fb0-b20b-41d7-a4b3-9e98e51c0518}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Utils\Matrix.h">
@@ -90,34 +93,19 @@
     <ClInclude Include="ITMLib\Objects\ITMPose.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMRenderState.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMTrackingState.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMMainEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMPixelUtils.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMRepresentationAccess.h">
-      <Filter>ITMLib\Engine</Filter>
-    </ClInclude>
-    <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
     <ClInclude Include="Utils\HashMap.h">
@@ -134,8 +122,20 @@
     <ClInclude Include="ITMLib\Utils\ITMCUDAUtils.h">
       <Filter>ITMLib\Utils</Filter>
     </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMMainEngine.h">
+      <Filter>WorkingSet</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h">
+      <Filter>WorkingSet</Filter>
+    </ClInclude>
     <ClInclude Include="ITMLib\Objects\ITMView.h">
-      <Filter>ITMLib\Engine</Filter>
+      <Filter>WorkingSet</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMVisualisationEngine.h">
+      <Filter>WorkingSet</Filter>
+    </ClInclude>
+    <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
+      <Filter>WorkingSet</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -152,18 +152,6 @@
     <CudaCompile Include="ITMLib\Objects\ITMPose.cu">
       <Filter>ITMLib\Objects</Filter>
     </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
-    <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
     <CudaCompile Include="Tests\Tests.cu">
       <Filter>Tests</Filter>
     </CudaCompile>
@@ -173,10 +161,23 @@
     <CudaCompile Include="LightingEstimation.cu" />
     <CudaCompile Include="GeometryRefinement.cu" />
     <CudaCompile Include="Scene.cu" />
-    <CudaCompile Include="ITMLib\Engine\ITMView.cu">
-      <Filter>ITMLib\Engine</Filter>
-    </CudaCompile>
     <CudaCompile Include="CoordinateSystems.cu" />
+    <CudaCompile Include="RenderingRangeImage.cu" />
+    <CudaCompile Include="ITMLib\Engine\ITMMainEngine.cu">
+      <Filter>WorkingSet</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMDepthTracker.cu">
+      <Filter>WorkingSet</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMView.cu">
+      <Filter>WorkingSet</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMVisualisationEngine.cu">
+      <Filter>WorkingSet</Filter>
+    </CudaCompile>
+    <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu">
+      <Filter>WorkingSet</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

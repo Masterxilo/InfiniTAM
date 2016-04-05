@@ -16,20 +16,12 @@ operations.
 #include "ITMView.h"
 #include "ITMTrackingState.h"
 #include "ITMRenderState.h"
-    
-/** This will render an image using raycasting. */
-void RenderImage(
+#include "cameraimage.h"
+
+/** This will render an image using raycasting.
+TODO could render into a view*/
+CameraImage<Vector4u>* RenderImage(
     const ITMPose *pose,
     const ITMIntrinsics *intrinsics,
-    ITMRenderState *renderState, //!< [out] builds raycastResult
-    ITMUChar4Image *outputImage,
+    const Vector2i imgSize,
     std::string shader);
-
-/** Create an image of reference points and normals as
-required by the ITMLib::Engine::ITMDepthTracker classes.
-*/
-void CreateICPMaps(
-    ITMTrackingState * const trackingState, // [in, out] builds trackingState->pointCloud, renders from trackingState->pose_d 
-    const ITMIntrinsics * const intrinsics_d,
-    ITMRenderState *const renderState //!< [out] builds raycastResult
-    );

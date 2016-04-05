@@ -10,8 +10,8 @@ private:
     void operator=(const CameraImage& ci);
     CameraImage(const CameraImage&);
 public:
-    const Image<T>*const image;
-    const CoordinateSystem* const eyeCoordinates; // const ITMPose* const pose // pose->GetM is fromGlobal matrix of coord system; <- inverse is toGlobal
+    Image<T>*const image; // TODO should the image have to be const?
+    const CoordinateSystem* const eyeCoordinates; // const ITMPose* const pose // pose->GetM is fromGlobal matrix of coord system; <- inverse is toGlobal // TODO should this encapsulate a copy?
     const Vector4f cameraIntrinsics;// const ITMIntrinsics* const cameraIntrinsics;
 
     CameraImage(

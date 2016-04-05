@@ -244,6 +244,12 @@ CPU_AND_GPU void testCS(CoordinateSystem* o) {
         assert(t.direction == Vector3f(-1, -1, -2));
     }
 
+    // * scalar
+    {
+        Vector t = Vector(g, Vector3f(1, 1, 2)) * (-1);
+        assert(t.direction == Vector3f(-1, -1, -2));
+    }
+
     // dot (angle if the coordinate system is orthogonal and the vectors unit)
     assert(Vector(o, Vector3f(1, 2, 3)).dot(Vector(o, Vector3f(3, 2, 1))) == 1 * 3 + 2 * 2 + 1 * 3);
 }

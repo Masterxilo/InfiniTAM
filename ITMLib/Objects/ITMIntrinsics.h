@@ -7,6 +7,8 @@
 	camera (pinhole-camera model, no skew).
 
     Converted to Vector4f as (fx, fy, cx, cy).
+
+    TODO should this contain the resolution?
 */
 class ITMIntrinsics
 {

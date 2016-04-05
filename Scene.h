@@ -16,6 +16,7 @@ KERNEL doForEachAllocatedVoxel(
     T::process(vb, vb->getVoxel(localPos), localPos);
 }
 
+#define doForEachAllocatedVoxelBlock_process() static GPU_ONLY void process(ITMVoxelBlock* voxelBlock)
 // see doForEachAllocatedVoxel for T
 template<typename T>
 KERNEL doForEachAllocatedVoxelBlock(
@@ -41,6 +42,9 @@ public:
 
     Scene();
     virtual ~Scene();
+
+    void dump(std::string filename);
+    void restore(std::string filename);
 
     /*
     void reset() {

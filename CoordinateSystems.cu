@@ -9,7 +9,9 @@ __managed__ CoordinateSystem* voxelBlockCoordinates = 0;
 
 /// (0,0,0) is the lower corner of the voxel, (1,1,1) its upper corner,
 /// corresponding to (voxelSize, voxelSize, voxelSize) in world coordinates.
+/// aka "voxel-fractional-world-coordinates"
 __managed__ CoordinateSystem* voxelCoordinates = 0;
+
 void initCoordinateSystems() {
     CoordinateSystem::global(); // make sure it exists
 

@@ -132,6 +132,7 @@ public:
         return clr.toFloat() / intensity();
     }
 
+    // NOTE not used inially when memory is just allocated and reinterpreted, but used on each allocation
     GPU_ONLY ITMVoxel()
 	{
         setSDF_initialValue();
@@ -170,7 +171,7 @@ struct ITMVoxelBlock {
         for (auto& i : blockVoxels) i = ITMVoxel();
     }
 
-private:
+//private:
     /// pos is Mutable, 
     /// because this voxel block might represent any part of space
     VoxelBlockPos pos_;

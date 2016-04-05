@@ -24,17 +24,18 @@ struct AccuCell : public Managed {
 
 struct TrackingLevel : public Managed {
     /// FilterSubsampleWithHoles result of one level higher
-    ITMFloatImage* depth;
     /// Half of the intrinsics of one level higher
-    Vector4f intrinsics;
+    /// Coordinate system is defined by the matrix M_d 
+    /// which we are optimizing for.
+    DepthImage* depthImage;
 
     const float distanceThreshold;
     const int numberOfIterations;
     const TrackerIterationType iterationType;
 
     TrackingLevel(int numberOfIterations, TrackerIterationType iterationType, float distanceThreshold) :
-        numberOfIterations(numberOfIterations), iterationType(iterationType), distanceThreshold(distanceThreshold) {
-        depth = new ITMFloatImage(Vector2i(1,1)); // will get correct size from filter subsample
+        numberOfIterations(numberOfIterations), iterationType(iterationType), distanceThreshold(distanceThreshold),
+        depthImage(0) {
     }
 };
 // ViewHierarchy, 0 is highest resolution
@@ -68,10 +69,6 @@ static bool shortIteration() {
 static __managed__ /*const*/ AccuCell accu;
 /// In world-coordinates
 static __managed__ /*const*/ float distThresh;//!< \f$\epsilon_d\f$
-
-#include "cameraimage.h"
-/// currentTrackingLevel view
-static __managed__ DEVICEPTR(DepthImage) * depthImage = 0;
 
 /// In world coordinates, points map, normals map, for frame k-1, \f$V_{k-1}\f$
 static __managed__ DEVICEPTR(RayImage) * lastFrameICPMap = 0;
@@ -202,8 +199,6 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
     if (!should_prefix) return;
 
     __shared__ float dim_shared1[REDUCE_BLOCK_SIZE];
-    __shared__ float dim_shared2[REDUCE_BLOCK_SIZE];
-    __shared__ float dim_shared3[REDUCE_BLOCK_SIZE];
 
     { //reduction for noValidPoints
         warpReduce256<int>(
@@ -363,6 +358,7 @@ Matrix4f ComputeTinc(const float *delta)
     return Tinc;
 }
 #include <memory>
+
 /** Performing ICP based depth tracking.
 Implements the original KinectFusion tracking algorithm.
 
@@ -373,8 +369,11 @@ c.f. newcombe_etal_ismar2011.pdf section "Sensor Pose Estimation"
 /// \file c.f. newcombe_etal_ismar2011.pdf, Sensor Pose Estimation section
 void TrackCamera(
     ITMTrackingState *trackingState,
-    const ITMView *view)
+    ITMView * const view)
 {
+    assert(currentView);
+    CreateICPMapsForCurrentView();
+
     /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
     cudaDeviceSynchronize(); // prepare writing to __managed__
     auto sceneIntrinsics =

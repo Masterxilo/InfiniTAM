@@ -9,6 +9,10 @@ static __managed__ const short *d_in;
 static __managed__ Vector2f disparityCalibParams;
 static __managed__ float fx_depth;
 
+/// current depth & color image
+__managed__ ITMView * currentView;
+
+
 /// case ITMDisparityCalib::TRAFO_KINECT:
 /// Raw values are transformed according to \f$\frac{8 c_2 f_x}{c_1 - d}\f$
 /// Where f_x is the x focal length of the depth camera.

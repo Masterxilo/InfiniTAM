@@ -1,3 +1,6 @@
 ﻿Files/Scenes/*
 Kinect/*
 x64/*
+*.suo
+*.sdf
+*.user
