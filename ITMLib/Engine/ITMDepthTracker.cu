@@ -2,6 +2,10 @@
  * T_{g,k} denotes the transformation from frame k's view space to global space
  * T_{k,g} is the inverse
  */
+/// \file Depth Tracker, c.f. newcombe_etal_ismar2011.pdf Sensor Pose Estimation
+// The current implementation ignores the possible optimizations/special iterations with 
+// rotation estimation only ("At the coarser levels we optimise only for the rotation matrix R.")
+
 #include "ITMDepthTracker.h"
 #include "ITMCUDAUtils.h"
 #include "CUDADefines.h"
@@ -25,10 +29,11 @@ struct AccuCell : public Managed {
 struct TrackingLevel : public Managed {
     /// FilterSubsampleWithHoles result of one level higher
     /// Half of the intrinsics of one level higher
-    /// Coordinate system is defined by the matrix M_d 
+    /// Coordinate system is defined by the matrix M_d (this is the world-to-eye transform, i.e. 'fromGlobal')
     /// which we are optimizing for.
     DepthImage* depthImage;
 
+    // Tweaking
     const float distanceThreshold;
     const int numberOfIterations;
     const TrackerIterationType iterationType;
@@ -43,17 +48,19 @@ static std::vector<TrackingLevel*> trackingLevels;
 struct ITMDepthTracker_
 {
     ITMDepthTracker_() {
+        // Tweaking
         // Tracking strategy:
         const int noHierarchyLevels = 5;
-        const float distThreshStep = depthTrackerICPThreshold / noHierarchyLevels;
+        const float distThreshStep = depthTrackerICPMaxThreshold / noHierarchyLevels;
         // starting with highest resolution (lowest level, last to be executed)
 #define iterations
-        trackingLevels.push_back(new TrackingLevel(2  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 4));
-        trackingLevels.push_back(new TrackingLevel(4  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPThreshold - distThreshStep * 3));
-        trackingLevels.push_back(new TrackingLevel(6  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep * 2));
-        trackingLevels.push_back(new TrackingLevel(8  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold - distThreshStep));
-        trackingLevels.push_back(new TrackingLevel(10 iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPThreshold));
+        trackingLevels.push_back(new TrackingLevel(2  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPMaxThreshold - distThreshStep * 4));
+        trackingLevels.push_back(new TrackingLevel(4  iterations, TRACKER_ITERATION_BOTH, depthTrackerICPMaxThreshold - distThreshStep * 3));
+        trackingLevels.push_back(new TrackingLevel(6  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPMaxThreshold - distThreshStep * 2));
+        trackingLevels.push_back(new TrackingLevel(8  iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPMaxThreshold - distThreshStep));
+        trackingLevels.push_back(new TrackingLevel(10 iterations, TRACKER_ITERATION_ROTATION, depthTrackerICPMaxThreshold));
         assert(trackingLevels.size() == noHierarchyLevels);
+#undef iterations
     }
 } _;
 
@@ -65,18 +72,15 @@ static TrackerIterationType iterationType() {
 static bool shortIteration() {
     return (iterationType() == TRACKER_ITERATION_ROTATION);
 }
+/// In world-coordinates squared
+//!< \f$\epsilon_d\f$
+GPU_ONLY static float distThresh() {
+    return currentTrackingLevel->distanceThreshold;
+}
 
 static __managed__ /*const*/ AccuCell accu;
-/// In world-coordinates
-static __managed__ /*const*/ float distThresh;//!< \f$\epsilon_d\f$
-
 /// In world coordinates, points map, normals map, for frame k-1, \f$V_{k-1}\f$
 static __managed__ DEVICEPTR(RayImage) * lastFrameICPMap = 0;
-
-// device functions
-/// \file Depth Tracker, c.f. newcombe_etal_ismar2011.pdf Sensor Pose Estimation
-// The current discussion ignores the optimizations/special iterations with 
-// rotation estimation only ("At the coarser levels we optimise only for the rotation matrix R.")
 
 
 /**
@@ -99,7 +103,7 @@ the direction in which \f$p_k\f$ is observed (projective data association).
 \return false on failure
 \see newcombe_etal_ismar2011.pdf Sensor Pose Estimation
 */
-CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
+GPU_ONLY static inline bool computePerPointGH_Depth_Ab(
     THREADPTR(float) AT[6], //!< [out]
     THREADPTR(float) &b,//!< [out]
 
@@ -107,9 +111,9 @@ CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
     )
 {
     // p_k := T_{g,k}V_k(u) = V_k^g(u)
-    Point V_ku = depthImage->getPointForPixel(Vector2i(x, y));
+    Point V_ku = currentTrackingLevel->depthImage->getPointForPixel(Vector2i(x, y));
     if (V_ku.location.z <= 1e-8f) return false;
-    assert(V_ku.coordinateSystem == depthImage->eyeCoordinates);
+    assert(V_ku.coordinateSystem == currentTrackingLevel->depthImage->eyeCoordinates);
     Point p_k = CoordinateSystem::global()->convert(V_ku);
 
     // hat_u = \pi(K T_{k-1,g} T_{g,k}V_k(u) )
@@ -136,7 +140,7 @@ CPU_AND_GPU static inline bool computePerPointGH_Depth_Ab(
     // [
     // Projective data assocation rejection test, "\Omega_k(u) != 0"
     // TODO check whether normal matches normal from image, done in the original paper, but does not seem to be required
-    if (length2(d.direction) > distThresh) return false;
+    if (length2(d.direction) > distThresh()) return false;
     // ]
 
     // (2) Point-plane ICP computations
@@ -180,7 +184,7 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
     float b;
     bool isValidPoint = false;
 
-    auto viewImageSize = depthImage->imgSize();
+    auto viewImageSize = currentTrackingLevel->depthImage->imgSize();
     if (x < viewImageSize.width && y < viewImageSize.height
         )
     {
@@ -236,19 +240,18 @@ static KERNEL depthTrackerOneLevel_g_rt_device_main()
 AccuCell ComputeGandH(Matrix4f T_g_k_estimate) {
     cudaDeviceSynchronize(); // prepare writing to __managed__
 
+    assert(lastFrameICPMap->pointCoordinates == CoordinateSystem::global());
+    assert(!(lastFrameICPMap->eyeCoordinates == CoordinateSystem::global()));
+    assert(lastFrameICPMap->eyeCoordinates == currentView->depthImage->eyeCoordinates);
+
     //::depth = currentTrackingLevel->depth->GetData(MEMORYDEVICE_CUDA);
     //::viewIntrinsics = currentTrackingLevel->intrinsics;
-    auto viewImageSize = currentTrackingLevel->depth->noDims;
+    auto viewImageSize = currentTrackingLevel->depthImage->imgSize();
+
     //::T_g_k = T_g_k_estimate;
-    std::auto_ptr<CoordinateSystem> depthCoordinateSystemEstimate(new CoordinateSystem(T_g_k_estimate));
-    depthImage = new DepthImage(
-        currentTrackingLevel->depth, 
-        depthCoordinateSystemEstimate.get(),
-        currentTrackingLevel->intrinsics
-        );
-    assert(depthImage->imgSize() == currentTrackingLevel->depth->noDims);
-    ::accu.reset();
-    ::distThresh = currentTrackingLevel->distanceThreshold;
+    std::auto_ptr<CoordinateSystem> depthCoordinateSystemEstimate(new CoordinateSystem(T_g_k_estimate)); // TODO should this be deleted when going out of scope?
+    // do we really need to recreate it every time? Should it be the same instance ('new depth eye coordinate system') for all resolutions?
+    currentTrackingLevel->depthImage->eyeCoordinates = depthCoordinateSystemEstimate.get();
 
     dim3 blockSize(16, 16); // must equal REDUCE_BLOCK_SIZE
     assert(16 * 16 == REDUCE_BLOCK_SIZE);
@@ -257,6 +260,9 @@ AccuCell ComputeGandH(Matrix4f T_g_k_estimate) {
         (int)ceil((float)viewImageSize.x / (float)blockSize.x),
         (int)ceil((float)viewImageSize.y / (float)blockSize.y));
 
+    assert(!(currentTrackingLevel->depthImage->eyeCoordinates == CoordinateSystem::global()));
+
+    ::accu.reset();
     LAUNCH_KERNEL(depthTrackerOneLevel_g_rt_device_main, gridSize, blockSize);
 
     cudaDeviceSynchronize(); // for later access of accu
@@ -301,7 +307,7 @@ void ComputeDelta(float step[6], float nabla[6], float hessian[6][6])
         float smallHessian[3][3];
         for (int r = 0; r < 3; r++) for (int c = 0; c < 3; c++) smallHessian[r][c] = hessian[r][c];
 
-        ORUtils::Cholesky::solve((float*)smallHessian, 3, nabla, step);
+        Cholesky::solve((float*)smallHessian, 3, nabla, step);
         
         // check
         /*float result[3];
@@ -311,7 +317,7 @@ void ComputeDelta(float step[6], float nabla[6], float hessian[6][6])
     */}
     else
     {
-        ORUtils::Cholesky::solve((float*)hessian, 6, nabla, step);
+        Cholesky::solve((float*)hessian, 6, nabla, step);
     }
 }
 
@@ -327,11 +333,11 @@ bool HasConverged(float *step)
     return false;
 }
 
-Matrix4f ComputeTinc(const float *delta)
+Matrix4f ComputeTinc(const float delta[6])
 {
     // step is T_inc, expressed as a parameter vector 
     // (beta, gamma, alpha, tx,ty, tz)
-    // beta, gamma, alpha parametrize the rotation axis
+    // beta, gamma, alpha parametrize the rotation axis and angle
     float step[6];
 
     // Depending on the iteration type, fill in 0 for values that where not computed.
@@ -358,7 +364,7 @@ Matrix4f ComputeTinc(const float *delta)
     return Tinc;
 }
 #include <memory>
-
+#include "ITMVisualisationEngine.h"
 /** Performing ICP based depth tracking.
 Implements the original KinectFusion tracking algorithm.
 
@@ -367,46 +373,48 @@ c.f. newcombe_etal_ismar2011.pdf section "Sensor Pose Estimation"
 6-d parameter vector "x" is (beta, gamma, alpha, tx, ty, tz)
 */
 /// \file c.f. newcombe_etal_ismar2011.pdf, Sensor Pose Estimation section
-void TrackCamera(
-    ITMTrackingState *trackingState,
-    ITMView * const view)
-{
+void ImprovePose() {
     assert(currentView);
-    CreateICPMapsForCurrentView();
+    assert(!lastFrameICPMap);
+    lastFrameICPMap = CreateICPMapsForCurrentView();
 
     /// Initialize one tracking event base data. Init hierarchy level 0 (finest).
     cudaDeviceSynchronize(); // prepare writing to __managed__
-    auto sceneIntrinsics =
-        view->calib->intrinsics_d.projectionParamsSimple.all;
-
-    std::auto_ptr<CoordinateSystem> lastFrameEyeCoordinateSystem(new CoordinateSystem(
-        trackingState->pointCloud->pose_pointCloud->GetInvM()
-        ));
-    lastFrameICPMap = new RayImage(
-        trackingState->pointCloud->locations, 
-        trackingState->pointCloud->normals,
-        CoordinateSystem::global(), // locations and normals are both in world-coordinates
-
-        lastFrameEyeCoordinateSystem.get(),
-        sceneIntrinsics
-        );
 
     /// Init image hierarchy levels
-    trackingLevels[0]->depth = view->depth;
-    trackingLevels[0]->intrinsics = sceneIntrinsics;
+    assert(currentView->depthImage->imgSize().area() > 1);
+    trackingLevels[0]->depthImage = //currentView->depthImage;
+        new DepthImage(
+        currentView->depthImage->image,
+        new CoordinateSystem(*currentView->depthImage->eyeCoordinates),
+        currentView->depthImage->cameraIntrinsics
+        );
+
     for (int i = 1; i < trackingLevels.size(); i++)
     {
         TrackingLevel* currentLevel = trackingLevels[i];
         TrackingLevel* previousLevel = trackingLevels[i - 1];
 
-        FilterSubsampleWithHoles(currentLevel->depth, previousLevel->depth);
+        auto subsampledDepthImage = new ITMFloatImage();
+        FilterSubsampleWithHoles(subsampledDepthImage, previousLevel->depthImage->image);
         cudaDeviceSynchronize();
-        //currentLevel->depth->UpdateDeviceFromHost();
-        //cudaDeviceSynchronize();
 
-        currentLevel->intrinsics = previousLevel->intrinsics * 0.5f;
+        currentLevel->depthImage = new DepthImage(
+            subsampledDepthImage,
+            CoordinateSystem::global(), // will be set correctly later
+            previousLevel->depthImage->cameraIntrinsics * 0.5f
+            );
+
+        assert(currentLevel->depthImage->imgSize() == previousLevel->depthImage->imgSize() / 2);
+        assert(currentLevel->depthImage->imgSize().area() < currentView->depthImage->imgSize().area());
     }
 
+    ITMPose T_k_g_estimate;
+    T_k_g_estimate.SetM(currentView->depthImage->eyeCoordinates->fromGlobal);
+    {
+        Matrix4f M_d = T_k_g_estimate.GetM();
+        assert(M_d == currentView->depthImage->eyeCoordinates->fromGlobal);
+    }
     // Coarse to fine
     for (int levelId = trackingLevels.size() - 1; levelId >= 0; levelId--)
     {
@@ -414,24 +422,23 @@ void TrackCamera(
         if (iterationType() == TRACKER_ITERATION_NONE) continue;
 
         // T_{k,g} transforms global (g) coordinates to eye or view coordinates of the k-th frame
-#define T_k_g_estimate trackingState->pose_d
         // T_g_k_estimate caches T_k_g_estimate->GetInvM()
-        Matrix4f T_g_k_estimate = T_k_g_estimate->GetInvM();
+        Matrix4f T_g_k_estimate = T_k_g_estimate.GetInvM();
 
 #define set_T_k_g_estimate(x)\
-T_k_g_estimate->SetFrom(&x);
-        T_g_k_estimate = T_k_g_estimate->GetInvM();
+T_k_g_estimate.SetFrom(&x);
+        T_g_k_estimate = T_k_g_estimate.GetInvM();
 
 #define set_T_k_g_estimate_from_T_g_k_estimate(x) \
-T_k_g_estimate->SetInvM(x);\
-T_k_g_estimate->Coerce(); /* and make sure we've got an SE3*/\
-T_g_k_estimate = T_k_g_estimate->GetInvM();
+T_k_g_estimate.SetInvM(x);\
+T_k_g_estimate.Coerce(); /* and make sure we've got an SE3*/\
+T_g_k_estimate = T_k_g_estimate.GetInvM();
 
         // We will 'accept' updates into trackingState->pose_d and T_g_k_estimate
         // before we know whether they actually decrease the energy.
         // When they did not in fact, we will revert to this value that was known to have less energy 
         // than all previous estimates.
-        ITMPose least_energy_T_k_g_estimate(*T_k_g_estimate);
+        ITMPose least_energy_T_k_g_estimate(T_k_g_estimate);
 
         // Track least energy we measured so far to see whether we improved
         float f_old = 1e20f;
@@ -495,7 +502,7 @@ T_g_k_estimate = T_k_g_estimate->GetInvM();
             }
             else {
                 f_old = f_new;
-                least_energy_T_k_g_estimate.SetFrom(T_k_g_estimate);
+                least_energy_T_k_g_estimate.SetFrom(&T_k_g_estimate);
 
                 // Prepare to solve a new system
 
@@ -531,5 +538,16 @@ T_g_k_estimate = T_k_g_estimate->GetInvM();
 
     delete lastFrameICPMap;
     lastFrameICPMap = 0;
+
+    // Apply new guess
+    Matrix4f M_d = T_k_g_estimate.GetM();
+
+    Matrix4f id; id.setIdentity();
+    assert(M_d != id);
+
+    cudaDeviceSynchronize(); // necessary here?
+    assert(currentView->depthImage->eyeCoordinates);
+    assert(M_d != currentView->depthImage->eyeCoordinates->fromGlobal);
+    currentView->ChangePose(M_d);
 }
 // 540        

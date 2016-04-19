@@ -17,13 +17,24 @@
 
 #define WINDOWS_LEAN_AND_MEAN
 #include <windows.h>
+
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
+#include <device_functions.h>
 #include <device_launch_parameters.h>
 #pragma comment(lib,"cudart")
 
+
 // Some macros to identify cuda concepts (e.g. pointer/function types)
+
+// usage: #if GPU_CODE ... #else ... #endif
+#ifdef __CUDA_ARCH__
+#define GPU_CODE 1
+#else
+#define GPU_CODE 0
+#endif
+
 #define GPU_ONLY __device__
 #define GPU(mem) mem
 #define KERNEL __global__ void

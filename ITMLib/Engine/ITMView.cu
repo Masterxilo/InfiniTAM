@@ -1,3 +1,4 @@
+#define ITMVIEW_
 #include "ITMView.h"
 #include "CUDADefines.h"
 #include "MemoryBlock.h"
@@ -10,7 +11,7 @@ static __managed__ Vector2f disparityCalibParams;
 static __managed__ float fx_depth;
 
 /// current depth & color image
-__managed__ ITMView * currentView;
+__managed__ ITMView * currentView = 0;
 
 
 /// case ITMDisparityCalib::TRAFO_KINECT:
@@ -44,24 +45,24 @@ struct ScaleAndValidateDepth {
 
 std::string ITMView::depthConversionType;
 
-void ITMView::Update(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
+void ITMView::ChangeImages(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
 {
     // copy rgb as-is
-	rgb->SetFrom(rgbImage, MemoryBlock<Vector4u>::CPU_TO_CUDA);
+	rgbData->SetFrom(rgbImage, CPU_TO_CUDA);
 
     // copy rawDepthImage to gpu, then store ConvertDisparityToDepth result in view->depth
-    rawDepthImageGPU->SetFrom(rawDepthImage, MemoryBlock<short>::CPU_TO_CUDA);
+    rawDepthImageGPU->SetFrom(rawDepthImage, CPU_TO_CUDA);
 
     ::d_in = rawDepthImageGPU->GetData(MEMORYDEVICE_CUDA);
 
 
-    depth->ChangeDims(rawDepthImageGPU->noDims);
+    depthData->ChangeDims(rawDepthImageGPU->noDims);
 
-    ::d_out = depth->GetData(MEMORYDEVICE_CUDA);
+    ::d_out = depthData->GetData(MEMORYDEVICE_CUDA);
     ::fx_depth = calib->intrinsics_d.projectionParamsSimple.fx;
     ::disparityCalibParams = calib->disparityCalib.params;
 
-#define dcp(name) if (ITMView::depthConversionType == #name) {forEachPixelNoImage<name>(depth->noDims); return;}
+#define dcp(name) if (ITMView::depthConversionType == #name) {forEachPixelNoImage<name>(depthData->noDims); return;}
     dcp(ConvertDisparityToDepth);
     dcp(ScaleAndValidateDepth);
 

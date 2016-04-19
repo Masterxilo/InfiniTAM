@@ -7,6 +7,8 @@
 #include "itmcudautils.h"
 
 
+enum MemoryCopyDirection { CPU_TO_CPU, CPU_TO_CUDA, CUDA_TO_CPU, CUDA_TO_CUDA };
+
 enum MemoryDeviceType { MEMORYDEVICE_CPU, MEMORYDEVICE_CUDA };
 
 namespace ORUtils
@@ -61,8 +63,6 @@ namespace ORUtils
         CPU_AND_GPU size_t dataSizeInBytes() const {
             return dataSize * sizeof(T);
         }
-		enum MemoryCopyDirection { CPU_TO_CPU, CPU_TO_CUDA, CUDA_TO_CPU, CUDA_TO_CUDA };
-
 		/** Get the data pointer on CPU or GPU. */
 		CPU_AND_GPU DEVICEPTR(T)* GetData(MemoryDeviceType memoryType)
 		{

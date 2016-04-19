@@ -30,6 +30,7 @@ GPU_ONLY inline float computeUpdatedVoxelDepthInfo(
     /// I_d(\pi(K_dX_d))
     auto p = currentView->depthImage->getPointForPixel(pt_image.toInt());
     const float depth_measure = p.location.z;
+    if (depth_measure <= 0.0) return -1;
 
     /// I_d(\pi(K_dX_d)) - X_d^(z)          (3)
     float const eta = depth_measure - pt_camera.z;

@@ -8,7 +8,6 @@
 
 #include "itmview.h"
 #include "itmpose.h"
-#include "itmtrackingstate.h"
 #include "ITMLibDefines.h"
 
 // .png files
@@ -84,57 +83,6 @@ namespace dump {
         assert(x > 0);
         CloseHandle(h);
         return x;
-    }
-
-    // View and tracking state
-    template<>
-    static inline ITMView* load(std::string f) {
-        Vector2i 
-            imgSize_rgb = *load<Vector2i>(f + ".imgSize_rgb"), 
-            imgSize_d = *load<Vector2i>(f + ".imgSize_d");
-        ITMRGBDCalib *calib = load<ITMRGBDCalib>(f + ".calib");
-        ITMView* v = new ITMView(calib);
-        ReadImageFromFile(v->depth, f+".depth");
-        ReadImageFromFile(v->rgb, f + ".rgb");
-        return v;
-    }
-    template<>
-    static inline void store(ITMView* v, std::string f) {
-        store(&v->rgb->noDims, f + ".imgSize_rgb");
-        store(&v->depth->noDims, f + ".imgSize_d");
-        store(v->calib, f + ".calib");
-        assert(fileSize(f + ".calib") == sizeof(ITMRGBDCalib));
-        SaveImageToFile(v->depth, f + ".depth");
-        SaveImageToFile(v->rgb, f + ".rgb");
-    }
-
-    template<>
-    static inline ITMTrackingState* load(std::string f) {
-        Vector2i
-            imgSize_d = *load<Vector2i>(f + ".imgSize_d");
-        ITMTrackingState* v = new ITMTrackingState(imgSize_d);
-
-
-        v->pose_d = load<ITMPose>(f + ".pose_d");
-
-
-
-        v->pointCloud->pose_pointCloud = load<ITMPose>(f + ".pose_pointCloud");
-        assert(ReadImageFromFile(v->pointCloud->locations, f + ".locations"));
-        assert(ReadImageFromFile(v->pointCloud->normals, f + ".normals"));
-        return v;
-    }
-    template<>
-    static inline void store(ITMTrackingState* v, std::string f) {
-        store(&v->pointCloud->locations->noDims, f + ".imgSize_d");
-
-        store(v->pose_d, f + ".pose_d");
-        assert(fileSize(f + ".pose_d") == sizeof(ITMPose));
-        store(v->pointCloud->pose_pointCloud, f + ".pose_pointCloud");
-        assert(fileSize(f + ".pose_pointCloud") == sizeof(ITMPose));
-
-        assert(SaveImageToFile(v->pointCloud->locations, f + ".locations"));
-        assert(SaveImageToFile(v->pointCloud->normals, f + ".normals"));
     }
 
 }

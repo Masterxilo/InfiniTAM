@@ -68,13 +68,13 @@ namespace ORUtils {
 			this->m30 = a30; this->m31 = a31; this->m32 = a32; this->m33 = a33;
         }
 
-#define Rij(row, col) R.m[row + 3 * col]
+#define Rij(row, col) R.m[row + 3 * col] // m is row-major (for opengl)
         CPU_AND_GPU Matrix3<T> GetR(void) const
         {
             Matrix3<T> R;
-            Rij(0, 0) = m[0 + 4 * 0]; Rij(1, 0) = m[1 + 4 * 0]; Rij(2, 0) = m[2 + 4 * 0];
-            Rij(0, 1) = m[0 + 4 * 1]; Rij(1, 1) = m[1 + 4 * 1]; Rij(2, 1) = m[2 + 4 * 1];
-            Rij(0, 2) = m[0 + 4 * 2]; Rij(1, 2) = m[1 + 4 * 2]; Rij(2, 2) = m[2 + 4 * 2];
+            Rij(0, 0) = m[0 + 4 * 0]; Rij(0, 1) = m[0 + 4 * 1]; Rij(0, 2) = m[0 + 4 * 2]; 
+            Rij(1, 0) = m[1 + 4 * 0]; Rij(1, 1) = m[1 + 4 * 1]; Rij(1, 2) = m[1 + 4 * 2]; 
+            Rij(2, 0) = m[2 + 4 * 0]; Rij(2, 1) = m[2 + 4 * 1]; Rij(2, 2) = m[2 + 4 * 2];
 
             return R;
         }
@@ -395,20 +395,39 @@ namespace ORUtils {
 	class MatrixSQX : public MatrixSQX_ < T, s >
 	{
 	public:
-		CPU_AND_GPU MatrixSQX() { this->dim = s; this->sq = s*s; }
-		CPU_AND_GPU MatrixSQX(T t) { this->dim = s; this->sq = s*s; setValues(t); }
-		CPU_AND_GPU MatrixSQX(const T *m)	{ this->dim = s; this->sq = s*s; setValues(m); }
+        CPU_AND_GPU MatrixSQX() { this->dim = s; this->sq = s*s; }
+        CPU_AND_GPU MatrixSQX(T t) { this->dim = s; this->sq = s*s; setValues(t); }
+        CPU_AND_GPU MatrixSQX(const T *m)	{ this->dim = s; this->sq = s*s; setValues(m); }
+        CPU_AND_GPU MatrixSQX(const T m[s][s])	{ this->dim = s; this->sq = s*s; setValues((T*)m); }
 
-		CPU_AND_GPU inline void getValues(T *mp) const	{ memcpy(mp, this->m, sizeof(T) * 16); }
-		CPU_AND_GPU inline const T *getValues() const { return this->m; }
+        CPU_AND_GPU inline void getValues(T *mp) const	{ memcpy(mp, this->m, sizeof(T) * 16); }
+        CPU_AND_GPU inline const T *getValues() const { return this->m; }
 
-		// Element access
-		CPU_AND_GPU inline T &operator()(int x, int y)	{ return at(x, y); }
-		CPU_AND_GPU inline const T &operator()(int x, int y) const	{ return at(x, y); }
-		CPU_AND_GPU inline T &operator()(Vector2<int> pnt)	{ return at(pnt.x, pnt.y); }
-		CPU_AND_GPU inline const T &operator()(Vector2<int> pnt) const	{ return at(pnt.x, pnt.y); }
-		CPU_AND_GPU inline T &at(int x, int y) { return this->m[y * s + x]; }
-		CPU_AND_GPU inline const T &at(int x, int y) const { return this->m[y * s + x]; }
+        CPU_AND_GPU static inline MatrixSQX<T, s> make_aaT(const VectorX<float, s>& a) {
+            float a_aT[s][s];
+            for (int c = 0; c < s; c++)
+                for (int r = 0; r < s; r++)
+                    a_aT[c][r] = a[c] * a[r];
+            return a_aT;
+        }
+
+        CPU_AND_GPU static inline MatrixSQX<T, s> make_zeros() {
+            MatrixSQX<T, s> x;
+            x.setZeros();
+            return x;
+        }
+
+        // Element access
+        CPU_AND_GPU inline T &operator()(int x, int y)	{ return at(x, y); }
+        CPU_AND_GPU inline const T &operator()(int x, int y) const	{ return at(x, y); }
+        CPU_AND_GPU inline T &operator()(Vector2<int> pnt)	{ return at(pnt.x, pnt.y); }
+        CPU_AND_GPU inline const T &operator()(Vector2<int> pnt) const	{ return at(pnt.x, pnt.y); }
+        CPU_AND_GPU inline T &at(int x, int y) { return this->m[y * s + x]; }
+        CPU_AND_GPU inline const T &at(int x, int y) const { return this->m[y * s + x]; }
+
+        // indexing operators
+        CPU_AND_GPU T &operator [](int i) { return this->m[i]; }
+        CPU_AND_GPU const T &operator [](int i) const { return this->m[i]; }
 
 		// set values
 		CPU_AND_GPU inline void setValues(const T *mp) { for (int i = 0; i < s*s; i++) this->m[i] = mp[i]; }

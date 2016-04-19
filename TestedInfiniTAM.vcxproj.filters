@@ -96,9 +96,6 @@
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h">
       <Filter>ITMLib\Objects</Filter>
     </ClInclude>
-    <ClInclude Include="ITMLib\Objects\ITMTrackingState.h">
-      <Filter>ITMLib\Objects</Filter>
-    </ClInclude>
     <ClInclude Include="ITMLib\Engine\ITMLowLevelEngine.h">
       <Filter>ITMLib\Engine</Filter>
     </ClInclude>
@@ -137,6 +134,7 @@
     <ClInclude Include="ITMLib\Engine\ITMSceneReconstructionEngine.h">
       <Filter>WorkingSet</Filter>
     </ClInclude>
+    <ClInclude Include="constructAndSolve.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />

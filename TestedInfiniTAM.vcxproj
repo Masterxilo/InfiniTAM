@@ -117,6 +117,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="constructAndSolve.h" />
     <ClInclude Include="Engine\ImageSourceEngine.h" />
     <ClInclude Include="Engine\UIEngine.h" />
     <ClInclude Include="ITMLib\Engine\ITMDepthTracker.h" />
@@ -132,7 +133,6 @@
     <ClInclude Include="ITMLib\Objects\ITMIntrinsics.h" />
     <ClInclude Include="ITMLib\Objects\ITMPose.h" />
     <ClInclude Include="ITMLib\Objects\ITMRGBDCalib.h" />
-    <ClInclude Include="ITMLib\Objects\ITMTrackingState.h" />
     <ClInclude Include="ITMLib\Objects\ITMView.h" />
     <ClInclude Include="ITMLib\Utils\ITMCalibIO.h" />
     <ClInclude Include="ITMLib\Utils\ITMCUDAUtils.h" />
@@ -174,10 +174,15 @@
     </CudaCompile>
     <CudaCompile Include="RenderingRangeImage.cu">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
     <CudaCompile Include="Scene.cu" />
     <CudaCompile Include="Tests\Tests.cu">
       <GenerateRelocatableDeviceCode Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</GenerateRelocatableDeviceCode>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>
     <CudaCompile Include="Tests\TestUtils.cu" />
     <CudaCompile Include="Utils\FileUtilsPNG.cu" />
@@ -186,7 +191,6 @@
     <ClCompile Include="lodepng\lodepng.cpp" />
     <CudaCompile Include="LightingEstimation.cu">
       <FileType>CppCode</FileType>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </CudaCompile>

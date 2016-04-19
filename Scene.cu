@@ -2,23 +2,33 @@
 
 //__device__ Scene* currentScene;
 //__host__
-__managed__ Scene* currentScene = 0; // TODO use __const__ memory, not changeable from gpu!
+__managed__ Scene* currentScene = 0; // TODO use __const__ memory, since this value is not changeable from gpu!
 
 CPU_AND_GPU Scene* Scene::getCurrentScene() {
     return currentScene;
-}
-
-__managed__ ITMVoxelBlock* currentLocalVBA = 0;
-__device__ void Scene::AllocateVB::allocate(VoxelBlockPos pos, int sequenceId) {
-    assert(currentLocalVBA);
-
-    currentLocalVBA[sequenceId].reinit(pos);
 }
 
 void Scene::setCurrentScene(Scene* s) {
     cudaDeviceSynchronize(); // want to write managed currentScene 
     currentScene = s;
 }
+
+
+// performAllocations -- private:
+__managed__ ITMVoxelBlock* currentLocalVBA = 0; //!< used for passing localVBA to allocate, called when doing voxel allocations by HashMap
+__device__ void Scene::AllocateVB::allocate(VoxelBlockPos pos, int sequenceId) {
+    assert(currentLocalVBA);
+
+    currentLocalVBA[sequenceId].reinit(pos);
+}
+
+void Scene::performAllocations() {
+    assert(!currentLocalVBA);
+    currentLocalVBA = localVBA;
+    voxelBlockHash->performAllocations(); // will call Scene::AllocateVB::allocate for all outstanding allocations
+    currentLocalVBA = 0;
+}
+//
 
 Scene::Scene() {
     initCoordinateSystems();
@@ -32,10 +42,6 @@ Scene::~Scene() {
     cudaFree(localVBA);
 }
 
-void Scene::performAllocations() {
-    currentLocalVBA = localVBA;
-    voxelBlockHash->performAllocations();
-}
 
 static GPU_ONLY inline VoxelBlockPos pointToVoxelBlockPos(
     const THREADPTR(Vector3i) & point //!< [in] in voxel coordinates
@@ -60,9 +66,15 @@ GPU_ONLY ITMVoxel* Scene::getVoxel(Vector3i point) {
     return b->getVoxel(localPos);
 }
 
+GPU_ONLY ITMVoxelBlock* Scene::getVoxelBlockForSequenceNumber(unsigned int sequenceNumber) {
+    assert(sequenceNumber < SDF_LOCAL_BLOCK_NUM);
+    assert(sequenceNumber < voxelBlockHash->getLowestFreeSequenceNumber());
+    return &localVBA[sequenceNumber];
+}
+
 /// Returns NULL if the voxel block is not allocated
 GPU_ONLY ITMVoxelBlock* Scene::getVoxelBlock(VoxelBlockPos pos) {
-    int sequenceNumber = voxelBlockHash->getSequenceNumber(pos);
+    int sequenceNumber = voxelBlockHash->getSequenceNumber(pos); // returns 0 if pos is not allocated
     if (sequenceNumber == 0) return NULL;
     return &localVBA[sequenceNumber];
 }

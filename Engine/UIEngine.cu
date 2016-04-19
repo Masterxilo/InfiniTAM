@@ -27,7 +27,7 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
     switch (key)
     {
     case 'n':
-        printf("processing one frame ...\n");
+        //printf("processing one frame ...\n");
         uiEngine->ProcessFrame();
         glutPostRedisplay();
         break;
@@ -43,7 +43,7 @@ void UIEngine::glutDisplayFunction()
 	UIEngine *uiEngine = UIEngine::Instance();
 
     if (!uiEngine->freeviewActive) {
-        if (!uiEngine->mainEngine->GetTrackingState() || !uiEngine->mainEngine->GetView())
+        if (!uiEngine->mainEngine->GetView() || uiEngine->mainEngine->GetView()->colorImage->imgSize().area() <= 1)
             return;
 
         // Restore viewpoint to live when freeview is not active
@@ -65,15 +65,14 @@ void UIEngine::glutDisplayFunction()
 		{
 			glEnable(GL_TEXTURE_2D);
 
-
             uiEngine->outputImage = new ITMUChar4Image(uiEngine->freeviewDim);
             uiEngine->mainEngine->GetImage(
                 uiEngine->outputImage,
                 &uiEngine->freeviewPose,
                 &uiEngine->freeviewIntrinsics,
-                "renderGrey" //renderGrey"
+                "renderColour" //renderGrey" // renderColour // renderColourFromNormal
                 );
-            png::SaveImageToFile(uiEngine->outputImage, "out.png");
+            //png::SaveImageToFile(uiEngine->outputImage, "out.png");
 
             glBindTexture(GL_TEXTURE_2D, uiEngine->textureId);
 			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 
@@ -118,7 +117,34 @@ void UIEngine::glutMouseButtonFunction(int button, int state, int x, int y)
     uiEngine->mouseLastClickState = state;
     uiEngine->mouseLastClickPos = Vector2i(x, y);
 }
-Matrix3f createRotation(const Vector3f & _axis, float angle);
+
+/// Alternative/external implementation of axis-angle rotation matrix construction
+/// axis does not need to be normalized.
+Matrix3f createRotation(const Vector3f & _axis, float angle)
+{
+    Vector3f axis = normalize(_axis);
+    float si = sinf(angle);
+    float co = cosf(angle);
+
+    Matrix3f ret;
+    ret.setIdentity();
+
+    ret *= co;
+    for (int r = 0; r < 3; ++r) for (int c = 0; c < 3; ++c) ret.at(c, r) += (1.0f - co) * axis[c] * axis[r];
+
+    Matrix3f skewmat;
+    skewmat.setZeros();
+    skewmat.at(1, 0) = -axis.z;
+    skewmat.at(0, 1) = axis.z;
+    skewmat.at(2, 0) = axis.y;
+    skewmat.at(0, 2) = -axis.y;
+    skewmat.at(2, 1) = axis.x; // should be -axis.x;
+    skewmat.at(1, 2) = -axis.x;// should be axis.x;
+    skewmat *= si;
+    ret += skewmat;
+
+    return ret;
+}
 void UIEngine::glutMouseMoveFunction(int x, int y)
 {
 	UIEngine *uiEngine = UIEngine::Instance();
@@ -179,11 +205,11 @@ void UIEngine::glutMouseWheelFunction(int button, int dir, int x, int y)
 
 void UIEngine::Initialise(int & argc, char** argv, ImageFileReader *imageSource, ITMMainEngine *mainEngine ) 
 {
-    this->freeviewActive = false;
+    this->freeviewActive = 1; this->freeviewPose.SetT(Vector3f(0, 0, 100 * voxelSize));
 
 	this->imageSource = imageSource;
 	this->mainEngine = mainEngine;
-    freeviewDim = Vector2i(640, 480);
+    this->freeviewDim = Vector2i(640, 480);
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);

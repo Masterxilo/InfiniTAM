@@ -22,8 +22,8 @@ static ImageFileReader * CreateDefaultImageSource(
     return new ImageFileReader(calibFile, rgbMask, depthMask, 1);
 }
 
-void tests();
 int main(int argc, char** argv) {
+    assert(LoadLibraryA("PaulLanguage3.dll"));
     //tests();
     
     auto imageSource = CreateDefaultImageSource(argv[1], argv[2], argv[3]);

@@ -11,21 +11,22 @@ extern __managed__ CoordinateSystem* globalcs;
 /// Coordinate systems are identical when their pointers are.
 class CoordinateSystem : public Managed {
 private:
-    CoordinateSystem(const CoordinateSystem&);
+    //CoordinateSystem(const CoordinateSystem&); // TODO should we really allow copying?
     void operator=(const CoordinateSystem&);
 
-    const Matrix4f toGlobal;
-    const Matrix4f fromGlobal;
     CPU_AND_GPU Point toGlobalPoint(Point p)const;
     CPU_AND_GPU Point fromGlobalPoint(Point p)const;
     CPU_AND_GPU Vector toGlobalVector(Vector p)const;
     CPU_AND_GPU Vector fromGlobalVector(Vector p)const;
 public:
+    const Matrix4f toGlobal;
+    const Matrix4f fromGlobal;
     explicit CoordinateSystem(const Matrix4f& toGlobal) : toGlobal(toGlobal), fromGlobal(toGlobal.getInv()) {
         assert(toGlobal.GetR().det() != 0);
     }
 
     /// The world or global space coodinate system.
+    /// Measured in meters if cameras and depth computation are calibrated correctly.
     CPU_AND_GPU static CoordinateSystem* global() {
 #ifndef __CUDA_ARCH__
         if (!globalcs) {
@@ -87,7 +88,7 @@ public:
     const Vector3f location;
     // copy constructor ok
 
-    // Assignment // TODO use a reference instead
+    // Assignment // TODO use a changing reference-to-Point instead (a pointer for example)
     CPU_AND_GPU void operator=(const Point& rhs) {
         coordinateSystem = rhs.coordinateSystem;
         const_cast<Vector3f&>(location) = rhs.location;

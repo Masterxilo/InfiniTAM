@@ -16,11 +16,11 @@ public:
 private:
 
     void setFreeviewFromLive() {
-        assert(mainEngine->GetTrackingState());
-        freeviewPose.SetFrom(mainEngine->GetTrackingState()->pose_d);
-        assert(mainEngine->GetView() != NULL);
+        freeviewPose.SetM(
+            mainEngine->GetView()->depthImage->eyeCoordinates->fromGlobal
+            );
         freeviewIntrinsics = mainEngine->GetView()->calib->intrinsics_d;
-        freeviewDim = mainEngine->GetView()->depth->noDims;
+        freeviewDim = mainEngine->GetView()->depthImage->imgSize();
     }
 	static UIEngine* instance;
 

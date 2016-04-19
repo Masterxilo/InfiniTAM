@@ -11,7 +11,11 @@
 
 #define SDF_BLOCK_SIZE 8
 #define SDF_BLOCK_SIZE3 (SDF_BLOCK_SIZE * SDF_BLOCK_SIZE * SDF_BLOCK_SIZE)
-#define SDF_LOCAL_BLOCK_NUM 0x40000		// Number of locally stored blocks (maximum load the hash-table can have)
+
+// (Maximum) Number of actually stored blocks (i.e. maximum load the hash-table can actually have -- yes, we can never fill all buckets)
+// is smaller than SDF_BUCKET_NUM for efficiency reasons. 
+// doesn't make sense for this to be bigger than SDF_GLOBAL_BLOCK_NUM
+#define SDF_LOCAL_BLOCK_NUM 0x40000		
 
 #define SDF_BUCKET_NUM 0x100000			// Number of Hash Bucket, must be 2^n and bigger than SDF_LOCAL_BLOCK_NUM
 #define SDF_HASH_MASK (SDF_BUCKET_NUM-1)// Used for get hashing value of the bucket index, "x & (uint)SDF_HASH_MASK" is the same as "x % SDF_BUCKET_NUM"
@@ -99,7 +103,7 @@ private:
 public:
     /** Value of the truncated signed distance transformation, in [-1, 1] (scaled by truncation mu when storing) */
 	CPU_AND_GPU void setSDF_initialValue() { sdf = 32767; }
-    CPU_AND_GPU float getSDF() { return (float)(sdf) / 32767.0f; }
+    CPU_AND_GPU float getSDF() const { return (float)(sdf) / 32767.0f; }
     CPU_AND_GPU void setSDF(float x) {
         assert(x >= -1 && x <= 1);
         sdf = (short)((x)* 32767.0f);
@@ -119,16 +123,18 @@ public:
     //float refinedDistance; // D'(v)
 
     // chromaticity and intensity are
-    // computed from C(v) on-the-fly
+    // computed from C(v) on-the-fly -- TODO visualize those two
 
-    /// \f$\Gamma(v)\f$
-    float intensity() {
+    // \in [0,1]
+    CPU_AND_GPU float intensity() const {
         // TODO is this how luminance should be computed?
         Vector3f color = clr.toFloat() / 255.f;
         return (color.r + color.g + color.b) / 3.f;
     }
 
-    Vector3f chromaticity() {
+    /// \f$\Gamma(v)\f$
+    // \in [0,255]^3
+    CPU_AND_GPU Vector3f chromaticity() const {
         return clr.toFloat() / intensity();
     }
 
@@ -139,6 +145,9 @@ public:
 		w_depth = 0;
 		clr = (uchar)0;
 		w_color = 0;
+
+        // start with constant white albedo
+        luminanceAlbedo = 1.f;
 	}
 };
 

@@ -1,3 +1,4 @@
+#pragma once
 #include "image.h"
 #include "itmlibdefines.h"
 #include "itmpixelutils.h"
@@ -11,15 +12,15 @@ private:
     CameraImage(const CameraImage&);
 public:
     Image<T>*const image; // TODO should the image have to be const?
-    const CoordinateSystem* const eyeCoordinates; // const ITMPose* const pose // pose->GetM is fromGlobal matrix of coord system; <- inverse is toGlobal // TODO should this encapsulate a copy?
+    const CoordinateSystem* eyeCoordinates; // const ITMPose* const pose // pose->GetM is fromGlobal matrix of coord system; <- inverse is toGlobal // TODO should this encapsulate a copy? // TODO should the eyeCoordinates have to be const?
     const Vector4f cameraIntrinsics;// const ITMIntrinsics* const cameraIntrinsics;
 
     CameraImage(
-        const Image<T>*const image,
+        Image<T>*const image,
         const CoordinateSystem* const eyeCoordinates,
         const Vector4f cameraIntrinsics) :
         image(image), eyeCoordinates(eyeCoordinates), cameraIntrinsics(cameraIntrinsics) {
-        assert(image->noDims.area() > 1);
+        //assert(image->noDims.area() > 1); // don't force this, the image we reference is allowed to change later on
     }
 
     CPU_AND_GPU Vector2i imgSize()const {
@@ -42,6 +43,8 @@ public:
     }
 #define EXTRA_BOUNDS true
     /// \see project
+    /// If Extra_bounds is specified, the point is considered to lie outside of the image
+    /// if it cannot later be interpolated (the outer bounds are shrinked by one pixel)
     /// \returns false when point projects outside of image
     CPU_AND_GPU bool project(Point p, Vector2f& pt_image, bool extraBounds = false) const {
         Point p_ec = eyeCoordinates->convert(p);
@@ -57,7 +60,7 @@ public:
 class DepthImage : public CameraImage<float> {
 public:
     DepthImage(
-        const Image<float>*const image,
+        Image<float>*const image,
         const CoordinateSystem* const eyeCoordinates,
         const Vector4f cameraIntrinsics) :
         CameraImage(image, eyeCoordinates, cameraIntrinsics) {}
@@ -86,7 +89,7 @@ public:
 class PointImage : public CameraImage<Vector4f> {
 public:
     PointImage(
-        const Image<Vector4f>*const image,
+        Image<Vector4f>*const image,
         const CoordinateSystem* const pointCoordinates,
 
         const CoordinateSystem* const eyeCoordinates,
@@ -117,8 +120,8 @@ public:
 class RayImage : public PointImage {
 public:
     RayImage(
-        const Image<Vector4f>*const pointImage,
-        const Image<Vector4f>*const normalImage,
+        Image<Vector4f>*const pointImage,
+        Image<Vector4f>*const normalImage,
         const CoordinateSystem* const pointCoordinates,
 
         const CoordinateSystem* const eyeCoordinates,
@@ -126,7 +129,7 @@ public:
         PointImage(pointImage, pointCoordinates, eyeCoordinates, cameraIntrinsics), normalImage(normalImage) {
         assert(normalImage->noDims == pointImage->noDims);
     }
-    const Image<Vector4f>* const normalImage;
+    Image<Vector4f>* const normalImage; // Image may change
 
     CPU_AND_GPU Ray getRayForPixel(Vector2i pixel) const {
         Point origin = getPointForPixel(pixel);
@@ -134,6 +137,8 @@ public:
         return Ray(origin, Vector(pointCoordinates, direction));
     }
 
+    /// pixel should have been produced with
+    /// project(x,pixel,EXTRA_BOUNDS)
     CPU_AND_GPU Ray getRayForPixelInterpolated(Vector2f pixel, bool& out_isIllegal) const {
         out_isIllegal = false;
         Point origin = getPointForPixelInterpolated(pixel, out_isIllegal);

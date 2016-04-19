@@ -14,10 +14,8 @@ operations.
 
 #include "ITMLibDefines.h"
 #include "ITMView.h"
-#include "ITMTrackingState.h"
-#include "ITMRenderState.h"
-#include "cameraimage.h"
-
+#include "ITMPose.h"
+    
 /** This will render an image using raycasting.
 TODO could render into a view*/
 CameraImage<Vector4u>* RenderImage(
@@ -25,3 +23,5 @@ CameraImage<Vector4u>* RenderImage(
     const ITMIntrinsics *intrinsics,
     const Vector2i imgSize,
     std::string shader);
+
+RayImage * CreateICPMapsForCurrentView();

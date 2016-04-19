@@ -1,132 +1,142 @@
 /// c.f. chapter "Lighting Estimation with Signed Distance Fields"
 
-#include "matrix.h"
 #include "itmlibdefines.h"
-#include "image.h" 
-#include "cholesky.h" 
 #include "cudadefines.h" 
+#include "lightingmodel.h"
+#include "Scene.h"
 #include "itmrepresentationaccess.h" 
+#include "constructAndSolve.h"
+/*
+
+#include "matrix.h"
+#include "image.h"
+#include "cholesky.h"
+
 #include "ITMLibDefines.h"
 #include <array>
-using namespace ORUtils;
-using namespace ITMLib;
-using namespace ITMLib::Objects;
 
 
-#include "lightingmodel.h"
+//
+*/
+/// for constructAndSolve
+struct ConstructLightingModelEquationRow {
+    // Amount of columns, should be small
+    static const unsigned int m = LightingModel::b2;
 
+    /*not really needed */
+    struct ExtraData {
+        // User specified payload to be summed up alongside:
+        uint count;
 
-/// compute H0(n(v_i)) ... H8(n(v_i))
-/// for voxel v_i given by pos
-/// 8 == b^2
-/// \returns false when this cannot be computed
-GPU_ONLY bool computeLightingEstimate(
-    const ITMVoxelBlock* const localVBA,
-    const typename ITMVoxelBlockHash::IndexData * const voxelIndex,
-    const Vector3i pos, //!< [in]
-    float H_n_out[LightingModel::b2] //!< [out] H0(n(v_i)) ... H8(n(v_i))
-    ) {
-    bool isFound;
-    Vector3f n = computeSingleNormalFromSDFByForwardDifference(localVBA, voxelIndex, pos, isFound);
-    if (!isFound) return false;
+        // Empty constructor must generate neutral element
+        CPU_AND_GPU ExtraData() : count(0) {}
 
-    for (int i = 0; i < LightingModel::b2; i++) {
-        H_n_out[i] = LightingModel::sphericalHarmonicHi(i, n);
-    }
-}
-
-/// compute the matrix a_i a_i^T
-// for the voxel i, where a_i is one column of A^T
-GPU_ONLY bool computeLightingEstimateAtColumn(
-    const ITMVoxelBlock* const localVBA,
-    const typename ITMVoxelBlockHash::IndexData * const voxelIndex,
-    const Vector3i pos,//!< [in]
-    MatrixSQX<float, LightingModel::b2>& ai_aiT,//!< [out]
-    float ai_bi[LightingModel::b2]//!< [out] a_i * b_i (a_i is a column of A^T)
-    ) {
-    // TODO handle isFound
-    // compute ai
-    float ai[LightingModel::b2];
-    computeLightingEstimate(localVBA, voxelIndex,
-        pos, ai);
-
-    // compute bi
-    bool isFound;
-    ITMVoxel v = readVoxel(localVBA, voxelIndex, pos, isFound);
-    float bi = v.intensity() / v.luminanceAlbedo; // I(v) / a(v)
-
-    // compute ai * bi vector (these are later summed up to give A^T * b)
-    for (int i = 0; i < LightingModel::b2; i++) {
-        ai_bi[i] = ai[i] * bi;
-    }
-
-    // each output column is the vector ai, multiplied by ai[column]
-    for (int column = 0; column < LightingModel::b2; column++) {
-        for (int row = 0; row < LightingModel::b2; row++) {
-            ai_aiT.at(column, row) = ai[row] * ai[column];
+        static GPU_ONLY ExtraData add(const ExtraData& l, const ExtraData& r) {
+            ExtraData o;
+            o.count = l.count + r.count;
+            return o;
         }
-    }
-}
-
-///#define REDUCE_BLOCK_SIZE 256 // must be power of 2. Used for reduction of a sum.
-
-
-/// launch this such that each thread handles one voxel (3-d)
-/// and each thread block handles one voxel block (1-d)
-/// we locally sum up A^TA and A^Tb and then put it into the global sum
-KERNEL reductionLightingEstimate(
-    const ITMVoxelBlock* const localVBA,
-    const typename ITMVoxelBlockHash::IndexData * const voxelIndex,
-
-    MatrixSQX<float, LightingModel::b2>* sum_AtA,
-    float sum_Atb[LightingModel::b2],
-    ) {
-    assert(blockDim.x == blockDim.y && blockDim.y == blockDim.z && blockDim.x == sdf_voxel_block_size);
-    assert(blockIdx.x < SDF_LOCAL_BLOCK_NUM);
-    assert(gridDim.x == SDF_LOCAL_BLOCK_NUM);
-    assert(gridDim.y == 1);
-    assert(gridDim.z == 1);
-    
-    ITMVoxelBlock* vb = localVBA[blockIdx.x];
-    if (vb->pos == illegal) return;
-
-    Vector3i pos = vb->pos * sdf_voxel_block_size + 
-        Vector3i(threadIdx.x, threadIdx.y, threadIdx.z)
-        ;
-
-
-    // local computation
-    MatrixSQX<float, LightingModel::b2>& ai_aiT;
-    float ai_bi[LightingModel::b2];
-
-    computeLightingEstimateAtColumn(
-        localVBA,
-        voxelIndex,
-        pos,//!< [in]
-        ai_aiT,//!< [out]
-        ai_bi);//!< [out] a_i * b_i (a_i is a column of A^T)
-
-    // reduction within block
-    __syncthreads();
-    __shared__ MatrixSQX<float, LightingModel::b2> shared_sum_AtA[sdf_block_size3 / 2];
-    __shared__ MatrixSQX<float, LightingModel::b2> shared_sum_Atb[sdf_block_size3 / 2][LightingModel::b2];
-    
-    __syncthreads();
-    // integrate with total sum (only done by thread 0)
-        if (threadIdx.x != 0 || threadIdx.y != 0 || threadIdx.z != 0) return;
-
-    for (int i = 0; i < LightingModel::b2; i++) {
-        atomicAdd(&sum_Atb[i], shared_sum_Atb[0][i]);
-            
-
-        for (int j = 0; j < LightingModel::b2; j++) {
-            atomicAdd(&sum_AtA.at(j, i), ai_aiT.at(j, i));
+        static GPU_ONLY void atomicAdd(DEVICEPTR(ExtraData&) result, const ExtraData& integrand) {
+            ::atomicAdd(&result.count, integrand.count);
         }
+    };
+
+    /// should be executed with (blockIdx.x/2) == valid localVBA index (0 ignored) 
+    /// annd blockIdx.y,z from 0 to 1 (parts of one block)
+    /// and threadIdx <==> voxel localPos / 2..
+    static GPU_ONLY bool generate(const uint i, VectorX<float, m>& out_ai, float& out_bi/*[1]*/, ExtraData& extra_count /*not really needed */) {
+        const uint blockSequenceId = blockIdx.x/2;
+        if (blockSequenceId == 0) return false; // unused
+        assert(blockSequenceId < SDF_LOCAL_BLOCK_NUM);
+
+        assert(blockSequenceId < Scene::getCurrentScene()->voxelBlockHash->getLowestFreeSequenceNumber());
+
+        assert(threadIdx.x < SDF_BLOCK_SIZE / 2 && 
+            threadIdx.y < SDF_BLOCK_SIZE / 2 &&
+            threadIdx.z < SDF_BLOCK_SIZE / 2);
+
+        assert(blockIdx.y <= 1);
+        assert(blockIdx.z <= 1);
+        // voxel position
+        const Vector3i localPos = Vector3i(threadIdx_xyz) + Vector3i(blockIdx.x % 2, blockIdx.y % 2, blockIdx.z % 2) * 4;
+
+        assert(localPos.x >= 0  &&
+               localPos.y >= 0 &&
+               localPos.z >= 0);
+        assert(localPos.x < SDF_BLOCK_SIZE  &&
+            localPos.y < SDF_BLOCK_SIZE &&
+            localPos.z < SDF_BLOCK_SIZE );
+
+        ITMVoxelBlock* voxelBlock = Scene::getCurrentScene()->getVoxelBlockForSequenceNumber(blockSequenceId);
+
+        const ITMVoxel* voxel = voxelBlock->getVoxel(localPos);
+        const Vector3i globalPos = (voxelBlock->pos.toInt() * SDF_BLOCK_SIZE + localPos);
+        /*
+        const Vector3i globalPos = vb->pos.toInt() * SDF_BLOCK_SIZE;
+
+        const THREADPTR(Point) & voxel_pt_world =  Point(
+            CoordinateSystem::global(),
+            (globalPos.toFloat() + localPos.toFloat()) * voxelSize
+            ));
+
+        .toFloat();
+        Vector3f worldPos = CoordinateSystems::global()->convert(globalPos);
+        */
+        const float worldSpaceDistanceToSurface = abs(voxel->getSDF() * mu);
+        assert(worldSpaceDistanceToSurface <= mu);
+
+        // Is this voxel within the truncation band? Otherwise discard this term (as unreliable for lighting calculation)
+        if (worldSpaceDistanceToSurface > t_shell) return false;
+
+        // return if we cannot compute the normal
+        bool found = true;
+        const Vector3f normal = computeSingleNormalFromSDFByForwardDifference(globalPos, found);
+        if (!found) return false;
+        assert(abs(length(normal) - 1) < 0.01);
+
+        // i-th (voxel-th) row of A shall contain H_{0..b^2-1}(n(v))
+        for (int i = 0; i < LightingModel::b2; i++) {
+            out_ai[i] = LightingModel::sphericalHarmonicHi(i, normal);
+        }
+
+        // corresponding entry of b is I(v) / a(v)
+        out_bi = voxel->intensity() / voxel->luminanceAlbedo;
+        assert(out_bi >= 0 && out_bi <= 1);
+
+        // TODO not really needed
+        extra_count.count = 1;
+        return true;
     }
-}
 
-
-class LightingEstimation {
-public:
-private:
 };
+
+// todo should we really discard the existing lighting model the next time? maybe we could use it as an initialization
+// when solving
+LightingModel estimateLightingModel() {
+    assert(Scene::getCurrentScene());
+    // Maximum number of entries
+
+    const int validBlockNum = Scene::getCurrentScene()->voxelBlockHash->getLowestFreeSequenceNumber();
+
+    auto gridDim = dim3(validBlockNum * 2, 2, 2); 
+    auto blockDim = dim3(SDF_BLOCK_SIZE / 2, SDF_BLOCK_SIZE / 2, SDF_BLOCK_SIZE / 2); // cannot use full SDF_BLOCK_SIZE: too much shared data (in reduction)
+
+    const int n = validBlockNum * SDF_BLOCK_SIZE3; // maximum number of entries: total amount of currently allocated voxels (unlikely)
+    assert(n == volume(gridDim) * volume(blockDim));
+
+    ConstructLightingModelEquationRow::ExtraData extra_count;
+    auto l_harmonicCoefficients = constructAndSolve<ConstructLightingModelEquationRow>(n, gridDim, blockDim, extra_count);
+    assert(extra_count.count <= n); // sanity check
+    assert(l_harmonicCoefficients.size() == LightingModel::b2);
+
+    std::array<float, LightingModel::b2> l_harmonicCoefficients_a;
+    for (int i = 0; i < LightingModel::b2; i++)
+        l_harmonicCoefficients_a[i] = assertFinite( l_harmonicCoefficients[i] );
+    
+    LightingModel lightingModel(l_harmonicCoefficients_a);
+    return lightingModel;
+}
+
+void estimateLightingModel_() {
+    estimateLightingModel();
+}

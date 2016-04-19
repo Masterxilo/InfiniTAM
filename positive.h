@@ -18,7 +18,7 @@ public:
             return +0.f;
         return x;
     }
-    /// Value verified at runtime
+    /// Value verified at runtime if assertions are enabled
     explicit positive(float x) : value(nz2pz(x)) {
         assert(_fpclass(value) == _FPCLASS_PD || _fpclass(value) == _FPCLASS_PN || _fpclass(value) == _FPCLASS_PZ);
     }

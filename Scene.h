@@ -4,6 +4,7 @@
 #include "hashmap.h"
 
 // see doForEachAllocatedVoxel for T
+#define doForEachAllocatedVoxel_process() static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos)
 template<typename T>
 KERNEL doForEachAllocatedVoxel(
     ITMVoxelBlock* localVBA,
@@ -35,6 +36,9 @@ class Scene : public Managed {
 public:
     /// \returns NULL when the voxel was not found
     GPU_ONLY ITMVoxel* getVoxel(Vector3i pos);
+
+    /// \returns a voxel block from the localVBA
+    GPU_ONLY ITMVoxelBlock* getVoxelBlockForSequenceNumber(unsigned int sequenceNumber);
 
     /// Returns NULL if the voxel block is not allocated
     GPU_ONLY void requestVoxelBlockAllocation(VoxelBlockPos pos);
@@ -96,7 +100,7 @@ public:
     }
 
 
-    /** !private! */
+    /** !private! But has to be placed in public for HashMap to access it - unless we make that a friend */
     struct Z3Hasher {
         typedef VoxelBlockPos KeyType;
         static const uint BUCKET_NUM = SDF_BUCKET_NUM; // Number of Hash Bucket, must be 2^n (otherwise we have to use % instead of & below)
@@ -108,7 +112,7 @@ public:
         }
     };
 
-    /** !private! */
+    /** !private! But has to be placed in public for HashMap to access it - unless we make that a friend*/
     struct AllocateVB {
         static __device__ void allocate(VoxelBlockPos pos, int sequenceId);
     };
@@ -138,7 +142,8 @@ private:
     static void setCurrentScene(Scene* s);
 
     GPU_ONLY DEVICEPTR(ITMVoxelBlock*) getVoxelBlock(VoxelBlockPos pos);
-     public:
+
+     public: // these two could be private where it not for testing/debugging
     DEVICEPTR(ITMVoxelBlock*) localVBA;
    
     /// Gives indices into localVBA for allocated voxel blocks

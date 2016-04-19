@@ -4,7 +4,6 @@
 #include "itmcudautils.h"
 #include "ITMLowLevelEngine.h"
 #include "ITMView.h"
-#include "itmtrackingstate.h"
 
 /** Performing ICP based depth tracking. 
 Implements the original KinectFusion tracking algorithm.

@@ -230,6 +230,7 @@ public:
         cudaFree(lowestFreeExcessListEntry);
     }
     
+    CPU_AND_GPU // could be CPU only if it where not for debugging (and dumping) - do we need it at all?
     uint getLowestFreeSequenceNumber() {
     return *lowestFreeSequenceNumber;
     }

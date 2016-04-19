@@ -668,10 +668,16 @@ namespace ORUtils {
 		CPU_AND_GPU VectorX(const T &t) { for (int i = 0; i < s; i++) this->v[i] = t; } //Scalar constructor
 		CPU_AND_GPU VectorX(const T *tp) { for (int i = 0; i < s; i++) this->v[i] = tp[i]; } // Construct from array
 
-		// indexing operators
-		CPU_AND_GPU T &operator [](int i) { return this->v[i]; }
-		CPU_AND_GPU const T &operator [](int i) const { return this->v[i]; }
 
+        CPU_AND_GPU static inline VectorX<T, s> make_zeros() {
+            VectorX<T, s> x;
+            x.setZeros();
+            return x;
+        }
+
+        // indexing operators
+        CPU_AND_GPU T &operator [](int i) { return this->v[i]; }
+        CPU_AND_GPU const T &operator [](int i) const { return this->v[i]; }
 
 		CPU_AND_GPU inline VectorX<int, s> toIntRound() const {
 			VectorX<int, s> retv;
@@ -699,6 +705,10 @@ namespace ORUtils {
 				this->v[i] = v;
 		}
 
+
+        CPU_AND_GPU void setZeros(){
+            Clear(0);
+        }
 
 		// type-cast operators
 		CPU_AND_GPU operator T *() { return this->v; }

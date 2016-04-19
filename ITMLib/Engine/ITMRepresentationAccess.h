@@ -98,7 +98,8 @@ GPU_ONLY inline Vector3f readFromSDF_color4u_interpolated(
     return ret;
 }
 
-
+// TODO test and visualize
+// e.g. round to voxel position when rendering and draw this
 GPU_ONLY inline Vector3f computeSingleNormalFromSDFByForwardDifference(
     const THREADPTR(Vector3i) &pos, //!< [in] global voxel position
     bool& isFound //!< [out] whether all values needed existed;

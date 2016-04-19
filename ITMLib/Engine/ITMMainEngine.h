@@ -45,21 +45,11 @@ class ITMMainEngine
 {
 private:
 	ITMView *view;
-	ITMTrackingState *trackingState;
 
 public:
-    /// Describes the tracked camera position and possibly a frame rendered from that position
-	ITMRenderState *renderState_live;
-
-    /// Describes a free camera position and frame rendered from that position
-	ITMRenderState *renderState_freeview;
-
     Scene* scene;
 	/// Gives access to the current input frame
 	ITMView* GetView() { return view; }
-
-	/// Gives access to the current camera pose and additional tracking information
-	ITMTrackingState* GetTrackingState(void) { return trackingState; }
 
 	/// Process a frame with rgb and depth images and optionally a corresponding imu measurement.
     /// Key method.
