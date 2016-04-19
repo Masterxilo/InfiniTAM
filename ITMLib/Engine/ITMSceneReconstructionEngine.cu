@@ -129,14 +129,8 @@ struct buildHashAllocAndVisibleTypePP {
 #include <cuda_runtime.h>
 
 struct IntegrateVoxel {
-    static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
-        const Vector3i globalPos = vb->pos.toInt() * SDF_BLOCK_SIZE;
-
-        computeUpdatedVoxelInfo(*v, 
-            Point(
-                CoordinateSystem::global(), 
-                (globalPos.toFloat() + localPos.toFloat()) * voxelSize
-            ));
+    doForEachAllocatedVoxel_process() {
+        computeUpdatedVoxelInfo(*v, globalPoint);
     }
 };
 

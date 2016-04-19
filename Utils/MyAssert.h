@@ -11,7 +11,7 @@
 /**
  * Build our own assert
  */
-
+#define NOMINMAX
 #define WINDOWS_LEAN_AND_MEAN
 #include <Windows.h>
 

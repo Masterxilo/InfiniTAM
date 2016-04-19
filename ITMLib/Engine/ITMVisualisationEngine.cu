@@ -19,6 +19,9 @@ static __managed__ DEVICEPTR(RayImage) * lastFrameICPMap = 0;
 static __managed__ CameraImage<Vector4u>* outRendering = 0;
 static __managed__ Vector3f towardsCamera;
 
+// written by rendering
+static __managed__ ITMFloatImage* outDepth;
+
 // === raycasting, rendering ===
 /// \param x,y [in] camera space pixel determining ray direction
 //!< [out] raycastResult[locId]: the intersection point. 
@@ -172,14 +175,21 @@ GPU_ONLY inline void drawPixelColour(DRAWFUNCTIONPARAMS) {
 struct PROCESSFUNCTION { \
     forEachPixelNoImage_process() {\
         DEVICEPTR(Vector4u) &outRender = outRendering->image->GetData()[locId]; \
-        const CONSTPTR(Vector3f) point = raycastResult->getPointForPixel(Vector2i(x,y)).location; \
+Point voxelCoordinatePoint = raycastResult->getPointForPixel(Vector2i(x,y));\
+assert(voxelCoordinatePoint.coordinateSystem == voxelCoordinates); \
+        const CONSTPTR(Vector3f) point = voxelCoordinatePoint.location; \
+float& outZ = ::outDepth->GetData()[locId];\
+    auto a = outRendering->eyeCoordinates->convert(voxelCoordinatePoint);\
+outZ = a.location.z; /* in world / eye coordinates (distance) */ \
         bool foundPoint = raycastResult->image->GetData()[locId].w > 0; \
         \
         Vector3f outNormal; \
         float angle; \
 computeNormalAndAngle(foundPoint, point, outNormal, angle); \
-        if (foundPoint) DRAWFUNCTION(outRender, point, outNormal, angle); \
-                else outRender = Vector4u((uchar)0); \
+        if (foundPoint) {/*assert(outZ >= viewFrustum_min && outZ <= viewFrustum_max); -- approx*/DRAWFUNCTION(outRender, point, outNormal, angle);} \
+        else {\
+            outRender = Vector4u((uchar)0); outZ = 0;\
+        } \
     }\
 };
 
@@ -216,9 +226,14 @@ CameraImage<Vector4u>* RenderImage(
     const ITMPose *pose,
     const ITMIntrinsics *intrinsics,
     const Vector2i imgSize,
+    ITMFloatImage* const outDepth,
     std::string shader)
 {
     assert(imgSize.area() > 1);
+    assert(outDepth);
+    assert(outDepth->noDims == imgSize);
+    ::outDepth = outDepth;
+
     auto outImage = new ITMUChar4Image(imgSize);
     auto outCs = new CoordinateSystem(pose->GetInvM());
     outRendering = new CameraImage<Vector4u>(

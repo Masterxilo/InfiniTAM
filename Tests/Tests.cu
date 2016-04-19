@@ -201,7 +201,7 @@ KERNEL checkS(Scene* scene) {
 }
 
 struct WriteEach {
-    static GPU_ONLY void process(ITMVoxelBlock* vb, ITMVoxel* v, Vector3i localPos) {
+    doForEachAllocatedVoxel_process() {
         v->setSDF((
             localPos.x + 
             localPos.y * SDF_BLOCK_SIZE + 
@@ -213,7 +213,7 @@ struct WriteEach {
 __managed__ int counter = 0;
 __managed__ bool visited[SDF_BLOCK_SIZE][SDF_BLOCK_SIZE][SDF_BLOCK_SIZE] = {0};
 struct DoForEach {
-    static GPU_ONLY void process(ITMVoxelBlock* vb, ITMVoxel* v, Vector3i localPos) {
+    doForEachAllocatedVoxel_process() {
         assert(localPos.x >= 0 && localPos.y >= 0 && localPos.z >= 0);
         assert(localPos.x  < SDF_BLOCK_SIZE && localPos.y < SDF_BLOCK_SIZE && localPos.z < SDF_BLOCK_SIZE);
 

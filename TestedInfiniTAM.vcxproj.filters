@@ -135,6 +135,8 @@
       <Filter>WorkingSet</Filter>
     </ClInclude>
     <ClInclude Include="constructAndSolve.h" />
+    <ClInclude Include="computeArtificialLighting.h" />
+    <ClInclude Include="visualizeCoordinateSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="InfiniTAM.cu" />
@@ -176,6 +178,8 @@
     <CudaCompile Include="ITMLib\Engine\ITMSceneReconstructionEngine.cu">
       <Filter>WorkingSet</Filter>
     </CudaCompile>
+    <CudaCompile Include="computeArtificialLighting.cu" />
+    <CudaCompile Include="visualizeCoordinateSystem.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="lodepng\lodepng.cpp">

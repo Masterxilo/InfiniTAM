@@ -33,6 +33,7 @@ std::string readFile(std::string fn) {
 
 #include <stdio.h>
 
+#define NOMINMAX
 #include <windows.h>
 #include <tchar.h>
 #include <stdio.h>
@@ -80,7 +81,6 @@ void flushStd() {
     remove(stdoutfile);
     remove(stderrfile);
 }
-#include <windows.h>
 void logger(std::string s) {
     std::string narrow = s;
     _errmsg = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>().from_bytes(narrow);

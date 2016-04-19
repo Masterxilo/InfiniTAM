@@ -5,3 +5,11 @@ x64/*
 *.sdf
 *.opensdf
 *.user
+*.tmp
+*.dump
+*.png
+*.exe
+*.ilk
+*.lib
+*.pdb
+*.dll

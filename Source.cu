@@ -35,9 +35,9 @@ void saveDepth(std::string filename) {
 
 static void render(void)
 {
-    glViewport(0, H, W, -H);
+    glViewport(0, H, W, -H); // invert viewport along y axis
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
+    glDepthFunc(GL_LEQUAL);// LESS);
     glutReportErrors();
     glClearColor(0,0,0, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT| GL_DEPTH_BUFFER_BIT);
@@ -53,7 +53,11 @@ static void render(void)
         auto depth_float_image = new Image<float>(depth->noDims);
         for (int i = 0; i < depth->dataSize; i++) {
             auto rr = depth->GetData()[i];
-            if (rr.w != 1.0) continue; // raycast hit nothing
+            if (rr.w != 1.0) {
+                depth_float_image->GetData()[i] = 1; // raycast hit nothing -> z-buffer value = max = 1
+                continue;
+            }
+
             auto z = rr.z*voxelSize; // convert raycastResult to world coordinates
 
             z = viewFrustum_max*(z - viewFrustum_min) / 
@@ -66,7 +70,7 @@ static void render(void)
             assert(z >= 0 && z <= 1);
         }
         assert(depth_float_image->noDims == Vector2i(W, H));
-/*
+
         glColorMask(0, 0, 0, 0);
         glDrawPixels(W, H,
             GL_DEPTH_COMPONENT, GL_FLOAT,
@@ -80,7 +84,16 @@ static void render(void)
         auto render = new ITMUChar4Image(Vector2i(W, H));
         png::ReadImageFromFile(render, "render.png");
         glutReportErrors();
-        //glRasterPos2f(0,0);
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        typedef void(*glWindowPos3fT)(float, float, float);
+        auto glWindowPos3f = (glWindowPos3fT)wglGetProcAddress("glWindowPos3f");
+        assert(glWindowPos3f);
+        glWindowPos3f(0, 0, 0); // required 
+
         assert(render->noDims == Vector2i(W, H));
         glDepthMask(0);
         glDrawPixels(W, H,
@@ -89,7 +102,7 @@ static void render(void)
             render->GetData());
         glutReportErrors();
         glDepthMask(1);
-    }*/
+    }
 
     glBegin(GL_TRIANGLES);
     /*glColor4f(1, 1,1, 1);
@@ -108,7 +121,7 @@ static void render(void)
     
     glEnd();
 
-    //
+    // c.f. projectionMatrix.nb
     glMatrixMode(GL_PROJECTION);
     ITMIntrinsics intrin;
     float fx = intrin.projectionParamsSimple.fx;
@@ -147,27 +160,26 @@ static void render(void)
     glLoadMatrixf(columnMajorProjectionMatrix);
     puts("load");
     glutReportErrors();
-    glBegin(GL_LINES);
     
-    glColor4f(0, 1,0, 1);
-    glVertex3f(0, 0, (zmin + zmax) / 2);
-    glVertex3f(0.1, 0, (zmin + zmax) / 2);
-    glVertex3f(0, 1, (zmin + zmax) / 2);
-/*
+ // redraw points from raycast result one by one
+    /*
+glBegin(GL_POINTS);
+glColor4f(0,1,1, 1);
     for (int i = 0; i < depth->dataSize; i++) {
         auto rr = depth->GetData()[i];
         if (rr.w != 1.0) continue; // raycast hit nothing
         rr = rr*voxelSize; // convert raycastResult to world coordinates
 
-
         glVertex3f(rr.x, rr.y, rr.z);
     }
+    glEnd();
     */
 
-    glEnd();
 
     glBegin(GL_LINES);
-    float zoff = (zmin + zmax) / 2;
+    float zoff = (zmin + zmax) / 3;
+
+    // draw major axis of world coordinate system with unit length
 #define ax(x,y,z)\
     glColor4f((x),(y),(z),1);\
     glVertex3f(0, 0, zoff);\
@@ -345,33 +357,41 @@ void testCameraImage() {
     cameraToWorld.setTranslate(Vector3f(0, 0, 1));
     cs = new CoordinateSystem(cameraToWorld);
     auto di = new DepthImage(depthImage, cs, intrin.projectionParamsSimple.all);
-    auto pi = new PointImage(pointImage, cs, intrin.projectionParamsSimple.all);
+    auto pi = new PointImage(pointImage, cs, cs, intrin.projectionParamsSimple.all);
 
     testCi(di, pi);
+
+    // must submit manually
+    depthImage->UpdateDeviceFromHost();
+    pointImage->UpdateDeviceFromHost();
+
     ktestCi << <1, 1 >> >(di, pi);
     
 }
 
 int main(int argc, char** argv)
 {
-    testCameraImage();
-    cudaDeviceSynchronize();
-    // o gives points with twice as large coordinates as the global coordinate system
-    Matrix4f m;
-    m.setIdentity();
-    m.setScale(0.5); // scale down by half to get the global coordinates of the point
-    auto o = new CoordinateSystem(m);
+    if (0) {
+        testCameraImage();
+        cudaDeviceSynchronize();
+        // o gives points with twice as large coordinates as the global coordinate system
+        Matrix4f m;
+        m.setIdentity();
+        m.setScale(0.5); // scale down by half to get the global coordinates of the point
+        auto o = new CoordinateSystem(m);
 
-    testCS(o);
-    ktestCS<<<1,1>>>(o);
-    cudaDeviceSynchronize();
+        testCS(o);
+        ktestCS << <1, 1 >> >(o);
+        cudaDeviceSynchronize();
 
 
-    assert(_fpclass(-0.f) == _FPCLASS_NZ);
-    assert(_fpclass(-0.f * 5.f) == _FPCLASS_NZ);
-    assert(_fpclass(-0.f * -5.f) == _FPCLASS_PZ);
-    assert(-0.f >= 0.f);
-    doit(positive(1.3f));
+        assert(_fpclass(-0.f) == _FPCLASS_NZ);
+        assert(_fpclass(-0.f * 5.f) == _FPCLASS_NZ);
+        assert(_fpclass(-0.f * -5.f) == _FPCLASS_PZ);
+        assert(-0.f >= 0.f);
+        doit(positive(1.3f));
+    }
+
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
     glutInitWindowSize(W, H);

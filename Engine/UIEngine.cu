@@ -37,7 +37,12 @@ void UIEngine::glutKeyUpFunction(unsigned char key, int x, int y)
         break;
     }
 }
+
+char shader[100] = "renderColour" //renderGrey" // renderColour // renderColourFromNormal
+;
+
 #include "fileutils.h"
+#include "visualizeCoordinateSystem.h"
 void UIEngine::glutDisplayFunction()
 {
 	UIEngine *uiEngine = UIEngine::Instance();
@@ -50,6 +55,24 @@ void UIEngine::glutDisplayFunction()
         uiEngine->setFreeviewFromLive();
     }
 
+    auto outputImage = new ITMUChar4Image(uiEngine->freeviewDim);
+    auto outputDepthImage = new ITMFloatImage(uiEngine->freeviewDim);
+
+    uiEngine->mainEngine->GetImage(
+        outputImage, outputDepthImage, 
+        &uiEngine->freeviewPose,
+        &uiEngine->freeviewIntrinsics,
+        shader
+        );
+
+    BeginGLRender(
+        outputImage,
+        outputDepthImage,
+        uiEngine->freeviewIntrinsics,
+        &uiEngine->freeviewPose
+        );
+
+    /*
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glEnable(GL_TEXTURE_2D);
@@ -97,6 +120,14 @@ void UIEngine::glutDisplayFunction()
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 
+    */
+
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
 	glColor3f(1.0f, 0.0f, 0.0f); 
 
 	glRasterPos2f(-0.95f, -0.95f);
@@ -105,6 +136,7 @@ void UIEngine::glutDisplayFunction()
 		KEY_HELP_STR);
 	safe_glutBitmapString(GLUT_BITMAP_HELVETICA_12, (const char*)str);
 
+    glFinish();
 	glutSwapBuffers();
 
     glutKeyUpFunction('n', 0, 0);
@@ -205,8 +237,9 @@ void UIEngine::glutMouseWheelFunction(int button, int dir, int x, int y)
 
 void UIEngine::Initialise(int & argc, char** argv, ImageFileReader *imageSource, ITMMainEngine *mainEngine ) 
 {
-    this->freeviewActive = 1; this->freeviewPose.SetT(Vector3f(0, 0, 100 * voxelSize));
-
+    this->freeviewActive = 1;
+    this->freeviewPose.SetT(Vector3f(0, 0,  100 * voxelSize)); // move back a bit to see something
+    //viewFrustum_max
 	this->imageSource = imageSource;
 	this->mainEngine = mainEngine;
     this->freeviewDim = Vector2i(640, 480);
@@ -227,7 +260,6 @@ void UIEngine::Initialise(int & argc, char** argv, ImageFileReader *imageSource,
     glGenTextures(1, &textureId);
 
     inputRGBImage = new ITMUChar4Image();
-    outputImage = new ITMUChar4Image();
 	inputRawDepthImage = new ITMShortImage();
 
     mouseLastClickPos = Vector2i(0, 0);

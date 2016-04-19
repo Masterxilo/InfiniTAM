@@ -57,6 +57,8 @@ public:
 
 	void GetImage(
         ITMUChar4Image * const out, //!< [in] must be allocated on cuda and host. On exit, host version will be requested image, cuda image undefined. Dimensions must not change from call to call.
+
+        ITMFloatImage * const outDepth,
         const ITMPose * const pose, //!< used for InfiniTAM_IMAGE_FREECAMERA_... image type
         const ITMIntrinsics * const intrinsics,
         std::string shader 

@@ -47,7 +47,7 @@ Beyond that a sliding average is computed.
 /** \brief
 Fallback parameters: consider only parts of the
 scene from @p viewFrustum_min in front of the camera
-to a distance of @p viewFrustum_max. Usually the
+to a distance of @p viewFrustum_max (world-space distance). Usually the
 actual depth range should be determined
 automatically by a ITMLib::Engine::ITMVisualisationEngine.
 */

@@ -22,6 +22,7 @@ CameraImage<Vector4u>* RenderImage(
     const ITMPose *pose,
     const ITMIntrinsics *intrinsics,
     const Vector2i imgSize,
+    ITMFloatImage* const outDepth,
     std::string shader);
 
 RayImage * CreateICPMapsForCurrentView();

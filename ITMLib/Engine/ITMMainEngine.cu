@@ -23,7 +23,7 @@ struct BuildSphere {
         assert(radiusInWorldCoordinates > 0);
 
         // world-space coordinate position of current voxel
-        Vector3f voxelGlobalPos = (vb->getPos().toFloat() * SDF_BLOCK_SIZE + localPos.toFloat()) * voxelSize;
+        Vector3f voxelGlobalPos = globalPoint.location;
 
         // Compute distance to origin
         const float distanceToOrigin = length(voxelGlobalPos);
@@ -88,7 +88,7 @@ void buildSphereScene(const float radiusInWorldCoordinates) {
 // z == (SDF_BLOCK_SIZE / 2)*voxelSize
 // and negative at bigger z.
 struct BuildWall {
-    static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos) {
+    doForEachAllocatedVoxel_process() {
         assert(v);
 
         float z = (threadIdx.z) * voxelSize;
@@ -111,7 +111,7 @@ ITMMainEngine::ITMMainEngine(const ITMRGBDCalib *calib)
     scene = new Scene();
     CURRENT_SCENE_SCOPE(scene);
     
-    buildSphereScene(2 * voxelBlockSize);
+    //buildSphereScene(2 * voxelBlockSize);
     //buildWallScene();
 
     view = new ITMView(calib); // will be allocated by the view builder
@@ -129,10 +129,10 @@ int frameCount = 0;
 Matrix4f cameraMatrices[1000];
 bool computeLighting;
 void estimateLightingModel_();
+void computeArtificialLighting_();
 
 void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDepthImage)
 {
-    return;
 
     assert(rgbImage->noDims.area() > 1);
     assert(rawDepthImage->noDims.area() > 1);
@@ -152,19 +152,87 @@ void ITMMainEngine::ProcessFrame(ITMUChar4Image *rgbImage, ITMShortImage *rawDep
 
     // record camera toGlobal matrix
     cameraMatrices[frameCount++] = view->depthImage->eyeCoordinates->toGlobal;
-    if (computeLighting)
-        estimateLightingModel_();
+    if (computeLighting) {
+        computeArtificialLighting_();
+            estimateLightingModel_();
+    }
 }
+#include "fileutils.h"
+#include <memory>
+
+inline float interpolate(float val, float y0, float x0, float y1, float x1) {
+    return (val - x0)*(y1 - y0) / (x1 - x0) + y0;
+}
+
+inline float base(float val) {
+    if (val <= -0.75f) return 0.0f;
+    else if (val <= -0.25f) return interpolate(val, 0.0f, -0.75f, 1.0f, -0.25f);
+    else if (val <= 0.25f) return 1.0f;
+    else if (val <= 0.75f) return interpolate(val, 1.0f, 0.25f, 0.0f, 0.75f);
+    else return 0.0;
+}
+void DepthToUchar4(ITMUChar4Image *dst, ITMFloatImage *src)
+{
+    assert(dst->noDims == src->noDims);
+    Vector4u *dest = dst->GetData(MEMORYDEVICE_CPU);
+    float *source = src->GetData(MEMORYDEVICE_CPU);
+    int dataSize = static_cast<int>(dst->dataSize);
+    assert(dataSize > 1);
+    memset(dst->GetData(MEMORYDEVICE_CPU), 0, dataSize * 4);
+
+    Vector4u *destUC4;
+    float lims[2], scale;
+
+    destUC4 = (Vector4u*)dest;
+    lims[0] = 100000.0f; lims[1] = -100000.0f;
+
+    for (int idx = 0; idx < dataSize; idx++)
+    {
+        float sourceVal = source[idx]; // only depths greater than 0 are considered
+        if (sourceVal > 0.0f) { lims[0] = MIN(lims[0], sourceVal); lims[1] = MAX(lims[1], sourceVal); }
+    }
+
+    scale = ((lims[1] - lims[0]) != 0) ? 1.0f / (lims[1] - lims[0]) : 1.0f / lims[1];
+    
+    if (lims[0] == lims[1]) 
+        assert(false);
+
+    for (int idx = 0; idx < dataSize; idx++)
+    {
+        float sourceVal = source[idx];
+
+        if (sourceVal > 0.0f)
+        {
+            sourceVal = (sourceVal - lims[0]) * scale;
+
+            destUC4[idx].r = (uchar)(base(sourceVal - 0.5f) * 255.0f);
+            destUC4[idx].g = (uchar)(base(sourceVal) * 255.0f);
+            destUC4[idx].b = (uchar)(base(sourceVal + 0.5f) * 255.0f);
+            destUC4[idx].a = 255;
+        }
+    }
+}
+
 void ITMMainEngine::GetImage(
     ITMUChar4Image * const out,
+    ITMFloatImage * const outDepth,
+
     const ITMPose * const pose, 
     const ITMIntrinsics * const intrinsics,
     std::string shader
     )
 {
     assert(out->noDims.area() > 1);
+    assert(outDepth->noDims == out->noDims);
     CURRENT_SCENE_SCOPE(scene);
-	auto ci = RenderImage(pose, intrinsics, out->noDims, shader);
+	auto ci = RenderImage(pose, intrinsics, out->noDims, outDepth, shader); // <- good place to stop freeze if a current scene should be set
+    
+    assert(outDepth->GetData()[0] >= 0);
+
+    //std::auto_ptr<ITMUChar4Image> cDepth (new ITMUChar4Image(out->noDims));
+    //DepthToUchar4(cDepth.get(), outDepth);
+    //png::SaveImageToFile(cDepth.get(), "cDepth.png");
+
     out->SetFrom(ci->image, MemoryCopyDirection::CUDA_TO_CPU);
     delete ci;
 }

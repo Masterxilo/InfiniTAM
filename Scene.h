@@ -2,9 +2,12 @@
 #include "itmlibdefines.h"
 #include "cudadefines.h"
 #include "hashmap.h"
+#include "coordinateSystem.h"
 
 // see doForEachAllocatedVoxel for T
-#define doForEachAllocatedVoxel_process() static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* v, const Vector3i localPos)
+#define doForEachAllocatedVoxel_process() static GPU_ONLY void process(const ITMVoxelBlock* vb, ITMVoxel* const v, const Vector3i localPos, const Vector3i globalPos, const Point globalPoint)
+
+
 template<typename T>
 KERNEL doForEachAllocatedVoxel(
     ITMVoxelBlock* localVBA,
@@ -14,7 +17,23 @@ KERNEL doForEachAllocatedVoxel(
 
     ITMVoxelBlock* vb = &localVBA[index];
     Vector3i localPos(threadIdx_xyz);
-    T::process(vb, vb->getVoxel(localPos), localPos);
+
+    // signature specified in doForEachAllocatedVoxel_process
+
+    // TODO  an optimization would remove the following computations whose result is not used
+    // in voxel coordinates (as passed to getVoxel of Scene)
+    const Vector3i globalPos = vb->pos.toInt() * SDF_BLOCK_SIZE + localPos;
+
+    // world-space coordinate position of current voxel
+    auto globalPoint = Point(CoordinateSystem::global(),globalPos.toFloat() * voxelSize);
+         
+    T::process(
+        vb, 
+        vb->getVoxel(localPos), 
+        localPos,
+        globalPos, 
+        globalPoint);
+
 }
 
 #define doForEachAllocatedVoxelBlock_process() static GPU_ONLY void process(ITMVoxelBlock* voxelBlock)

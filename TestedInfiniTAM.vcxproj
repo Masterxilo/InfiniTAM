@@ -117,6 +117,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="computeArtificialLighting.h" />
     <ClInclude Include="constructAndSolve.h" />
     <ClInclude Include="Engine\ImageSourceEngine.h" />
     <ClInclude Include="Engine\UIEngine.h" />
@@ -153,6 +154,7 @@
     <ClInclude Include="Utils\MemoryBlock.h" />
     <ClInclude Include="Utils\PlatformIndependence.h" />
     <ClInclude Include="Utils\Vector.h" />
+    <ClInclude Include="visualizeCoordinateSystem.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="CoordinateSystems.cu" />
@@ -188,7 +190,13 @@
     <CudaCompile Include="Utils\FileUtilsPNG.cu" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="computeArtificialLighting.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
     <ClCompile Include="lodepng\lodepng.cpp" />
+    <CudaCompile Include="visualizeCoordinateSystem.cu">
+      <FileType>CppCode</FileType>
+    </CudaCompile>
     <CudaCompile Include="LightingEstimation.cu">
       <FileType>CppCode</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UnitTests|x64'">true</ExcludedFromBuild>
